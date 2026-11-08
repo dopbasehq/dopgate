@@ -1,0 +1,71 @@
+:root {
+  --dopgate-teal: #0d9488;
+  --dopgate-teal-light: #2dd4bf;
+  --dopgate-ink: #0f172a;
+  --vp-c-brand-1: var(--dopgate-teal);
+  --vp-c-brand-2: #0f766e;
+  --vp-c-brand-3: #115e59;
+  --vp-c-brand-soft: rgba(13, 148, 136, 0.14);
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    135deg,
+    var(--dopgate-teal) 0%,
+    #38bdf8 90%
+  );
+}
+
+.dark {
+  --vp-c-brand-1: var(--dopgate-teal-light);
+  --vp-c-brand-2: #5eead4;
+  --vp-c-brand-3: #14b8a6;
+  --vp-c-brand-soft: rgba(45, 212, 191, 0.16);
+}
+
+.VPNavBarTitle .logo {
+  border-radius: 8px;
+  height: 28px;
+  width: 28px;
+}
+
+.VPHero .name,
+.VPHero .text {
+  letter-spacing: -0.04em;
+}
+
+.VPHero .tagline {
+  max-width: 620px;
+}
+
+/* The four-step strip under the home hero. */
+.dopgate-home {
+  margin: 0 auto;
+  max-width: 1152px;
+  padding: 0 24px 48px;
+}
+
+.dopgate-path {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.dopgate-path > div {
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+}
+
+.dopgate-path strong {
+  color: var(--vp-c-brand-1);
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
+}
+
+.dopgate-path span {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+}
