@@ -1,0 +1,12 @@
+node_modules
+.DS_Store
+
+# Rust build output
+app/target
+
+# Local data for `bun run dev`
+.dev-data
+
+# Docs build output
+docs/.vitepress/cache
+docs/.vitepress/dist
