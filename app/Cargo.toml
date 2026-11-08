@@ -1,0 +1,116 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2024"
+# File::try_lock (InstanceLock) is stable from 1.89.
+rust-version = "1.89"
+description = "Self-hosted authentication server: one binary, one SQLite file."
+license = "Apache-2.0"
+
+[[bin]]
+name = "dopgate"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime (required by axum / sqlx)
+tokio = { version = "1", features = [
+  "macros",
+  "rt-multi-thread",
+  "signal",
+  "net",
+] }
+# HTTP server / REST API
+axum = { version = "0.8", default-features = false, features = [
+  "form",
+  "http1",
+  "json",
+  "matched-path",
+  "query",
+  "tokio",
+  "tracing",
+] }
+tower-http = { version = "0.7", features = ["request-id", "timeout", "trace"] }
+# API Documentation
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
+# SQLite driver, connection pool, and runtime migrations
+sqlx = { version = "0.8", default-features = false, features = [
+  "sqlite",
+  "runtime-tokio",
+  "migrate",
+  "macros",
+  "json",
+] }
+# CLI subcommands (serve, init, ...)
+clap = { version = "4", features = ["derive"] }
+anstream = "1"
+anstyle = "1"
+inquire = "0.9"
+# Serialization for the REST API
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+url = "2"
+# HTTP client for the OpenID Connect relying party
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "rustls-tls",
+  "rustls-tls-native-roots",
+] }
+# Master-key encryption (authenticated encryption)
+chacha20poly1305 = "0.10"
+# Password hashing
+argon2 = "0.5"
+# Timestamps (audit records, token metadata)
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"
+base64 = "0.22"
+hex = "0.4"
+getrandom = "0.3"
+mime_guess = "2"
+rust-embed = "8"
+sha2 = "0.10"
+subtle = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ulid = { version = "1", features = ["serde"] }
+zeroize = "1"
+# OpenID Connect relying party for single sign-on. Uses the reqwest client
+# above; discovery, PKCE, nonce, and ID token checks come from the crate.
+openidconnect = { version = "4", default-features = false, features = [
+  "reqwest",
+] }
+# Outgoing email over SMTP. rustls with ring and the system roots, like the
+# reqwest client above.
+lettre = { version = "0.11.23", default-features = false, features = [
+  "builder",
+  "hostname",
+  "smtp-transport",
+  "tokio1-rustls",
+  "ring",
+  "rustls-native-certs",
+] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+tempfile = "3"
+
+[profile.release]
+opt-level = "z"
+strip = "symbols"
+lto = "thin"
+codegen-units = 1
+
+# The release build optimizes for size, which makes Argon2 about 25% slower.
+# Password hashing runs on every sign-in, so its crates get full speed.
+[profile.release.package.argon2]
+opt-level = 3
+
+[profile.release.package.blake2]
+opt-level = 3
+
+# Stripping proc-macro dylibs on macOS 27 can leave a misaligned LINKEDIT
+# string pool that dyld refuses to load (seen with sqlx-macros). Only the
+# release binary needs stripping.
+[profile.release.build-override]
+strip = false

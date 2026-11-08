@@ -1,0 +1,17 @@
+pub const ALREADY_INITIALIZED: &str = "ALREADY_INITIALIZED";
+pub const AUTHENTICATION_INVALID: &str = "AUTHENTICATION_INVALID";
+pub const AUTHENTICATION_REQUIRED: &str = "AUTHENTICATION_REQUIRED";
+pub const AUTHORIZATION_DENIED: &str = "AUTHORIZATION_DENIED";
+pub const EMAIL_INVALID: &str = "EMAIL_INVALID";
+pub const INTERNAL_ERROR: &str = "INTERNAL_ERROR";
+pub const NOT_IMPLEMENTED: &str = "NOT_IMPLEMENTED";
+pub const PASSWORD_INVALID: &str = "PASSWORD_INVALID";
+pub const RATE_LIMITED: &str = "RATE_LIMITED";
+pub const REQUEST_INVALID: &str = "REQUEST_INVALID";
+pub const SETTINGS_INVALID: &str = "SETTINGS_INVALID";
+pub const SETUP_TOKEN_INVALID: &str = "SETUP_TOKEN_INVALID";
+pub const SMTP_NOT_CONFIGURED: &str = "SMTP_NOT_CONFIGURED";
+pub const SMTP_SEND_FAILED: &str = "SMTP_SEND_FAILED";
+
+pub const EMAIL_INVALID_MESSAGE: &str = "Enter a valid email address.";
+pub const NOT_IMPLEMENTED_MESSAGE: &str = "This endpoint is planned but not built yet.";
