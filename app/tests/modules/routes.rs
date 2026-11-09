@@ -1,6 +1,6 @@
-//! Every route in the OpenAPI document answers. The public list comes from
-//! the document itself, so a new public route without an entry here fails
-//! `public_routes_are_all_listed`.
+//! Every route in the OpenAPI document, and every planned route hidden from
+//! it, answers. The public list comes from those documents, so a new public
+//! route without an entry here fails `public_routes_are_all_listed`.
 
 use std::collections::BTreeSet;
 
@@ -91,13 +91,19 @@ fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
   ]
 }
 
-/// Every `(method, path)` in the OpenAPI document, split by whether it needs
-/// a bearer token.
+/// Every `(method, path)` in the served OpenAPI document plus the planned
+/// modules hidden from it, split by whether it needs a bearer token.
 async fn documented_routes(app: &TestApp) -> (Vec<(String, String)>, Vec<(String, String)>) {
-  let (_, doc) = app.request(Method::GET, "/api/v1/openapi.json", None).await;
+  let (_, served) = app.request(Method::GET, "/api/v1/openapi.json", None).await;
+  let planned = serde_json::to_value(app::modules::planned_openapi()).unwrap();
   let mut protected = Vec::new();
   let mut public = Vec::new();
-  for (path, item) in doc["paths"].as_object().unwrap() {
+  let paths = served["paths"]
+    .as_object()
+    .unwrap()
+    .iter()
+    .chain(planned["paths"].as_object().unwrap());
+  for (path, item) in paths {
     for (method, operation) in item.as_object().unwrap() {
       let needs_bearer = operation["security"].as_array().is_some_and(|options| {
         options

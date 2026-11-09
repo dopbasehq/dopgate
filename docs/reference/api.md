@@ -412,7 +412,7 @@ Admin. Recomputes the hash chain and answers `200 AUDIT_CHAIN_VERIFIED` with `ok
 
 ## Planned endpoints
 
-These are part of the API description and answer `501 NOT_IMPLEMENTED` after their authentication check.
+These routes exist but answer `501 NOT_IMPLEMENTED` after their authentication check. They are left out of the Swagger UI at `/api/docs` and `/api/v1/openapi.json` until they work.
 
 | Endpoint | Auth | Feature |
 | --- | --- | --- |
@@ -427,4 +427,4 @@ These are part of the API description and answer `501 NOT_IMPLEMENTED` after the
 | `GET`, `POST /api/v1/admin/sso/providers` | Admin | List and add providers |
 | `GET`, `PATCH`, `DELETE /api/v1/admin/sso/providers/{id}` | Admin | Read, change, and remove a provider |
 
-`GET /api/v1/admin/sso/presets` (Admin) already works and returns the provider presets with `id`, `label`, `buttonLabel`, `issuer`, and `hint`.
+`GET /api/v1/admin/sso/presets` (Admin) already works and returns the provider presets with `id`, `label`, `buttonLabel`, `issuer`, and `hint`. It stays out of the API docs with the rest of single sign-on.

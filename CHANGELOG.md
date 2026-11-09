@@ -43,5 +43,5 @@ with an admin console and Docker images. Nothing below has shipped before.
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
 - A `Dockerfile` and a `docker-compose.yml` with PostgreSQL and Dopgate.
 - Documentation site and README for the setup above.
-- Single sign-on and MFA routes are listed in the API and answer
-  `501 NOT_IMPLEMENTED` until they are built.
+- Single sign-on and MFA routes answer `501 NOT_IMPLEMENTED` until they are
+  built. They are hidden from the API docs at `/api/docs` for now.

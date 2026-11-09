@@ -34,6 +34,8 @@ pub fn routes() -> Router<AppState> {
     .merge(audit::routes())
 }
 
+/// The API description served at `/api/docs`. It lists only modules that
+/// work today; planned ones live in [`planned_openapi`] until they are built.
 pub fn openapi() -> OpenApi {
   let mut doc = health::doc::build();
   doc.merge(bootstrap::doc::build());
@@ -41,12 +43,18 @@ pub fn openapi() -> OpenApi {
   doc.merge(recovery::doc::build());
   doc.merge(verification::doc::build());
   doc.merge(sessions::doc::build());
-  doc.merge(mfa::doc::build());
-  doc.merge(sso::doc::build());
   doc.merge(users::doc::build());
   doc.merge(keys::doc::build());
   doc.merge(settings::doc::build());
   doc.merge(email_templates::doc::build());
   doc.merge(audit::doc::build());
+  doc
+}
+
+/// Modules whose routes exist but answer `501 NOT_IMPLEMENTED`. Kept out of
+/// the served docs; move a module into [`openapi`] once it works.
+pub fn planned_openapi() -> OpenApi {
+  let mut doc = mfa::doc::build();
+  doc.merge(sso::doc::build());
   doc
 }

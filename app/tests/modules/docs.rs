@@ -4,10 +4,10 @@ use axum::http::{Method, StatusCode};
 
 use crate::support::TestApp;
 
-/// Every module shows up in the OpenAPI document, placeholders included,
-/// with the security schemes the routes refer to.
+/// Every working module shows up in the OpenAPI document, with the security
+/// schemes the routes refer to. Planned modules that answer 501 stay hidden.
 #[tokio::test]
-async fn openapi_lists_every_module() {
+async fn openapi_lists_working_modules_only() {
   let app = TestApp::new().await;
   let (status, body) = app.request(Method::GET, "/api/v1/openapi.json", None).await;
   assert_eq!(status, StatusCode::OK);
@@ -26,8 +26,6 @@ async fn openapi_lists_every_module() {
     "recovery",
     "verification",
     "sessions",
-    "mfa",
-    "sso",
     "users",
     "keys",
     "settings",
@@ -41,6 +39,16 @@ async fn openapi_lists_every_module() {
   for removed in ["clients", "oidc", "backups"] {
     assert!(!tags.contains(removed), "{removed} should be gone");
   }
+  for planned in ["mfa", "sso"] {
+    assert!(!tags.contains(planned), "{planned} is not built yet");
+  }
+  let paths = body["paths"].as_object().unwrap();
+  assert!(
+    paths
+      .keys()
+      .all(|path| !path.contains("/mfa/") && !path.contains("/sso/")),
+    "planned routes leaked into the docs"
+  );
 }
 
 /// Handlers share names such as `list` across modules; the document still
