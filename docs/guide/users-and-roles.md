@@ -1,40 +1,65 @@
 ---
 title: "Users and roles"
-description: "The root, admin, and member roles in dopgate, what each can do, and where to keep app-specific data about a user."
+description: "The three roles in Dopgate, what root, admins, members, and the service key may do, and how accounts are created, disabled, and deleted."
 ---
 
 # Users and roles
 
-Every account in dopgate is a row in one `users` table, whatever its role. An account has an email, an optional password, a display name and avatar, a status, and two JSON metadata objects.
+Everyone who signs in to Dopgate has one account, identified by an ID with the `usr_` prefix. Each account has one of three roles.
 
-## Roles
-
-| Role | Who | Can do |
+| Role | Who it is for | What it may do |
 | --- | --- | --- |
-| `root` | The instance owner. Exactly one exists, created at setup. | Everything, including backups, restores, and key rotation. Nobody can change or delete root through the API. |
-| `admin` | People who run the user base. | Manage users, clients, settings, single sign-on, and read the audit log. They cannot touch root. |
-| `member` | The people who use your apps. | Manage their own account and sessions. |
+| `root` | The instance owner. Exactly one exists. | Everything admins can do, plus manage admins, change roles, and rotate signing keys. |
+| `admin` | People who run the app. | Use the admin API and the console: manage members, settings, email templates, and read keys and the audit log. |
+| `member` | The end users of your app. | Sign in and manage their own account through `/api/v1/auth/*`. |
 
-A backend that calls the admin API with a client secret key acts like an admin. See [Clients](/guide/clients).
+Your backend can also call the admin API with the [service key](/guide/admin-api). The service key acts as an admin. It has no account, so it can't call the endpoints for a signed-in user, and it never acts as root.
 
-The access token carries the role in its `role` claim, so your backend can tell admins from members without a lookup.
+## Who can manage whom
 
-::: warning Planned
-User management through the admin API arrives in phase 1. Today the only account you can create is root, with `dopgate init` or the setup token.
-:::
+| Actor | Members | Admins | Root |
+| --- | --- | --- | --- |
+| Root | Yes | Yes | No, root is protected from the API |
+| Admin | Yes | No | No |
+| Service key | Yes | No | No |
 
-## Status
+"Manage" covers updating, disabling, enabling, deleting, ending sessions, and sending a password reset code. Admins can still list and read every account, root included. Only root creates admins or changes an account's role.
 
-An account is `active` or `disabled`. Disabling an account refuses new sign-ins and ends its sessions; access tokens already issued stop working when they expire, within minutes.
+Trying to change root through the admin API answers `403 ROOT_PROTECTED`. Root changes its own profile, password, and email through the same `/auth` endpoints any user has.
 
-After too many failed passwords an account is locked for a while. That is separate from status and clears by itself.
+## Creating accounts
 
-## Metadata
+Accounts come from four places:
 
-`publicMetadata` is a JSON object the user can read and your app can show, such as a plan name or a preferred language. `privateMetadata` is only visible to admins and backends with a secret key, for things like an internal customer ID.
+- Sign-up through `POST /api/v1/auth/signup`, when sign-up is on. New accounts are always members.
+- A first sign-in by emailed code for an unknown email, when **passwordless sign-up** is on. See [Sign-in with a password or a code](/guide/sign-in).
+- `POST /api/v1/admin/users`, from the console or your backend. No email is sent. Leave out `password` for an account that signs in with codes only, and set `emailVerified: true` to skip verification.
+- The root account, created at setup. See [the quick start](/guide/quick-start) and [`dopgate init`](/cli/commands#init).
 
-Keep metadata small. For anything that grows, such as permissions per project, use your own database and key it by the user ID.
+```bash
+curl -X POST https://auth.example.com/api/v1/admin/users \
+  -H "authorization: Bearer $DOPGATE_SERVICE_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"email":"sam@example.com","displayName":"Sam","emailVerified":true}'
+```
 
-## IDs
+Emails are stored lowercased and must be unique. A second account with the same email answers `409 EMAIL_TAKEN`.
 
-User IDs look like `usr_01M5X911APKT75KDR5RGZNTT33`. They never change, so use them, never the email, as the foreign key in your own tables. Emails are stored lowercased and compared without regard to case.
+## Account status
+
+An account is `active` or `disabled`. Disabling it (`POST /api/v1/admin/users/{id}/disable`) ends every session at once and refuses new sign-ins with `403 ACCOUNT_DISABLED`. Dopgate also refuses the account's access tokens right away, but a backend that verifies tokens offline accepts the last one until it expires. Enable the account again with `POST /api/v1/admin/users/{id}/enable`.
+
+## Deleting accounts
+
+`DELETE /api/v1/admin/users/{id}` removes the account, its sessions, and its codes, and answers `204`. The audit log keeps a `user.deleted` event with the email and role. The same email can sign up again later as a new account with a new ID, so clean up your own rows keyed by the old `sub`.
+
+## Listing and searching
+
+`GET /api/v1/admin/users` returns accounts newest first, 50 per page by default and at most 200. Filter with `search` (matches the email or display name), `role`, and `status`, and pass `nextCursor` back as `cursor` for the next page.
+
+```bash
+curl "https://auth.example.com/api/v1/admin/users?search=ana&role=member&limit=20" \
+  -H "authorization: Bearer $DOPGATE_SERVICE_KEY"
+```
+
+Admins see two fields users don't: `privateMetadata` and `lockedUntil`, which is set while the account is [locked out](/guide/rate-limits#account-lockout).

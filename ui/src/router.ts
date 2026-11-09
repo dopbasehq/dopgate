@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { guard } from "./router.guards";
 
-/** Route table for the dopgate admin console. */
+/** Route table for the Dopgate admin console. */
 export const router = createRouter({
   history: createWebHistory(),
   routes: [

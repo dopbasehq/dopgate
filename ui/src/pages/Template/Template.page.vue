@@ -198,7 +198,7 @@ const tabClass = (active: boolean) =>
     <DgConfirmDialog
       :open="resetOpen"
       title="Reset to the built-in template?"
-      description="Your changes to this email are deleted and dopgate goes back to sending the built-in version."
+      description="Your changes to this email are deleted and Dopgate goes back to sending the built-in version."
       confirm-label="Reset"
       :loading="busy === 'reset'"
       @confirm="confirmReset"

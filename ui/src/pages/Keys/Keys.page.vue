@@ -35,7 +35,7 @@ const LABELS = { active: "Active", retiring: "Retiring", retired: "Retired" };
     <div class="page-width flex flex-col gap-5 py-6 lg:py-8">
       <PageHeader
         title="Signing keys"
-        subtitle="The keys that sign access tokens. Apps check tokens with the public keys dopgate publishes under /.well-known.">
+        subtitle="The keys that sign access tokens. Apps check tokens with the public keys Dopgate publishes under /.well-known.">
         <template v-if="canRotate" #actions>
           <DgButton data-testid="rotate-key" @click="askRotate">
             <RefreshIcon class="h-4 w-4" />

@@ -1,72 +1,66 @@
 ---
 title: "Email (SMTP)"
-description: "Connect dopgate to an SMTP server so it can send verification codes, sign-in links, and password resets."
+description: "Connect Dopgate to an SMTP server with DOPGATE_SMTP_* variables, check it with a test email, and read codes from the log during development."
 ---
 
 # Email (SMTP)
 
-::: warning Partly built
-dopgate stores SMTP settings and sends mail through them. The admin endpoints below answer `501` until access tokens land in phase 2, because nothing can verify an admin token before then. Until then, set SMTP in [`server.toml`](#in-server-toml). The emails themselves (verification codes, sign-in links, password resets) arrive with the rest of phase 3.
-:::
+Dopgate sends six kinds of email: verification codes, sign-in codes, password reset codes, email change codes, and two notices. It talks to any SMTP server, your own or a provider such as Amazon SES, Postmark, Mailgun, or Resend.
 
-dopgate sends mail for email verification, passwordless sign-in, and password resets. It talks to any SMTP server: your own, or a provider such as Amazon SES, Postmark, Mailgun, or Resend.
+SMTP is set with environment variables, or the `[smtp]` table of the [config file](/self-hosting/configuration#config-file), and read at startup. The admin API and the console only show the SMTP settings; they can't change them. A `PATCH /api/v1/admin/settings` that includes `smtp` answers `422 SETTINGS_INVALID`.
 
-There are two places to set SMTP. Runtime settings change through the admin API without a restart. `server.toml` and `DOPGATE_SMTP_*` variables are read at startup. When both have a host, the runtime settings win.
-
-## Runtime settings
+## Variables
 
 ```bash
-curl -X PATCH https://auth.example.com/api/v1/admin/settings \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"smtp":{"host":"smtp.example.com","port":587,"username":"dopgate","password":"...","security":"starttls","fromEmail":"no-reply@example.com","fromName":"Example"}}'
+DOPGATE_SMTP_HOST=smtp.example.com
+DOPGATE_SMTP_PORT=587
+DOPGATE_SMTP_SECURITY=starttls
+DOPGATE_SMTP_USERNAME=dopgate
+DOPGATE_SMTP_PASSWORD=change-me
+DOPGATE_SMTP_FROM_EMAIL=no-reply@example.com
+DOPGATE_SMTP_FROM_NAME=Acme
 ```
 
-| Field | Meaning |
+| Variable | Meaning |
 | --- | --- |
-| `host` | Host name or IP address, without a scheme or port. |
-| `port` | Defaults to the usual port for `security`: 587, 465, or 25. |
-| `security` | `starttls` (the default), `tls` for TLS from the first byte, or `none` for a relay on the same host or a private network. |
-| `username`, `password` | Optional. dopgate signs in only when a username is set. |
-| `fromEmail` | The sender address. Required while `host` is set. |
-| `fromName` | Optional display name for the sender. |
+| `DOPGATE_SMTP_HOST` | Host name or IP address, with no scheme, port, or `@`. Leave it empty to write emails to the log. |
+| `DOPGATE_SMTP_PORT` | Defaults to the usual port for the security mode: 587 for `starttls`, 465 for `tls`, 25 for `none`. |
+| `DOPGATE_SMTP_SECURITY` | `starttls` (the default) upgrades a plain connection. `tls` uses TLS from the first byte. `none` sends unencrypted, only for a relay on the same host or a private network. |
+| `DOPGATE_SMTP_USERNAME` | Optional. Dopgate signs in to the server only when a username is set. |
+| `DOPGATE_SMTP_PASSWORD` | The password for that username. Spaces are kept. |
+| `DOPGATE_SMTP_FROM_EMAIL` | The sender address. Required when a host is set. |
+| `DOPGATE_SMTP_FROM_NAME` | Optional display name for the sender, such as your app's name. |
 
-Fields you leave out keep their saved value. An empty string clears `host`, `username`, `password`, `fromEmail`, or `fromName`. Clearing `host` hands mail back to `server.toml`, or to the server log when that has no host either.
+Empty values count as unset. A bad value stops Dopgate at startup with a message that names it: a host with a port or scheme in it, a host without a from address, an unknown security mode, or a username or name with a line break.
 
-The password is encrypted with the master key and never returned. `GET /api/v1/admin/settings` shows `passwordSet` instead, and `smtp.source` says where mail goes right now: `settings`, `server_config`, or `log`. Every change is recorded in the audit log as `settings.updated`, without the values.
+Dopgate checks the server's certificate against the trusted roots of the image and waits up to 15 seconds for each SMTP command.
 
-## In server.toml
+## Check it with a test email
 
-The generated `server.toml` has a commented `[smtp]` table. Uncomment the header and the lines you need, then restart:
-
-```toml
-[smtp]
-host = "smtp.example.com"
-security = "starttls"
-port = 587
-username = "dopgate"
-password = "change-me"
-from_email = "no-reply@example.com"
-from_name = "Example"
-```
-
-The fields mean the same as above, in snake case. Each one also has an environment variable, which wins over the file: `DOPGATE_SMTP_HOST`, `DOPGATE_SMTP_PORT`, `DOPGATE_SMTP_SECURITY`, `DOPGATE_SMTP_USERNAME`, `DOPGATE_SMTP_PASSWORD`, `DOPGATE_SMTP_FROM_EMAIL`, and `DOPGATE_SMTP_FROM_NAME`. An empty variable clears the file's value.
-
-dopgate writes `server.toml` readable only by its owner, but the password sits there in plain text. To keep it out of the file, set `DOPGATE_SMTP_PASSWORD` instead. A bad value, such as a host with a port in it or a host without `from_email`, stops the server at startup with a message naming the field.
-
-dopgate checks the server certificate against the operating system's trusted roots.
-
-## Test the settings
+From the console, open **Settings** and use **Send a test email** in the SMTP section. From the API:
 
 ```bash
 curl -X POST https://auth.example.com/api/v1/admin/settings/smtp/test \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d '{"to":"you@example.com"}'
 ```
 
-This sends a short message through whichever SMTP server is in use, runtime settings or `server.toml`. If the server refuses it or cannot be reached, the response is `502 SMTP_SEND_FAILED` with the server's answer in the message. Without a host it answers `400 SMTP_NOT_CONFIGURED`.
+Without `to`, the message goes to the signed-in admin's own email. The service key has no email, so it must give `to`.
+
+| Answer | Meaning |
+| --- | --- |
+| `200 SMTP_TEST_SENT` | The SMTP server accepted the message. |
+| `400 SMTP_NOT_CONFIGURED` | No host or no from address is set. |
+| `400 EMAIL_INVALID` | `to` is not a valid address, or the service key left it out. |
+| `502 SMTP_SEND_FAILED` | The server refused the message or couldn't be reached. The message holds the server's answer. |
+
+`GET /api/v1/admin/settings` returns the settings in use under `smtp`, without the password: `host`, `port`, `security`, `username`, `passwordSet`, `fromEmail`, `fromName`, and `source`. `source` is `server_config` when a host is set and `log` when it isn't.
 
 ## Without SMTP
 
-With no SMTP host in either place, dopgate writes each message to the server log instead of sending it. That is enough for local development: the code or link is right there in the terminal.
+With no host, Dopgate writes each email's recipient, subject, and plain text to its log at the `info` level instead of sending it. That covers local development: the 6-digit code is right there in the terminal or in `docker compose logs dopgate`. Don't run a public instance this way, since anyone who can read the logs can read the codes.
+
+## Failures don't block requests
+
+Dopgate sends emails in the background. A sign-up, a code request, or a password reset answers right away, and a failed send is written to the log with the template name and recipient. Watch the log after changing SMTP settings, or use the test email above.
