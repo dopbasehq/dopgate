@@ -47,8 +47,9 @@ with an admin console and Docker images. Nothing below has shipped before.
   from `DOPGATE_SERVICE_KEY`. The sender defaults to `no-reply@dopgate.com`.
 - A hash-chained audit log with retention (`DOPGATE_AUDIT_RETENTION_DAYS`,
   365 days by default) and a verify endpoint.
-- The admin console at `/`: users, email templates, settings, signing keys,
-  audit log, and your account.
+- The admin console at `/`: users, admins, email templates, settings,
+  signing keys, audit log, and your account. Admins sign in to it at
+  `/api/v1/console`; your app's users can't.
 - The Dopgate brand: the Hash D logo, Gate Red, and the Geist wordmark across
   the console, docs, README, and favicons.
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
