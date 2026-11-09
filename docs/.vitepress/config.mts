@@ -232,6 +232,7 @@ const config = defineConfig({
           items: [
             { text: "Tokens and sessions", link: "/guide/tokens-and-sessions" },
             { text: "Personal tokens", link: "/guide/personal-tokens" },
+            { text: "Agents", link: "/guide/agents" },
             { text: "Calling the admin API", link: "/guide/admin-api" },
             { text: "Email templates", link: "/guide/email-templates" },
             { text: "Rate limits and lockout", link: "/guide/rate-limits" },

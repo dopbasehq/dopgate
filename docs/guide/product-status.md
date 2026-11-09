@@ -23,6 +23,7 @@ This page lists what works in Dopgate {{version}}. Planned endpoints already exi
 | User management | `/api/v1/admin/users` and everything under it |
 | Admin management | `/api/v1/admin/admins` and everything under it |
 | Personal tokens | `/api/v1/auth/personal-tokens`, `/api/v1/auth/token`, `/api/v1/admin/users/{id}/personal-tokens` |
+| Agents | `/api/v1/auth/agents`, `/api/v1/admin/agents`, and agent tokens at `/api/v1/auth/token` |
 | Settings | `/api/v1/admin/settings`, `/api/v1/admin/settings/smtp/test` |
 | Email templates | `/api/v1/admin/email-templates` and everything under it |
 | Audit log with hash chain and retention | `/api/v1/admin/audit-events`, `/api/v1/admin/audit-events/verify` |

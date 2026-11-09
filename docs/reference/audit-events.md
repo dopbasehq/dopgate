@@ -64,7 +64,18 @@ A failed sign-in for an email with no account isn't recorded, because there is n
 | `personal_token.deleted` | The user, or the admin who revoked it | `name`, and `userId` when an admin revoked it |
 | `token.rejected` | `anonymous`, label `token` | `kind` (`personal` or `unknown`) and `lastFour`. A token traded at `/auth/token` matched nothing. |
 
-Successful trades aren't recorded; they update the token's `lastUsedAt`, at most once a minute.
+### Agents
+
+| Action | Actor | Metadata |
+| --- | --- | --- |
+| `agent.created` | The owner, an admin or a user | `name`; the agent is the resource |
+| `agent.updated` | The owner | `fields` that changed |
+| `agent.token_regenerated` | The owner | `name` |
+| `agent.disabled`, `agent.enabled` | The owner or an admin | `name`, `ownerId` |
+| `agent.deleted` | The owner or an admin | `name`, `ownerId` |
+| `agent.token_rejected` | `anonymous`, label `token` | `kind` (`agent`) and `lastFour`. A `dga_` token matched no agent. |
+
+Successful trades of personal and agent tokens aren't recorded; they update `lastUsedAt`, at most once a minute.
 
 ### Sessions
 
