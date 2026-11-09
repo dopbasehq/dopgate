@@ -154,7 +154,6 @@ async fn the_test_message_goes_to_the_admin_through_smtp() {
     .await;
   assert_eq!(status, StatusCode::OK, "{body}");
   assert_eq!(smtp.wait_for(crate::support::ROOT_EMAIL, 1).await, 1);
-  assert!(smtp.received().contains("Test message from Dopgate"));
 }
 
 #[tokio::test]

@@ -90,6 +90,19 @@ pub async fn find_by_id(
     .await
 }
 
+/// Lock the row for the rest of the transaction.
+pub async fn find_by_id_for_update(
+  connection: &mut PgConnection,
+  id: &str,
+) -> Result<Option<UserRow>, sqlx::Error> {
+  sqlx::query_as(&format!(
+    "SELECT {COLUMNS} FROM users WHERE id = $1 FOR UPDATE"
+  ))
+  .bind(id)
+  .fetch_optional(connection)
+  .await
+}
+
 /// `email` must already be normalized.
 pub async fn find_by_email(
   executor: impl PgExecutor<'_>,
@@ -133,6 +146,19 @@ pub async fn insert(
   .await
 }
 
+pub async fn mark_verified(
+  executor: impl PgExecutor<'_>,
+  id: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query(
+    "UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()), updated_at = now() WHERE id = $1",
+  )
+  .bind(id)
+  .execute(executor)
+  .await
+  .map(|_| ())
+}
+
 /// Record a successful sign-in and clear failed attempts.
 pub async fn record_sign_in(
   executor: impl PgExecutor<'_>,
@@ -160,6 +186,20 @@ pub async fn set_password(
   .execute(executor)
   .await
   .map(|_| ())
+}
+
+pub async fn set_email(
+  executor: impl PgExecutor<'_>,
+  id: &str,
+  email: &str,
+) -> Result<UserRow, sqlx::Error> {
+  sqlx::query_as(&format!(
+    "UPDATE users SET email = $2, email_verified_at = now(), updated_at = now() WHERE id = $1 RETURNING {COLUMNS}"
+  ))
+  .bind(id)
+  .bind(email)
+  .fetch_one(executor)
+  .await
 }
 
 /// The profile fields a user or an admin changes. `None` leaves a field as

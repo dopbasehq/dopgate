@@ -43,30 +43,29 @@ fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
       401,
     ),
     ("POST", "/api/v1/auth/logout", Some(json!({})), 401),
-    // Codes arrive with email verification.
     (
       "POST",
       "/api/v1/auth/password/forgot",
-      Some(json!({"email": "user@example.com", "method": "otp"})),
-      501,
+      Some(json!({"email": "user@example.com"})),
+      200,
     ),
     (
       "POST",
       "/api/v1/auth/password/reset",
-      Some(json!({"token": "dgl_x", "newPassword": "correct-horse"})),
-      501,
+      Some(json!({"email": "user@example.com", "code": "123456", "newPassword": "correct-horse"})),
+      400,
     ),
     (
       "POST",
       "/api/v1/auth/verification/send",
-      Some(json!({"email": "user@example.com", "purpose": "email_verify", "method": "link"})),
-      501,
+      Some(json!({"email": "user@example.com", "purpose": "email_verify"})),
+      200,
     ),
     (
       "POST",
       "/api/v1/auth/verification/confirm",
       Some(json!({"purpose": "login", "email": "user@example.com", "code": "123456"})),
-      501,
+      400,
     ),
     // Planned features.
     (
@@ -136,7 +135,7 @@ async fn protected_routes_refuse_missing_and_bad_tokens() {
   let app = TestApp::new().await;
   let (protected, _) = documented_routes(&app).await;
   assert!(
-    protected.len() >= 25,
+    protected.len() >= 30,
     "only {} protected routes",
     protected.len()
   );

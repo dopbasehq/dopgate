@@ -31,6 +31,7 @@ async fn openapi_lists_every_module() {
     "users",
     "keys",
     "settings",
+    "email-templates",
     "audit",
   ] {
     assert!(tags.contains(tag), "missing tag {tag}");
