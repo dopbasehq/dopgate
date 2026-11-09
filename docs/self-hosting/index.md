@@ -1,33 +1,54 @@
 ---
 title: "Self-hosting"
-description: "What a dopgate server needs and how to put it on the internet."
+description: "What a Dopgate deployment looks like: one container, one PostgreSQL schema, a public URL, and a few environment variables."
 ---
 
 # Self-hosting
 
-A dopgate server is one binary and one data directory. It needs no database server, no cache, and no queue.
+A Dopgate deployment is a PostgreSQL database and one Dopgate container. Dopgate keeps no files on disk: accounts, sessions, codes, signing keys, settings, templates, and the audit log all live in its PostgreSQL schema. You can restart, replace, or move the container freely as long as it points at the same database.
 
-## The data directory
+```mermaid
+flowchart LR
+    accTitle: A Dopgate deployment
+    accDescr: Browsers and your backend reach Dopgate through a reverse proxy over HTTPS. Dopgate stores everything in the Dopgate schema of the PostgreSQL database your app also uses.
 
-`~/.dopgate` by default, or whatever `--data-dir` or `DOPGATE_DATA_DIR` names:
+    USERS["Your frontend"] -->|"HTTPS"| PROXY["Reverse proxy"]
+    PROXY --> GATE["dopgate container"]
+    BACKEND["Your backend"] -->|"JWKS, admin API"| GATE
+    GATE --> PG[("PostgreSQL: dopgate schema")]
+    BACKEND --> APPDB[("PostgreSQL: your schema")]
 
-| File | What it is |
-| --- | --- |
-| `dopgate.db` | The SQLite database, with `-wal` and `-shm` files next to it while running. |
-| `master.key` | 32 random bytes that encrypt secrets in the database. See [Encryption keys](/self-hosting/encryption-keys). |
-| `server.toml` | Server configuration. See [Server configuration](/cli/configuration). |
-| `dopgate.db.lock` | Stops a second server from opening the same database. |
-| `audit-archive/` | Audit records moved out by retention. |
-| `backups/` | Backups, once that feature lands. |
+    classDef app fill:#fff1f2,color:#18181b,stroke:#d4213a,stroke-width:2px;
+    classDef gate fill:#18181b,color:#ffffff,stroke:#ff4053,stroke-width:2px;
+    class USERS,PROXY,BACKEND,PG,APPDB app;
+    class GATE gate;
+```
 
-dopgate creates the directory with mode `0700` and the database and key with mode `0600`.
+## What you need
 
-## Exposing the server
+- PostgreSQL. The Compose file and the test suite use PostgreSQL 17.
+- A host name for Dopgate, such as `auth.example.com`, served over HTTPS. Dopgate serves the console at `/` and the API under `/api`, so give it its own host name instead of a path on your app's site.
+- An SMTP server for real email. Without one, emails go to the log.
 
-dopgate speaks plain HTTP. In production, put it behind a reverse proxy that terminates TLS, and:
+## What you set
 
-- Set `public_url` to the HTTPS address. Tokens, links, and single sign-on depend on it.
-- Bind to `127.0.0.1` if the proxy runs on the same machine.
-- Add the proxy's address to `trusted_proxies`, so rate limits and the audit log see the real client address.
+At minimum, set `DOPGATE_DATABASE_URL` and `DOPGATE_PUBLIC_URL`. For a real deployment you will also want `DOPGATE_ALLOWED_ORIGINS`, `DOPGATE_SERVICE_KEY`, `DOPGATE_ROOT_EMAIL`, `DOPGATE_TRUSTED_PROXIES` if a proxy sits in front, and the SMTP variables. [Environment variables](/reference/environment-variables) lists them all.
 
-See [Running in production](/self-hosting/operations) for a proxy example and a systemd unit.
+## Pages in this section
+
+- [Docker image](/self-hosting/docker): build it, run it, and use it for one-off commands.
+- [Running with your app's stack](/self-hosting/with-your-app): add Dopgate to your app's Compose file and put a proxy in front.
+- [PostgreSQL and the schema](/self-hosting/postgres): how the schema works and how to give Dopgate its own role.
+- [Email (SMTP)](/self-hosting/smtp): send real email.
+- [Configuration](/self-hosting/configuration): environment variables, the optional TOML file, and the order they apply in.
+- [Backups](/self-hosting/backups): `pg_dump --schema=dopgate` and restoring.
+- [Upgrading](/self-hosting/upgrading): new versions and migrations.
+- [Security checklist](/self-hosting/security-checklist): what to check before going live.
+
+## Logs and health
+
+Dopgate logs to standard error. `RUST_LOG` sets the level, `app=info,tower_http=warn` in the image. Every response carries an `X-Request-Id` header. Your app can log it next to its own errors.
+
+`GET /api/v1/health` answers `200` with `"status": "ok"` while the database answers, and `503` with `"status": "degraded"` and `"database": "unavailable"` while it doesn't. The image's health check runs [`dopgate healthcheck`](/cli/commands#healthcheck) against it every 15 seconds.
+
+On startup and shutdown, and whenever someone verifies the audit chain, Dopgate writes the head of the audit chain to the log as an `audit checkpoint`. Keep your logs somewhere outside the database so those checkpoints can later prove the log wasn't rewritten. See [Audit events](/reference/audit-events#verifying-the-chain).
