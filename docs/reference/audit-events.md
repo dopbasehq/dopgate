@@ -1,36 +1,135 @@
 ---
 title: "Audit events"
-description: "What the dopgate audit log records, the fields of a record, and how to verify the chain."
+description: "Every action Dopgate records in its audit log, the fields of a record, how to read and filter the log, retention, and verifying the hash chain."
 ---
 
 # Audit events
 
-dopgate records security-relevant actions in an append-only, hash-chained log. Admins read it at `GET /api/v1/admin/audit-events` and check it at `GET /api/v1/admin/audit-events/verify`.
+Dopgate records sign-ins, account changes, and admin actions in the `audit_events` table. Each record is written in the same transaction as the change it describes, so a change and its record commit together. Root and admins read the log on the console's **Audit log** page or through the API.
 
 ## A record
 
+```json
+{
+  "id": "aud_01JC8Z3V7QK2N4R6T8W0Y2A4C6",
+  "actorType": "member",
+  "actorId": "usr_01JC8Z3V7QK2N4R6T8W0Y2A4C7",
+  "actorLabel": "ana@example.com",
+  "action": "user.signed_in",
+  "resourceType": "user",
+  "resourceId": "usr_01JC8Z3V7QK2N4R6T8W0Y2A4C7",
+  "ipAddress": "203.0.113.7",
+  "metadata": { "method": "password", "sessionId": "ses_01JC8Z3V7QK2N4R6T8W0Y2A4C8" },
+  "createdAt": "2026-11-09T08:15:42.123456Z",
+  "seq": 1284,
+  "prevHash": "9f2c...",
+  "recordHash": "4b7a..."
+}
+```
+
 | Field | Meaning |
 | --- | --- |
-| `id` | `aud_` followed by a ULID |
-| `actorType` | `root`, `admin`, `member`, `client`, or `system` |
-| `actorId`, `actorLabel` | Who acted: a user or client ID, and a readable name |
-| `action` | What happened, such as `instance.initialized` |
-| `resourceType`, `resourceId` | What it happened to |
-| `ipAddress` | The client address, through trusted proxies |
-| `metadata` | Details, as a JSON object |
-| `createdAt` | RFC 3339 time |
-| `seq`, `prevHash`, `recordHash` | The record's place in the chain |
+| `actorType` | `root`, `admin`, or `member` for a user; `service` for the service key; `anonymous`; or `system` for setup, retention, and the CLI |
+| `actorId`, `actorLabel` | The user ID and email, `service` for the service key, or a label such as `setup`, `cli`, `retention`, or `refresh` |
+| `resourceType`, `resourceId` | What the action touched: `user`, `session`, `settings`, `email_template`, `signing_key`, or `audit` |
+| `ipAddress` | The client address, through any [trusted proxies](/self-hosting/configuration#behind-a-reverse-proxy). Absent outside a request. |
+| `metadata` | Extra details per action, listed below. Never holds passwords, codes, or tokens. |
+| `seq`, `prevHash`, `recordHash` | The record's place in the hash chain |
 
-## Actions recorded today
+## Actions
 
-| Action | When |
-| --- | --- |
-| `instance.initialized` | The root account was created, by `dopgate init` or the setup token. |
-| `audit.pruned` | Retention archived and removed old records. |
-| `settings.updated` | An admin changed runtime settings. `metadata.sections` lists the sections, and `metadata.smtpPasswordChanged` says whether the SMTP password was set or cleared. Values are not recorded. |
+### Accounts
 
-Each feature adds its actions as it lands: sign-ins and failures, sign-ups, password changes and resets, role and status changes, client and key changes, and backups.
+| Action | Actor | Metadata |
+| --- | --- | --- |
+| `user.signed_up` | The new user | `method`: `password` or `otp` |
+| `user.signed_in` | The user | `method`, `sessionId` |
+| `user.sign_in_failed` | The user whose email was given | `reason`: `password` or `locked`; `locked`: whether this attempt locked the account |
+| `user.signed_out` | The user | `allSessions`, `sessionId` |
+| `user.email_verified` | The user | none |
+| `user.profile_updated` | The user | none |
+| `user.password_changed` | The user | `otherSessionsEnded` |
+| `user.password_reset` | The user | `sessionsEnded` |
+| `user.email_changed` | The user | `from`, `to` |
 
-## Verifying
+A failed sign-in for an email with no account isn't recorded, because there is no account to attach it to.
 
-The verify endpoint walks the chain in order, recomputes every hash, and reports the first record that does not match. Save `headSeq` and `headHash` from a report somewhere outside the server. Passing them back later as `anchorSeq` and `anchorHash` also catches a log that was rewritten from that point or had its newest records deleted, which the chain alone cannot see.
+### Sessions
+
+| Action | Actor | Metadata |
+| --- | --- | --- |
+| `session.revoked` | The user, ending one of their sessions | none; the session is the resource |
+| `session.revoked_all` | The user, signing out everywhere | `sessions`, `keptCurrent` |
+| `session.refresh_reused` | `anonymous`, label `refresh` | `userId`; the session is the resource. A spent refresh token came back and the session was ended. |
+
+### Admin actions
+
+| Action | Actor | Metadata |
+| --- | --- | --- |
+| `user.created` | Admin, root, or service | `email`, `role` |
+| `user.updated` | Admin, root, or service | `fields` that changed, `role` |
+| `user.deleted` | Admin, root, or service | `email`, `role` |
+| `user.disabled` | Admin, root, or service | `sessionsEnded` |
+| `user.enabled` | Admin, root, or service | `sessionsEnded` (always 0) |
+| `user.sessions_revoked` | Admin, root, or service | `sessionsEnded` |
+| `user.password_reset_sent` | Admin, root, or service | none |
+| `settings.updated` | Admin, root, or service | `sections` that changed, such as `["signup", "limits"]` |
+| `email_template.updated` | Admin, root, or service | none; the template name is the resource |
+| `email_template.reset` | Admin, root, or service | none; only recorded when an override existed |
+| `key.rotated` | Root, or `system` with label `cli` | none; the new key is the resource |
+
+### Instance
+
+| Action | Actor | Metadata |
+| --- | --- | --- |
+| `instance.initialized` | `system`, label `setup` | `email` of the new root account |
+| `audit.pruned` | `system`, label `retention` | `records`, `legacyRecords`, `fromSeq`, `throughSeq`, `throughHash` |
+
+## Reading the log
+
+```bash
+curl "https://auth.example.com/api/v1/admin/audit-events?action=user.signed_in&limit=100" \
+  -H "authorization: Bearer $TOKEN"
+```
+
+Records come newest first, 50 per page by default and at most 200. Filter with `action` (an exact action name) and `actor` (a user ID or an actor label such as an email or `service`). Pass `nextCursor` back as `cursor` for the next page.
+
+## Retention
+
+Records older than `DOPGATE_AUDIT_RETENTION_DAYS` (365 by default) are deleted at startup and once a day while the server runs. `0` keeps everything. Each pass that removes records appends an `audit.pruned` record that names the last removed position and its hash, so the remaining records still verify as one chain.
+
+## Verifying the chain
+
+Every record stores its position (`seq`), the hash of the record before it, and a SHA-256 hash of its own stored contents. Changing, inserting, or deleting a record in the middle breaks the chain.
+
+```bash
+curl https://auth.example.com/api/v1/admin/audit-events/verify \
+  -H "authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "ok": true,
+  "records": 1284,
+  "headSeq": 1284,
+  "headHash": "4b7a...",
+  "legacy": 0,
+  "unsequenced": 0,
+  "prunedSeq": null,
+  "broken": null,
+  "anchor": null
+}
+```
+
+`broken` names the first record that doesn't match, with its `seq`, `id`, and a `reason`. `unsequenced` counts records with no chain position, which only appear if something wrote to the table directly; it should stay 0.
+
+The chain alone can't tell a log rewritten from start to end, or one with its newest records removed, from an honest one. For that, save `headSeq` and `headHash` somewhere outside the database, then pass them back later:
+
+```bash
+curl "https://auth.example.com/api/v1/admin/audit-events/verify?anchorSeq=1284&anchorHash=4b7a..." \
+  -H "authorization: Bearer $TOKEN"
+```
+
+`anchor.status` is `matched` when the record at that position still has that hash, `mismatch` when it changed, `missing` when the record is gone, and `pruned` when retention removed it. `mismatch` and `missing` make `ok` false.
+
+Dopgate also writes the chain head to its log as an `audit checkpoint` at startup, at shutdown, and on every verification. Logs shipped somewhere else are a ready source of anchors.
