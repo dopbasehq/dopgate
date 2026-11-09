@@ -18,16 +18,18 @@ The sign-in page accepts a password or an emailed code.
 | Page | Path | What you do there |
 | --- | --- | --- |
 | Users | `/users` | Search your app's users by email or name, filter by status, and create users. |
-| User | `/users/{id}` | Edit the profile and the three metadata objects, see and end sessions, disable, enable, or delete the account, and send a password reset code. |
+| User | `/users/{id}` | Edit the profile and the three metadata objects, see and end sessions, see and revoke the user's personal tokens, see the agents they own, disable, enable, or delete the account, and send a password reset code. |
+| Agents | `/agents` | Every agent and its owner, with search and a status filter. Create an agent you own, with its capabilities; its token shows once. |
+| Agent | `/agents/{id}` | The agent's owner, token, and capabilities. The owner edits it and regenerates the token; any admin turns it off, back on, or deletes it. |
 | Admins | `/admins` | See root and every admin. Root adds admins and turns them off, back on, or removes them. |
 | Email templates | `/templates` | See the six emails and which ones are customized. |
 | Template | `/templates/{name}` | Edit the subject, HTML, and text, insert variables, preview the result, send yourself a test, or reset to the built-in version. |
-| Settings | `/settings` | Sign-up rules, the minimum password length, token lifetimes, limits, and branding. The SMTP section is editable unless `DOPGATE_SMTP_HOST` is set, and has a button that sends a test email. |
+| Settings | `/settings` | Sign-up rules, the minimum password length, token lifetimes, limits, whether users can make personal tokens and agents, and branding. The SMTP section is editable unless `DOPGATE_SMTP_HOST` is set, and has a button that sends a test email. |
 | Signing keys | `/keys` | See the active, retiring, and retired keys. Root can rotate the key here. |
 | Audit log | `/audit` | Page through every recorded event, filter by action or actor, and verify the hash chain. |
 | Account | `/account` | Your own profile, password, email, and signed-in sessions. |
 
-The console only shows what your role allows. Every admin manages every user. Only root sees the actions on the Admins page and the rotate button, and nobody can change root from the console.
+The console only shows what your role allows. Every admin manages every user and can turn off or delete any agent. Only an agent's owner edits it or regenerates its token. Only root sees the actions on the Admins page and the rotate button, and nobody can change root from the console.
 
 ## How it keeps you signed in
 
