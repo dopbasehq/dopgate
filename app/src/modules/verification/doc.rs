@@ -1,7 +1,7 @@
 use super::{controller, model::*};
 use crate::{
   http::{ErrorBody, HttpResponseFormat},
-  services::otp::{Method, Purpose},
+  modules::auth::model::AuthTokens,
 };
 use utoipa::OpenApi;
 
@@ -9,16 +9,15 @@ use utoipa::OpenApi;
 #[openapi(
   paths(controller::send, controller::confirm),
   components(schemas(
-    SendVerificationRequest,
-    ConfirmVerificationRequest,
-    VerificationResult,
+    SendCodeRequest,
+    ConfirmCodeRequest,
     Purpose,
-    Method,
+    AuthTokens,
     ErrorBody,
-    HttpResponseFormat<VerificationResult>,
+    HttpResponseFormat<AuthTokens>,
     HttpResponseFormat<serde_json::Value>
   )),
-  tags((name = "verification", description = "Email codes and links: verification and passwordless sign-in"))
+  tags((name = "verification", description = "Emailed codes: verify an email or sign in without a password"))
 )]
 struct VerificationApi;
 

@@ -99,3 +99,12 @@ pub struct ChangePasswordRequest {
   pub current_password: Option<String>,
   pub new_password: String,
 }
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeEmailRequest {
+  pub new_email: String,
+  /// The current password. Required when the account has one, so a stolen
+  /// access token alone cannot move the account.
+  pub password: Option<String>,
+}

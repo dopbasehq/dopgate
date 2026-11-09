@@ -1,0 +1,46 @@
+# The smallest dopgate setup: PostgreSQL and dopgate.
+#
+#   cp .env.example .env    # then fill in the values
+#   docker compose up -d
+#
+# To run dopgate next to your own app, copy the dopgate service into your
+# app's compose file and point DOPGATE_DATABASE_URL at your PostgreSQL.
+# dopgate keeps its tables in the `dopgate` schema, so sharing a database
+# with your app is fine.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  dopgate:
+    build: .
+    image: dopgate:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DOPGATE_DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@postgres:5432/app
+      # Inside the container dopgate always listens on 8850; publish it on
+      # another host port with DOPGATE_HOST_PORT.
+      DOPGATE_PORT: "8850"
+    ports:
+      - "${DOPGATE_HOST_PORT:-8850}:8850"
+
+volumes:
+  pgdata:

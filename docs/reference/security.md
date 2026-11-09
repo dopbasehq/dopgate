@@ -1,49 +1,64 @@
 ---
 title: "Security model"
-description: "How dopgate stores passwords, tokens, and secrets, and what it does against guessing and tampering."
+description: "How Dopgate stores passwords, tokens, codes, and keys, how it avoids revealing accounts, and the protections on its HTTP responses."
 ---
 
 # Security model
 
-::: info
-Some of what this page describes arrives with later phases, marked where it applies. [Product status](/guide/product-status) says what runs today.
-:::
+This page describes what Dopgate protects and how. For the steps you take when deploying, see the [security checklist](/self-hosting/security-checklist).
 
-## What is stored, and how
+## What is stored and how
 
-| Value | Stored as |
+| Secret | Stored as |
 | --- | --- |
-| Passwords | Argon2id hashes in PHC format. Passwords over 1024 bytes are refused before hashing. |
-| Refresh tokens | SHA-256 hashes. A token is single-use; reuse ends the session. |
-| Emailed codes and link tokens | SHA-256 hashes, single-use, valid 10 minutes. |
-| Client secret keys | SHA-256 hashes, plus the last four characters for display. |
-| The setup token | Memory only, gone once root exists. |
-| JWT signing keys | Encrypted with the master key. |
-| SSO client secrets, the SMTP password | Encrypted with the master key. |
+| Passwords | Argon2id hashes with a random salt each. Passwords are limited to 1024 bytes so hashing stays cheap enough. |
+| Refresh tokens | SHA-256 hashes. The token itself is 32 random bytes and only exists in the response. |
+| Emailed codes | SHA-256 hashes, single use, compared in constant time, and burned after too many wrong tries. |
+| Signing keys | The P-256 private key as a PKCS#8 PEM in `signing_keys`, readable by anyone who can read the schema. |
+| Service key | Not stored. It is read from the environment and compared in constant time. |
+| Setup token | Kept in memory only, and gone once root exists or the server restarts. |
+| SMTP password | Not stored in the database. It comes from the environment or the config file. |
 
-A stolen database therefore gives no passwords and no usable tokens. A stolen database together with `master.key` also gives the signing keys, which would let the holder mint access tokens; keep the two apart.
+The database is the boundary that matters most. Keep the `dopgate` schema readable only by Dopgate's own role, as the [PostgreSQL page](/self-hosting/postgres#give-dopgate-its-own-role) explains.
 
 ## Tokens
 
-Access tokens are ES256 JWTs that live 15 minutes. (Phase 2.) They cannot be recalled once issued, which is why they are short. Sessions, refresh tokens, and signing keys can all be revoked, and revoking them takes effect at the next refresh.
+Access tokens are ES256 JWTs. Dopgate only accepts `alg: ES256` with a known `kid`, checks the issuer and expiry with 30 seconds of leeway, and on its own endpoints also checks that the session is still open and the account still active. Your backend verifies offline and can't make those last two checks. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
 
-## Guessing
+Refresh tokens rotate on every use. A spent token presented again ends its session, since it means two parties hold the same token.
 
-- Five wrong setup tokens from one address lock that address out for 15 minutes.
-- Five wrong codes burn a verification code. (Phase 3.)
-- Failed passwords lock the account for a while. (Phase 4.)
-- Sign-up, password reset, and verification emails are limited per address and per email. (Phase 4.)
+## Not revealing accounts
 
-The limits key on the client address. Behind a reverse proxy, set `trusted_proxies` or every request looks like it comes from the proxy.
+- A sign-in for an unknown email checks the password against a dummy hash, so the answer takes about as long as for a real account, and the error is the same as a wrong password.
+- A disabled or unverified account is only reported after the right password.
+- A locked account answers like a wrong password.
+- Asking for a verification, sign-in, or reset code always answers `200`, and the per-email limits apply whether or not the email has an account.
 
-## Not telling who has an account
+Sign-up is the exception: it answers `409 EMAIL_TAKEN` for an email that has an account, so users learn they should sign in. Turn sign-up off if that matters for your app. Email change does the same for the new address.
 
-Password reset and verification answer the same way whether or not the email has an account. Sign-in answers "wrong email or password" without saying which. (Phases 1 and 3.)
+## Limits
 
-## The audit log
+Per-address limits, per-email code limits, and account lockout slow down guessing and email flooding. See [Rate limits and lockout](/guide/rate-limits). The setup token allows 5 wrong tries per address per 15 minutes.
 
-Every record stores a hash of its contents and of the record before it. Changing or deleting a record breaks the chain, and `GET /api/v1/admin/audit-events/verify` finds the break. Someone with write access to the database could rebuild the whole chain, so dopgate also writes the chain head to the server log at startup and shutdown, and the verify endpoint accepts an anchor you saved elsewhere.
+## HTTP protections
 
-## HTTP
+Every response carries:
 
-Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a strict `Content-Security-Policy`. API responses also carry `Cache-Control: no-store`. Request bodies are capped at 3 MiB and requests time out after 30 seconds.
+- `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'`
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: no-referrer`
+
+API responses also carry `Cache-Control: no-store`. Request bodies are limited to 3 MB and requests to 30 seconds. CORS allows only the origins in `DOPGATE_ALLOWED_ORIGINS` and never allows credentials. The console's refresh cookie is `HttpOnly`, `SameSite=Strict`, limited to `/api/v1/auth`, and `Secure` on an HTTPS public URL.
+
+## Roles
+
+Root, admins, members, and the service key have the permissions listed in [Users and roles](/guide/users-and-roles). Root can't be changed through the admin API by anyone, root included, and only root rotates keys or manages admins.
+
+## Audit log
+
+Sign-ins, failed sign-ins, account changes, and admin actions are recorded with the actor, the client address, and the time, in the same transaction as the change. Records are SHA-256 hash-chained, and the chain head is written to the server log at startup, shutdown, and each verification. See [Audit events](/reference/audit-events).
+
+## Reporting a vulnerability
+
+Report security problems privately to the maintainers. Please don't open a public issue for them.

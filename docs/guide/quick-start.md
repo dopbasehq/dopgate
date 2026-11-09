@@ -1,75 +1,96 @@
 ---
 title: "Quick start"
-description: "Build dopgate, create the root account, start the server, and open the API docs."
+description: "Run PostgreSQL and Dopgate with Docker Compose, sign in to the admin console, and create a first user."
 ---
 
 # Quick start
 
-This page takes you from source code to a running server with a root account. It needs Rust 1.89 or newer. [Bun](https://bun.sh) is only needed for the docs and the dev script.
+This page runs Dopgate and PostgreSQL on your machine with Docker Compose, signs you in to the admin console as root, and makes a first API call. It takes a few minutes. You need Docker with the Compose plugin and a clone of the Dopgate repository.
 
-## Build the binary
+## 1. Fill in the environment file
 
 From the repository root:
 
 ```bash
-cargo build --release --manifest-path app/Cargo.toml
+cp .env.example .env
 ```
 
-The binary is `app/target/release/dopgate`. Copy it anywhere; it carries its own migrations.
+Open `.env` and change at least these values:
 
-## Create the root account
+| Variable | What to put there |
+| --- | --- |
+| `POSTGRES_PASSWORD` | A password for the bundled PostgreSQL server. |
+| `DOPGATE_PUBLIC_URL` | The URL your app reaches Dopgate on. Keep `http://localhost:8850` on your machine. |
+| `DOPGATE_ROOT_EMAIL` | Your email. The first start creates the root account for it. |
+| `DOPGATE_ALLOWED_ORIGINS` | Your frontend's origin, such as `http://localhost:3000`. |
 
-The root account owns the instance. Create it before the first start:
+Leave `DOPGATE_SMTP_HOST` empty for now. Without an SMTP server, Dopgate writes every email, codes included, to its log. [Environment variables](/reference/environment-variables) lists everything else you can set.
+
+## 2. Start the stack
 
 ```bash
-./app/target/release/dopgate init --email you@example.com
+docker compose up -d
 ```
 
-dopgate asks for a password of at least 8 characters, then creates `~/.dopgate` with the database, the master key, and a commented `server.toml`.
+Compose builds the Dopgate image from the `Dockerfile` on the first run, starts PostgreSQL, waits until it is healthy, and then starts Dopgate. On startup Dopgate creates the `dopgate` schema, runs its migrations, and generates a signing key.
 
-To script it, pass the password through the environment instead:
+## 3. Copy the root password
+
+Because `DOPGATE_ROOT_EMAIL` is set and the database has no root account yet, Dopgate creates root and prints a generated password once:
 
 ```bash
-DOPGATE_ROOT_PASSWORD='a long password' ./app/target/release/dopgate init --email you@example.com
+docker compose logs dopgate
 ```
 
-## Start the server
+```text
+Root account created for admin@example.com.
+Password: k7Hq-3xPm-Rt9a-WcZe-8nVb-Xf2u
 
-```bash
-./app/target/release/dopgate serve
+This password is shown once. Sign in and change it, and clear DOPGATE_ROOT_EMAIL if you like; later starts ignore it.
 ```
 
-The server listens on `http://localhost:8850`. Check it:
+Copy the password now. Later starts see that root exists and print nothing.
+
+::: tip Lost the password?
+Reset it with a code, like any user. Ask for one with `POST /api/v1/auth/password/forgot` and the root email, then send the code and a new password to `POST /api/v1/auth/password/reset`. Without SMTP, the code is in `docker compose logs dopgate`. [Password reset](/guide/password-reset) shows both calls.
+:::
+
+## 4. Sign in to the console
+
+Open `http://localhost:8850` in a browser and sign in with the root email and the password from the log. Change the password on the **Account** page.
+
+From the console you can create users, edit the email templates, and change sign-up rules. The [admin console](/guide/admin-console) page walks through each screen.
+
+## 5. Try the API
+
+Check that the server is healthy:
 
 ```bash
 curl http://localhost:8850/api/v1/health
 ```
 
-```json
-{"success":true,"message":"HEALTH_OK","data":{"product":"dopgate","version":"{{version}}","apiVersion":"v1","status":"ok"}}
-```
-
-Open `http://localhost:8850/api/docs` for the Swagger UI. It lists every endpoint, including the ones that are still placeholders.
-
-::: tip Skipped `init`?
-If you start the server without a root account, it prints a one-time setup token and a `curl` command that creates the account through `POST /api/v1/bootstrap/root`. The token works once, and five wrong guesses from one address lock that address out for 15 minutes.
-:::
-
-## Run everything in development
-
-With Bun installed, one command starts the API and these docs together:
+Sign up a user. Your frontend makes the same call:
 
 ```bash
-bun install
-bun run dev
+curl -X POST http://localhost:8850/api/v1/auth/signup \
+  -H 'content-type: application/json' \
+  -d '{"email":"ana@example.com","password":"correct-horse-battery","displayName":"Ana"}'
 ```
 
-The API uses `./.dev-data` as its data directory, so it never touches `~/.dopgate`. Create its root account with:
+Sign-up requires a verified email by default, so the answer has `"tokens": null` and Dopgate sends a code. With no SMTP server, the email shows up in `docker compose logs dopgate`. Confirm it:
 
 ```bash
-cargo run --manifest-path app/Cargo.toml -- init --data-dir .dev-data --email you@example.com
+curl -X POST http://localhost:8850/api/v1/auth/verification/confirm \
+  -H 'content-type: application/json' \
+  -d '{"email":"ana@example.com","purpose":"email_verify","code":"482913"}'
 ```
 
-## What to try next
+Use the code from the log in place of `482913`. The answer holds an `accessToken` and a `refreshToken`. The user now shows up on the console's **Users** page.
 
-Sign-up and sign-in are the next features on the [roadmap](/about/roadmap). Until they land, those endpoints answer `501` with the error code `NOT_IMPLEMENTED`. [Product status](/guide/product-status) tracks each one.
+The running server also describes its own API in Swagger UI at `http://localhost:8850/api/docs`.
+
+## Next steps
+
+- [Add Dopgate to your app](/guide/add-to-your-app): the frontend calls and backend token checks.
+- [Email (SMTP)](/self-hosting/smtp): send real email.
+- [Running with your app's stack](/self-hosting/with-your-app): move the Dopgate service into your app's compose file.

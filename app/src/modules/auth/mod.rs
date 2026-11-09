@@ -20,4 +20,5 @@ pub fn routes() -> Router<AppState> {
     .route(auth::LOGOUT, post(controller::logout))
     .route(auth::ME, get(controller::me).patch(controller::update_me))
     .route(auth::PASSWORD_CHANGE, post(controller::change_password))
+    .route(auth::EMAIL_CHANGE, post(controller::change_email))
 }
