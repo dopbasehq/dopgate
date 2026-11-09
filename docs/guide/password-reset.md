@@ -1,19 +1,70 @@
 ---
 title: "Password reset"
-description: "Let users reset a forgotten password with an emailed code or link."
+description: "Reset a forgotten password with a 6-digit emailed code, change a password while signed in, and send a reset code as an admin."
 ---
 
 # Password reset
 
-::: warning Planned
-Password reset arrives in phase 3, together with SMTP settings.
-:::
+A user who forgot their password asks for a code, then sends the code with a new password. Both steps are public endpoints your frontend calls.
 
-1. Your app calls `POST /api/v1/auth/password/forgot` with the user's `email`, and optionally `method` (`link` by default, or `otp`) and a `redirectUrl`.
-2. dopgate emails a code or a link. The response is the same whether or not an account uses the address, so the endpoint cannot be used to find out who has an account.
-3. The user follows the link to your app, or types the code.
-4. Your app calls `POST /api/v1/auth/password/reset` with the new password and either `token` from the link or `email` and `code`.
+## 1. Ask for a code
 
-A reset ends every session of the account, so a device someone else signed in on is signed out too.
+```bash
+curl -X POST https://auth.example.com/api/v1/auth/password/forgot \
+  -H 'content-type: application/json' \
+  -d '{"email":"ana@example.com"}'
+```
 
-Signed-in users who know their password change it with `POST /api/v1/auth/password/change` instead.
+The answer is always `200 PASSWORD_RESET_SENT`, so the endpoint can't be used to find accounts. A code goes out with the `password_reset` [template](/guide/email-templates) only when the email belongs to an active account. Disabled accounts get nothing.
+
+The usual code limits apply: one reset code per email every 60 seconds, 5 codes per email per hour, and the per-address limit. See [Rate limits and lockout](/guide/rate-limits).
+
+## 2. Set the new password
+
+```bash
+curl -X POST https://auth.example.com/api/v1/auth/password/reset \
+  -H 'content-type: application/json' \
+  -d '{"email":"ana@example.com","code":"482913","newPassword":"a-new-long-password"}'
+```
+
+On success the answer is `200 PASSWORD_RESET` with no data, and Dopgate:
+
+- sets the new password,
+- ends every session of the account, so devices someone else signed in on are signed out,
+- clears any [lockout](/guide/rate-limits#account-lockout),
+- marks the email verified, since the user just proved they read that inbox,
+- emails a `password_changed` notice.
+
+The reset does not sign the user in. Send them to your sign-in screen.
+
+| Answer | When |
+| --- | --- |
+| `400 CODE_INVALID` | The code is wrong, used up after 5 wrong tries, or there is no code for this email. |
+| `400 CODE_EXPIRED` | The code is older than 10 minutes. |
+| `403 ACCOUNT_DISABLED` | The account was disabled after the code went out. |
+| `422 PASSWORD_INVALID` | The new password is too short or longer than 1024 bytes. |
+| `429 RATE_LIMITED` | Too many requests from this address. |
+
+## Changing a password while signed in
+
+A signed-in user changes their password with the current one:
+
+```bash
+curl -X POST https://auth.example.com/api/v1/auth/password/change \
+  -H "authorization: Bearer $ACCESS_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"currentPassword":"correct-horse-battery","newPassword":"a-new-long-password"}'
+```
+
+Every other session of the account ends, the session making the request stays signed in, and a `password_changed` notice goes to the account's email. A wrong current password answers `401 AUTHENTICATION_INVALID`. Accounts without a password, such as ones created by a code sign-in, leave out `currentPassword` to set their first one.
+
+## Sending a reset code as an admin
+
+Admins and the service key can email a user a reset code from the console or with:
+
+```bash
+curl -X POST https://auth.example.com/api/v1/admin/users/usr_01JC8.../password-reset \
+  -H "authorization: Bearer $DOPGATE_SERVICE_KEY"
+```
+
+The user then finishes with step 2. The audit log records `user.password_reset_sent`. Admins can't send a code to root or, unless they are root, to another admin.

@@ -1,24 +1,31 @@
 ---
 title: "Roadmap"
-description: "The order in which dopgate features are being built."
+description: "What Dopgate has built so far and what comes next: single sign-on, multi-factor authentication, and webhooks."
 ---
 
 # Roadmap
 
-dopgate is built in phases. Each phase replaces placeholders with working endpoints, adds tests, and updates [Product status](/guide/product-status).
+Dopgate is built in phases. Each phase replaces placeholder endpoints with working ones, adds tests, and updates [Product status](/guide/product-status).
+
+## Done
 
 | Phase | Scope |
 | --- | --- |
-| 0 | Project structure, configuration, CLI, setup, migrations, audit chain, and the full API description. Done. |
-| 1 | Users and the auth core: password sign-up and sign-in, sign-out, profile, change password, admin user management, roles. |
-| 2 | Tokens: ES256 JWTs, the JWKS endpoint, key rotation, refresh token rotation with reuse detection, session list and revoke. |
-| 3 | Email: SMTP settings, the mailer, verification by code or link, passwordless sign-in, forgot and reset password. |
-| 4 | Abuse protection: per-address and per-email limits on sign-up, reset, and codes; account lockout; audit events for every auth action. |
-| 5 | Clients: publishable and secret keys, CORS per client, redirect URL allow-lists. |
-| 6 | Single sign-on: OpenID Connect providers with presets, account linking. |
-| 7 | Backup, restore, user export, and user import, including hash formats from other services. |
-| 8 | MFA with an authenticator app, with recovery codes. |
-| 9 | dopgate as an OpenID Connect provider: discovery, authorize with PKCE, token, userinfo. |
-| 10 | Webhooks for events such as `user.created` and `user.signed_in`. Optional. |
+| Foundation | Project layout, configuration, the CLI, first-run setup, the hash-chained audit log, and the full API description. |
+| PostgreSQL | Every table in its own schema, migrations at startup, and the switch from SQLite. |
+| Accounts and tokens | Password sign-up and sign-in, sign-out, profiles and metadata, roles, ES256 access tokens, the JWKS, key rotation, refresh token rotation with reuse detection, and sessions. |
+| Email codes | SMTP from the environment, six editable templates, 6-digit codes for verification, sign-in, password reset, and email change, and passwordless sign-up. |
+| Admin API and limits | User management, settings, the service key, per-address and per-email limits, and account lockout. |
+| Admin console | The Vue console built into the binary, for root and admins. |
+| Docker and docs | The image, the Compose file, and these docs. |
 
-An Admin UI will follow once the API is complete.
+## Next
+
+| Feature | Scope |
+| --- | --- |
+| Single sign-on | Sign in with Google, Microsoft, Okta, or any OpenID Connect provider, with presets and account linking. The routes exist and answer `501`. |
+| Multi-factor authentication | A second factor with an authenticator app (TOTP), with recovery codes. The routes exist and answer `501`. |
+| Webhooks | Tell your backend about events such as `user.signed_up` and `user.deleted`. |
+| Hosted pages | Maybe: ready-made sign-in and sign-up pages for apps that don't want to build their own forms. |
+
+The order can change as people use Dopgate and report what they need.

@@ -8,9 +8,9 @@ import {
 
 // Set DOPGATE_DOCS_URL to the published address when the docs go online.
 const siteUrl = (process.env.DOPGATE_DOCS_URL ?? "http://localhost:5173").replace(/\/$/, "");
-const siteName = "dopgate";
+const siteName = "Dopgate";
 const siteDescription =
-  "dopgate is a self-hosted authentication server. One binary and one SQLite file handle sign-up, sign-in, email verification, password resets, and JWTs for your apps.";
+  "Dopgate is a self-hosted auth server for one app. It runs next to your app with PostgreSQL and handles sign-up, sign-in, email codes, password resets, and JWTs your backend verifies offline.";
 const sectionNames: Record<string, string> = {
   guide: "Guide",
   cli: "CLI",
@@ -95,7 +95,7 @@ function buildJsonLd(pageData: {
 }
 
 const config = defineConfig({
-  title: "dopgate",
+  title: "Dopgate",
   titleTemplate: ":title · dopgate",
   description: siteDescription,
   lang: "en-US",
@@ -168,7 +168,7 @@ const config = defineConfig({
         href: "/favicon.svg",
       },
     ],
-    ["meta", { name: "theme-color", content: "#0d9488" }],
+    ["meta", { name: "theme-color", content: "#ff4053" }],
   ],
   markdown: {
     theme: { light: "github-light", dark: "github-dark" },
@@ -186,7 +186,7 @@ const config = defineConfig({
   },
   themeConfig: {
     logo: "/logo.svg",
-    siteTitle: "dopgate",
+    siteTitle: "Dopgate",
     search: { provider: "local" },
     nav: [
       { text: "Guide", link: "/guide/", activeMatch: "^/guide/" },
@@ -209,55 +209,63 @@ const config = defineConfig({
     sidebar: {
       "/guide/": [
         {
-          text: "Getting Started",
+          text: "Getting started",
           items: [
             { text: "Introduction", link: "/guide/" },
             { text: "Quick start", link: "/guide/quick-start" },
+            { text: "Add dopgate to your app", link: "/guide/add-to-your-app" },
             { text: "Product status", link: "/guide/product-status" },
           ],
         },
         {
-          text: "Core Concepts",
+          text: "Accounts",
           items: [
             { text: "Users and roles", link: "/guide/users-and-roles" },
-            { text: "Tokens and sessions", link: "/guide/tokens-and-sessions" },
-            { text: "Clients", link: "/guide/clients" },
+            { text: "Sign-up and email verification", link: "/guide/sign-up-and-verification" },
+            { text: "Sign-in with a password or a code", link: "/guide/sign-in" },
+            { text: "Password reset", link: "/guide/password-reset" },
+            { text: "Profile and metadata", link: "/guide/profile-and-metadata" },
           ],
         },
         {
-          text: "Workflows",
+          text: "Tokens and admin",
           items: [
-            { text: "Email verification", link: "/guide/email-verification" },
-            { text: "Password reset", link: "/guide/password-reset" },
-            { text: "Single sign-on", link: "/guide/single-sign-on" },
-            { text: "Backup and restore", link: "/guide/backups-and-restore" },
+            { text: "Tokens and sessions", link: "/guide/tokens-and-sessions" },
+            { text: "Calling the admin API", link: "/guide/admin-api" },
+            { text: "Email templates", link: "/guide/email-templates" },
+            { text: "Rate limits and lockout", link: "/guide/rate-limits" },
+            { text: "Admin console", link: "/guide/admin-console" },
           ],
         },
       ],
       "/cli/": [
         {
-          text: "Command Line",
+          text: "Command line",
           items: [
             { text: "CLI overview", link: "/cli/" },
-            { text: "Command reference", link: "/cli/commands" },
-            { text: "Server configuration", link: "/cli/configuration" },
-            { text: "Environment variables", link: "/cli/environment-variables" },
+            { text: "Commands", link: "/cli/commands" },
           ],
         },
       ],
       "/self-hosting/": [
         {
-          text: "Deployment & Storage",
+          text: "Deploy",
           items: [
             { text: "Overview", link: "/self-hosting/" },
-            { text: "Storage and backups", link: "/self-hosting/storage-backups" },
-            { text: "Encryption keys", link: "/self-hosting/encryption-keys" },
+            { text: "Docker image", link: "/self-hosting/docker" },
+            { text: "Running with your app's stack", link: "/self-hosting/with-your-app" },
+            { text: "PostgreSQL and the schema", link: "/self-hosting/postgres" },
             { text: "Email (SMTP)", link: "/self-hosting/smtp" },
+            { text: "Configuration", link: "/self-hosting/configuration" },
           ],
         },
         {
-          text: "Operations",
-          items: [{ text: "Running in production", link: "/self-hosting/operations" }],
+          text: "Operate",
+          items: [
+            { text: "Backups", link: "/self-hosting/backups" },
+            { text: "Upgrading", link: "/self-hosting/upgrading" },
+            { text: "Security checklist", link: "/self-hosting/security-checklist" },
+          ],
         },
       ],
       "/reference/": [
@@ -269,7 +277,10 @@ const config = defineConfig({
           text: "API",
           items: [
             { text: "REST API", link: "/reference/api" },
+            { text: "Token claims", link: "/reference/token-claims" },
             { text: "Errors", link: "/reference/errors" },
+            { text: "Email template variables", link: "/reference/email-template-variables" },
+            { text: "Environment variables", link: "/reference/environment-variables" },
           ],
         },
         {
@@ -300,7 +311,7 @@ const config = defineConfig({
     sidebarMenuLabel: "Menu",
     darkModeSwitchLabel: "Appearance",
     footer: {
-      message: "Self-hosted authentication in one binary.",
+      message: "Self-hosted authentication for your app, on PostgreSQL.",
       copyright: "Apache-2.0",
     },
   },
