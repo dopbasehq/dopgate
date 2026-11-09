@@ -36,7 +36,8 @@ const settings: Settings = {
     security: "starttls",
     fromEmail: "auth@example.com",
     fromName: "Acme",
-    source: "server_config",
+    source: "database",
+    canStorePassword: true,
   },
   branding: { appName: "Acme", logoUrl: null },
 };
@@ -127,6 +128,77 @@ describe("useSettingsController", () => {
     c.drafts.value!.password.minLength = "20";
     c.discard("password");
     expect(c.drafts.value!.password.minLength).toBe("10");
+  });
+
+  describe("SMTP settings", () => {
+    it("sends the section without the password when it wasn't typed", async () => {
+      vi.mocked(adminApi.updateSettings).mockResolvedValue(settings);
+      const c = await mount();
+      expect(c.drafts.value!.smtp.password).toBe("");
+      c.drafts.value!.smtp.host = " mail.example.com ";
+      c.drafts.value!.smtp.fromEmail = "";
+      expect(c.dirty.value.smtp).toBe(true);
+      await c.save("smtp");
+      expect(adminApi.updateSettings).toHaveBeenCalledWith({
+        smtp: {
+          host: "mail.example.com",
+          port: 587,
+          security: "starttls",
+          username: "mailer",
+          fromEmail: null,
+          fromName: "Acme",
+        },
+      });
+    });
+
+    it("sends a typed password, or an empty one to remove it", async () => {
+      vi.mocked(adminApi.updateSettings).mockResolvedValue(settings);
+      const c = await mount();
+      c.drafts.value!.smtp.password = "s3cret";
+      await c.save("smtp");
+      expect(
+        vi.mocked(adminApi.updateSettings).mock.calls[0][0].smtp,
+      ).toMatchObject({ password: "s3cret" });
+
+      c.drafts.value!.smtp.clearPassword = true;
+      await c.save("smtp");
+      expect(
+        vi.mocked(adminApi.updateSettings).mock.calls[1][0].smtp,
+      ).toMatchObject({ password: "" });
+    });
+
+    it("moves a default port along with the security", async () => {
+      const c = await mount();
+      c.drafts.value!.smtp.security = "tls";
+      await settle();
+      expect(c.drafts.value!.smtp.port).toBe("465");
+
+      c.drafts.value!.smtp.port = "2525";
+      c.drafts.value!.smtp.security = "starttls";
+      await settle();
+      expect(c.drafts.value!.smtp.port).toBe("2525");
+    });
+
+    it("refuses a pasted URL, a bad port and a bad sender", async () => {
+      const c = await mount();
+      Object.assign(c.drafts.value!.smtp, {
+        host: "smtp.example.com:587",
+        port: "70000",
+        fromEmail: "not-an-address",
+      });
+      expect(await c.save("smtp")).toBe(false);
+      expect(Object.keys(c.state.smtp.fieldErrors).sort()).toEqual([
+        "fromEmail",
+        "host",
+        "port",
+      ]);
+      c.drafts.value!.smtp.host = "https://smtp.example.com";
+      await c.save("smtp");
+      expect(c.state.smtp.fieldErrors.host).toBe(
+        "Enter just the host name, like smtp.example.com.",
+      );
+      expect(adminApi.updateSettings).not.toHaveBeenCalled();
+    });
   });
 
   describe("SMTP test", () => {

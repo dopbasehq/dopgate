@@ -6,6 +6,8 @@ import type {
   EditableSettings,
   LimitSettings,
   Settings,
+  SmtpSecurity,
+  SmtpSettingsInput,
   TokenSettings,
 } from "~/services/types";
 import { settingsQuery } from "~/queries/admin";
@@ -73,7 +75,35 @@ export const TOKEN_FIELDS: NumberField<keyof TokenSettings>[] = [
   },
 ];
 
+/** The sender address the server uses when none is set. */
+export const DEFAULT_FROM_EMAIL = "no-reply@dopgate.com";
+
+export const SECURITY_OPTIONS: { label: string; value: SmtpSecurity }[] = [
+  { label: "STARTTLS (usually port 587)", value: "starttls" },
+  { label: "TLS (usually port 465)", value: "tls" },
+  { label: "None (usually port 25)", value: "none" },
+];
+
+const DEFAULT_PORTS: Record<SmtpSecurity, number> = {
+  starttls: 587,
+  tls: 465,
+  none: 25,
+};
+
 type Strings<T> = { [K in keyof T]: string };
+
+interface SmtpDraft {
+  host: string;
+  port: string;
+  security: SmtpSecurity;
+  username: string;
+  /** Empty keeps the saved password. */
+  password: string;
+  /** Remove the saved password on save. */
+  clearPassword: boolean;
+  fromEmail: string;
+  fromName: string;
+}
 
 interface Drafts {
   signup: Settings["signup"];
@@ -81,6 +111,7 @@ interface Drafts {
   limits: Strings<LimitSettings>;
   tokens: Strings<TokenSettings>;
   branding: { appName: string; logoUrl: string };
+  smtp: SmtpDraft;
 }
 
 interface SectionState {
@@ -96,6 +127,7 @@ const SECTIONS: SectionName[] = [
   "limits",
   "tokens",
   "branding",
+  "smtp",
 ];
 
 function strings<T extends object>(value: T): Strings<T> {
@@ -116,6 +148,19 @@ function draftOf<S extends SectionName>(
         appName: settings.branding.appName,
         logoUrl: settings.branding.logoUrl ?? "",
       } as Drafts[S];
+    case "smtp": {
+      const smtp = settings.smtp;
+      return {
+        host: smtp.host ?? "",
+        port: String(smtp.port),
+        security: smtp.security,
+        username: smtp.username ?? "",
+        password: "",
+        clearPassword: false,
+        fromEmail: smtp.fromEmail,
+        fromName: smtp.fromName ?? "",
+      } as Drafts[S];
+    }
     default:
       return strings(settings[section]) as Drafts[S];
   }
@@ -137,10 +182,44 @@ function numbers<T extends Record<string, string>>(
   return out as { [K in keyof T]: number };
 }
 
+/** The SMTP section as the API takes it; collects an error per bad field. */
+function smtpBody(
+  draft: SmtpDraft,
+  errors: Record<string, string>,
+): SmtpSettingsInput {
+  const host = draft.host.trim();
+  const portText = draft.port.trim();
+  const port = Number(portText);
+  if (portText && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+    errors.port = "Enter a port from 1 to 65535.";
+  }
+  if (/^[a-z]+:\/\/|[/@]/i.test(host)) {
+    errors.host = "Enter just the host name, like smtp.example.com.";
+  } else if (/^[^:]+:\d*$/.test(host)) {
+    errors.host = "Put the port in the Port field.";
+  }
+  const fromEmail = draft.fromEmail.trim();
+  if (fromEmail && !isValidEmail(fromEmail)) {
+    errors.fromEmail = "Enter a valid email address.";
+  }
+  const body: SmtpSettingsInput = {
+    host: host || null,
+    port: portText ? port : null,
+    security: draft.security,
+    username: draft.username.trim() || null,
+    fromEmail: fromEmail || null,
+    fromName: draft.fromName.trim() || null,
+  };
+  if (draft.clearPassword) body.password = "";
+  else if (draft.password) body.password = draft.password;
+  return body;
+}
+
 /**
  * Settings page controller. Each section saves on its own with the whole
- * sub-object, as the API wants. SMTP is read-only: it comes from the
- * server's environment, and here it can only be tested.
+ * sub-object, as the API wants. SMTP can be edited only while the server's
+ * DOPGATE_SMTP_* variables set no host; when they do, they win and the
+ * section is read-only.
  */
 export function useSettingsController() {
   const cache = useQueryCache();
@@ -190,6 +269,7 @@ export function useSettingsController() {
           limits: draftOf(next, "limits"),
           tokens: draftOf(next, "tokens"),
           branding: draftOf(next, "branding"),
+          smtp: draftOf(next, "smtp"),
         };
         return;
       }
@@ -206,6 +286,19 @@ export function useSettingsController() {
       }
     },
     { immediate: true },
+  );
+
+  // Switching the security moves a default port along with it, so picking
+  // TLS doesn't leave the form on 587. A custom port stays.
+  watch(
+    () => drafts.value?.smtp.security,
+    (next, previous) => {
+      const smtp = drafts.value?.smtp;
+      if (!smtp || !next || !previous || next === previous) return;
+      if (smtp.port.trim() === String(DEFAULT_PORTS[previous])) {
+        smtp.port = String(DEFAULT_PORTS[next]);
+      }
+    },
   );
 
   /** The section as the API wants it, or null with field errors set. */
@@ -236,6 +329,9 @@ export function useSettingsController() {
         body = { branding: { appName, logoUrl: logoUrl || null } };
         break;
       }
+      case "smtp":
+        body = { smtp: smtpBody(draft.smtp, errors) };
+        break;
     }
     state[section].fieldErrors = errors;
     return Object.keys(errors).length === 0 ? body : null;

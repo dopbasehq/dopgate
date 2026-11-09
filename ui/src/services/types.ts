@@ -97,15 +97,36 @@ export interface LimitSettings {
   ipRequestsPerMinute: number;
 }
 
+export type SmtpSecurity = "starttls" | "tls" | "none";
+
 export interface SmtpSettings {
   host: string | null;
   port: number;
   username: string | null;
   passwordSet: boolean;
-  security: "starttls" | "tls" | "none";
+  security: SmtpSecurity;
+  /** Defaults to no-reply@dopgate.com when nothing sets one. */
+  fromEmail: string;
+  fromName: string | null;
+  /**
+   * `server_config`: DOPGATE_SMTP_* sets a host and wins, so it's read-only.
+   * `database`: saved here. `log`: no host anywhere, mail goes to the log.
+   */
+  source: "server_config" | "database" | "log";
+  /** False until DOPGATE_SERVICE_KEY is set, which encrypts the password. */
+  canStorePassword: boolean;
+}
+
+/** SMTP as the API takes it. A left-out password keeps the saved one. */
+export interface SmtpSettingsInput {
+  host: string | null;
+  port: number | null;
+  security: SmtpSecurity;
+  username: string | null;
+  /** Empty string removes the saved password. */
+  password?: string;
   fromEmail: string | null;
   fromName: string | null;
-  source: "server_config" | "log";
 }
 
 export interface Settings {
@@ -117,8 +138,10 @@ export interface Settings {
   branding: Branding;
 }
 
-/** The parts of the settings an admin can change. */
-export type EditableSettings = Omit<Settings, "smtp">;
+/** The parts of the settings an admin can change, as the API takes them. */
+export type EditableSettings = Omit<Settings, "smtp"> & {
+  smtp: SmtpSettingsInput;
+};
 
 export type TemplateName =
   | "verify_email"
