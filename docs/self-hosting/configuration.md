@@ -8,7 +8,7 @@ description: "How Dopgate reads its configuration from DOPGATE_* environment var
 Dopgate has two kinds of configuration:
 
 - Server configuration, read once at startup: the database, the address, the public URL, CORS, the service key, SMTP. It comes from environment variables, an optional TOML file, and command-line flags.
-- Runtime settings, stored in the database and changed without a restart: sign-up rules, the password policy, token lifetimes, limits, and branding. Admins change them in the console or with `PATCH /api/v1/admin/settings`. See [the REST API](/reference/api#settings).
+- Runtime settings, stored in the database and changed without a restart: sign-up rules, the password policy, token lifetimes, limits, branding, and SMTP when the server config sets no SMTP host. Admins change them in the console or with `PATCH /api/v1/admin/settings`. See [the REST API](/reference/api#settings).
 
 ## Environment first
 

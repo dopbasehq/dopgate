@@ -21,7 +21,7 @@ The sign-in page accepts a password or an emailed code.
 | User | `/users/{id}` | Edit the profile and the three metadata objects, see and end sessions, disable, enable, or delete the account, send a password reset code, and (as root) change the role. |
 | Email templates | `/templates` | See the six emails and which ones are customized. |
 | Template | `/templates/{name}` | Edit the subject, HTML, and text, insert variables, preview the result, send yourself a test, or reset to the built-in version. |
-| Settings | `/settings` | Sign-up rules, the minimum password length, token lifetimes, limits, and branding. The SMTP section is read-only and has a button that sends a test email. |
+| Settings | `/settings` | Sign-up rules, the minimum password length, token lifetimes, limits, and branding. The SMTP section is editable unless `DOPGATE_SMTP_HOST` is set, and has a button that sends a test email. |
 | Signing keys | `/keys` | See the active, retiring, and retired keys. Root can rotate the key here. |
 | Audit log | `/audit` | Page through every recorded event, filter by action or actor, and verify the hash chain. |
 | Account | `/account` | Your own profile, password, email, and signed-in sessions. |

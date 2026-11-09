@@ -17,7 +17,7 @@ This page describes what Dopgate protects and how. For the steps you take when d
 | Signing keys | The P-256 private key as a PKCS#8 PEM in `signing_keys`, readable by anyone who can read the schema. |
 | Service key | Not stored. It is read from the environment and compared in constant time. |
 | Setup token | Kept in memory only, and gone once root exists or the server restarts. |
-| SMTP password | Not stored in the database. It comes from the environment or the config file. |
+| SMTP password | From the environment or the config file, it isn't stored. Saved from the console, it is encrypted with ChaCha20-Poly1305 under a key derived from `DOPGATE_SERVICE_KEY`, and never returned by the API. |
 
 The database is the boundary that matters most. Keep the `dopgate` schema readable only by Dopgate's own role, as the [PostgreSQL page](/self-hosting/postgres#give-dopgate-its-own-role) explains.
 

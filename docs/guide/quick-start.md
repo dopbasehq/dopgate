@@ -24,7 +24,7 @@ Open `.env` and change at least these values:
 | `DOPGATE_ROOT_EMAIL` | Your email. The first start creates the root account for it. |
 | `DOPGATE_ALLOWED_ORIGINS` | Your frontend's origin, such as `http://localhost:3000`. |
 
-Leave `DOPGATE_SMTP_HOST` empty for now. Without an SMTP server, Dopgate writes every email, codes included, to its log. [Environment variables](/reference/environment-variables) lists everything else you can set.
+Leave `DOPGATE_SMTP_HOST` empty for now. You can add an SMTP server later in the console, and until then Dopgate writes every email, codes included, to its log. [Environment variables](/reference/environment-variables) lists everything else you can set.
 
 ## 2. Start the stack
 

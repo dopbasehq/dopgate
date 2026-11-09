@@ -36,7 +36,7 @@ Behind a proxy, set `DOPGATE_TRUSTED_PROXIES` to the proxy's address or network.
 
 ## SMTP is set
 
-Without `DOPGATE_SMTP_HOST`, Dopgate writes emails, codes included, to the log. On a public instance, anyone who can read the logs could take over accounts. Set SMTP and send a test email from the console.
+Without an SMTP host, from `DOPGATE_SMTP_HOST` or the console, Dopgate writes emails, codes included, to the log. On a public instance, anyone who can read the logs could take over accounts. Set SMTP and send a test email from the console.
 
 ## The root account is yours alone
 

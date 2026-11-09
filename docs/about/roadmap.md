@@ -14,7 +14,7 @@ Dopgate is built in phases. Each phase replaces placeholder endpoints with worki
 | Foundation | Project layout, configuration, the CLI, first-run setup, the hash-chained audit log, and the full API description. |
 | PostgreSQL | Every table in its own schema, migrations at startup, and the switch from SQLite. |
 | Accounts and tokens | Password sign-up and sign-in, sign-out, profiles and metadata, roles, ES256 access tokens, the JWKS, key rotation, refresh token rotation with reuse detection, and sessions. |
-| Email codes | SMTP from the environment, six editable templates, 6-digit codes for verification, sign-in, password reset, and email change, and passwordless sign-up. |
+| Email codes | SMTP from the environment or the console, six editable templates, 6-digit codes for verification, sign-in, password reset, and email change, and passwordless sign-up. |
 | Admin API and limits | User management, settings, the service key, per-address and per-email limits, and account lockout. |
 | Admin console | The Vue console built into the binary, for root and admins. |
 | Docker and docs | The image, the Compose file, and these docs. |
