@@ -1,77 +1,47 @@
 # Changelog
 
-All notable changes to dopgate are documented in this file. The format follows
+All notable changes to Dopgate are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+The first release: an authentication server for one app, backed by PostgreSQL,
+with an admin console and Docker images. Nothing below has shipped before.
+
 ### Added
 
-- The dopgate backend, restructured from the Dopbase secrets manager into an
-  authentication server. One `dopgate` binary runs the server and its CLI and
-  stores everything in one SQLite file under `~/.dopgate` (or `--data-dir`).
-  The default port is 8850 and every setting reads `DOPGATE_*` variables.
-- `dopgate init` creates the root account. `dopgate serve` runs the server and,
-  while no root account exists, prints a one-time setup token for
-  `POST /api/v1/bootstrap/root`. Five wrong tokens from one address lock it
-  out for 15 minutes. `GET /api/v1/bootstrap/status` reports whether setup is
-  done.
-- A fresh baseline schema: users with the root, admin, and member roles;
-  clients; sessions and single-use refresh tokens; emailed verification codes
-  and links; JWT signing keys; runtime settings; single sign-on providers,
-  identities, and flows; and the hash-chained audit log.
-- Placeholder modules for every planned feature: sign-up and sign-in,
-  verification and passwordless sign-in, password recovery, sessions, MFA,
-  admin user management, clients, signing keys and JWKS, settings, single
-  sign-on, backups with user export and import, and dopgate as an OpenID
-  Connect provider. Each route exists, checks credentials, appears in Swagger
-  at `/api/docs`, and answers `501 NOT_IMPLEMENTED` until its phase lands.
-- Argon2id password hashing with a minimum length of 8 characters. Setup
-  records an `instance.initialized` audit event.
-- Planned CLI commands (`backup`, `users`, `keys`) that exit with code 2.
-- Backend tests under `app/tests/`, mirroring `src/`. They cover setup and
-  its lockout, every route in the OpenAPI document (401 without a token, 501
-  for placeholders), the error and header layer, configuration precedence,
-  the CLI binary, master-key encryption and rekeying, audit chain tampering,
-  anchors and retention, rate limiting, client address resolution, roles,
-  migrations up and down, and password hashing.
-- OpenAPI operation IDs carry their tag (`users_list`, `clients_list`), so
-  every ID in the document is unique.
-- The `Authorization` header accepts the `Bearer` scheme in any case, as
-  RFC 9110 requires.
-- Argon2 and BLAKE2 build at full speed in release builds, which are otherwise
-  optimized for size. Password hashing is about 25% faster as a result.
-- SMTP settings and the mailer. `GET` and `PATCH /api/v1/admin/settings`
-  store sign-up rules, the password policy, token lifetimes, SMTP, and
-  branding in the `settings` table. The SMTP password is encrypted with the
-  master key and only reported as `passwordSet`. Left-out fields keep their
-  value, and an empty string clears one. `POST
-  /api/v1/admin/settings/smtp/test` sends a message and answers `502
-  SMTP_SEND_FAILED` with the server's reply when it fails. With no host set,
-  mail goes to the server log. Changes are audited as `settings.updated`.
-  New error codes: `SETTINGS_INVALID`, `SMTP_NOT_CONFIGURED`, and
-  `SMTP_SEND_FAILED`. The admin routes still answer 501 until access tokens
-  land, and the saved password policy and token lifetimes take effect when
-  sign-up and tokens do.
-- An `[smtp]` table in `server.toml` and matching `DOPGATE_SMTP_*`
-  variables for the host, port, security, login, and sender. The mailer
-  uses it while the runtime settings have no SMTP host, so SMTP works before
-  the admin API does. Bad values stop the server at startup.
-  `GET /api/v1/admin/settings` reports where mail goes in `smtp.source`:
-  `settings`, `server_config`, or `log`. The generated `server.toml`
-  documents every field.
-- `lettre` for SMTP, using rustls with the system's trusted roots, like the
-  OpenID Connect client.
-- `rust-version = "1.89"` in `app/Cargo.toml`.
-- The documentation site in `docs/`, built with VitePress: guide, CLI,
-  self-hosting, reference, and roadmap.
-- Root `package.json` scripts. `bun run dev` starts the API and the docs
-  together; `build`, `test:app`, `lint:app`, and `format:app` wrap the Rust
-  tooling.
-
-### Removed
-
-- Everything specific to the secrets manager: projects, environments,
-  secrets, runner and personal tokens, grants, groups, custom roles, CLI
-  device login, background daemon mode, and their 32 migrations.
+- The `dopgate` binary: `serve`, `init`, `keys rotate`, and `healthcheck`.
+  Settings come from `DOPGATE_*` variables, with an optional TOML file.
+- PostgreSQL storage through `DOPGATE_DATABASE_URL`. Every table lives in the
+  `dopgate` schema (`DOPGATE_DATABASE_SCHEMA`), so it can share your app's
+  database.
+- Root setup: `DOPGATE_ROOT_EMAIL` on a fresh database prints a generated
+  password once; otherwise a one-time setup token, `/setup`, or `dopgate init`.
+- Sign-up, sign-in by password or emailed 6-digit code, sign-out, profile
+  (`displayName`, `avatarUrl`, `userMetadata`), password change, and email
+  change.
+- Email verification and password reset by code. Sign-in requires a verified
+  email by default (`signup.requireEmailVerification`).
+- ES256 access tokens with `/.well-known/jwks.json`, key rotation, and
+  single-use refresh tokens that end the session when reused.
+- Sessions: list devices and sign out one or all at `/api/v1/auth/sessions`.
+- Admin API for users: search, create, update metadata, disable, delete, send
+  reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it;
+  only root manages admins.
+- Six email templates with built-in defaults that admins can edit, preview,
+  test, and reset at `/api/v1/admin/email-templates`.
+- Limits: per-address and per-email request limits, code resend waits, and
+  account lockout after five wrong passwords, all editable in settings.
+- SMTP through `DOPGATE_SMTP_*`. Without a host, emails go to the log.
+- A hash-chained audit log with retention (`DOPGATE_AUDIT_RETENTION_DAYS`,
+  365 days by default) and a verify endpoint.
+- The admin console at `/`: users, email templates, settings, signing keys,
+  audit log, and your account.
+- The Dopgate brand: the Hash D logo, Gate Red, and the Geist wordmark across
+  the console, docs, README, and favicons.
+- CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
+- A `Dockerfile` and a `docker-compose.yml` with PostgreSQL and Dopgate.
+- Documentation site and README for the setup above.
+- Single sign-on and MFA routes are listed in the API and answer
+  `501 NOT_IMPLEMENTED` until they are built.
