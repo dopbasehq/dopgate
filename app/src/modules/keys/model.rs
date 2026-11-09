@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -10,7 +11,7 @@ pub struct Jwks {
   pub keys: Vec<serde_json::Value>,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct SigningKeyResponse {
   /// The key ID, also the JWT `kid`.
@@ -19,6 +20,7 @@ pub struct SigningKeyResponse {
   /// `active` signs new tokens. `retiring` only verifies tokens it signed.
   /// `retired` is out of the key set.
   pub status: String,
-  pub created_at: String,
-  pub rotated_at: Option<String>,
+  pub created_at: DateTime<Utc>,
+  pub rotated_at: Option<DateTime<Utc>>,
+  pub retired_at: Option<DateTime<Utc>>,
 }

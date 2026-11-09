@@ -18,24 +18,3 @@ pub(crate) fn instance_overrides(instance: InstanceArgs) -> ServerOverrides {
 pub(crate) fn load_config(overrides: &ServerOverrides) -> anyhow::Result<ServerConfig> {
   ServerConfig::load(overrides)
 }
-
-/// Exit code for commands that are planned but not built yet.
-pub const EXIT_NOT_IMPLEMENTED: i32 = 2;
-
-/// Report a planned command and return its exit code.
-pub(crate) fn planned(
-  command: &str,
-  json: bool,
-) -> i32 {
-  if json {
-    crate::cli::output::print_error_json(&serde_json::json!({
-      "success": false,
-      "error": { "NOT_IMPLEMENTED": format!("`dopgate {command}` is planned and not built yet.") }
-    }));
-  } else {
-    crate::cli::output::print_error(&format!(
-      "`dopgate {command}` is planned and not built yet. The roadmap in the docs says when it lands."
-    ));
-  }
-  EXIT_NOT_IMPLEMENTED
-}

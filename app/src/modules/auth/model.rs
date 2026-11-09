@@ -3,18 +3,18 @@ use utoipa::ToSchema;
 
 use crate::models::User;
 
-/// What the sign-in screen of your app should offer.
+/// What your app's sign-in screen should offer.
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthMethods {
   pub signup_enabled: bool,
+  /// Email and password.
   pub password: bool,
-  /// Passwordless sign-in with an emailed code.
+  /// Sign-in with an emailed code.
   pub email_otp: bool,
-  /// Passwordless sign-in with an emailed link.
-  pub email_link: bool,
-  /// Enabled single sign-on providers, by ID.
-  pub sso_providers: Vec<String>,
+  /// Whether sign-in needs a verified email.
+  pub email_verification_required: bool,
+  pub branding: crate::modules::settings::model::BrandingSettings,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -25,6 +25,20 @@ pub struct SignupRequest {
   pub display_name: Option<String>,
 }
 
+/// What sign-up returns.
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SignupResult {
+  pub user: User,
+  /// Sign-in waits for the emailed code to be confirmed.
+  pub verification_required: bool,
+  /// A verification code went to the email.
+  pub verification_sent: bool,
+  /// Tokens, when sign-in does not wait for verification. `null` otherwise:
+  /// confirm the code with `/auth/verification/confirm` to get them.
+  pub tokens: Option<AuthTokens>,
+}
+
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginRequest {
@@ -32,17 +46,18 @@ pub struct LoginRequest {
   pub password: String,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RefreshRequest {
-  pub refresh_token: String,
+  /// The refresh token. The console leaves it out and sends its cookie.
+  pub refresh_token: Option<String>,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LogoutRequest {
-  /// End the session this refresh token belongs to. Without it, the
-  /// session of the access token ends.
+  /// End the session this refresh token belongs to. Works without an access
+  /// token, so an app can sign out after the access token expired.
   pub refresh_token: Option<String>,
   /// End every session of the account.
   #[serde(default)]
@@ -59,24 +74,28 @@ pub struct AuthTokens {
   pub token_type: String,
   /// Seconds until the access token expires.
   pub expires_in: i64,
-  /// Exchange it at `/auth/refresh` for new tokens. Each use returns a new
-  /// refresh token and retires the old one.
-  pub refresh_token: String,
+  /// Trade it at `/auth/refresh` for new tokens. Each use returns a new
+  /// refresh token and retires the old one. `null` in cookie mode, where an
+  /// HttpOnly cookie carries it.
+  pub refresh_token: Option<String>,
   pub user: User,
 }
 
+/// Fields left out stay as they are. An empty string clears `displayName`
+/// or `avatarUrl`.
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProfileRequest {
   pub display_name: Option<String>,
   pub avatar_url: Option<String>,
-  /// Replaces the account's public metadata.
-  pub public_metadata: Option<serde_json::Value>,
+  /// Replaces the whole object. Your app decides what goes in it.
+  pub user_metadata: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangePasswordRequest {
-  pub current_password: String,
+  /// Required when the account has a password.
+  pub current_password: Option<String>,
   pub new_password: String,
 }

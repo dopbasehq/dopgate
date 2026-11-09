@@ -1,7 +1,9 @@
 mod audit;
+mod auth;
 mod bootstrap;
 mod docs;
 mod health;
 mod routes;
+mod sessions;
 mod settings;
 mod sso;

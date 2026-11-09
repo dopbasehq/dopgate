@@ -3,6 +3,7 @@ pub mod authz;
 pub mod client_ip;
 pub mod db;
 pub mod jwt;
+pub mod keys;
 pub mod mailer;
 pub mod oidc;
 pub mod otp;

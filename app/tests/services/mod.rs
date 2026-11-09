@@ -2,6 +2,7 @@ mod audit_chain;
 mod authz;
 mod client_ip;
 mod db;
+mod jwt;
 mod mailer;
 mod migrations;
 mod password;

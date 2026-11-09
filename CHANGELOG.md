@@ -11,16 +11,21 @@ PostgreSQL. Nothing below has shipped before.
 
 ### Added
 
-- The `dopgate` binary: `serve`, `init`, and `healthcheck`. Settings come
-  from `DOPGATE_*` variables, with an optional TOML file.
+- The `dopgate` binary: `serve`, `init`, `keys rotate`, and `healthcheck`.
+  Settings come from `DOPGATE_*` variables, with an optional TOML file.
 - PostgreSQL storage through `DOPGATE_DATABASE_URL`. Every table lives in the
   `dopgate` schema (`DOPGATE_DATABASE_SCHEMA`), so it can share your app's
   database.
 - Root setup: `DOPGATE_ROOT_EMAIL` on a fresh database prints a generated
   password once; otherwise a one-time setup token or `dopgate init`.
+- Sign-up, sign-in by password, sign-out, profile (`displayName`,
+  `avatarUrl`, `userMetadata`), and password change.
+- ES256 access tokens with `/.well-known/jwks.json`, key rotation, and
+  single-use refresh tokens that end the session when reused.
+- Sessions: list devices and sign out one or all at `/api/v1/auth/sessions`.
 - SMTP through `DOPGATE_SMTP_*`. Without a host, emails go to the log.
 - A hash-chained audit log with retention (`DOPGATE_AUDIT_RETENTION_DAYS`,
   365 days by default) and a verify endpoint.
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
-- Routes still being built (accounts, tokens, codes, admin users, single
-  sign-on, and MFA) are listed in the API and answer `501 NOT_IMPLEMENTED`.
+- Routes still being built (codes, admin users, single sign-on, and MFA) are
+  listed in the API and answer `501 NOT_IMPLEMENTED`.

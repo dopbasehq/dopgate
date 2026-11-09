@@ -196,15 +196,18 @@ async fn root_email_creates_root_with_a_generated_password_once() {
   assert!(password.len() >= 24);
   assert!(state.setup.read().await.token.is_none());
 
-  let (role, verified, hash): (String, bool, String) = sqlx::query_as(
-    "SELECT role, email_verified_at IS NOT NULL, password_hash FROM users WHERE email = 'owner@example.com'",
-  )
-  .fetch_one(state.db.pool())
-  .await
-  .unwrap();
-  assert_eq!(role, "root");
-  assert!(verified);
-  assert!(app::services::password::verify(&password, &hash));
+  let router = app::server::router(state.clone());
+  let app = crate::support::TestApp {
+    state,
+    router,
+    _schema: crate::support::SchemaGuard(crate::support::unique_schema()),
+  };
+  let token = app.login("owner@example.com", &password).await;
+  let (_, me) = app
+    .request_with(Method::GET, "/api/v1/auth/me", None, Some(&token))
+    .await;
+  assert_eq!(me["data"]["role"], "root");
+  assert_eq!(me["data"]["emailVerified"], true);
 
   let (_, again) = app::server::build_state_with_setup(config).await.unwrap();
   assert!(matches!(again, app::server::RootSetup::Exists));
