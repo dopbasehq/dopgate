@@ -1,39 +1,24 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use utoipa::ToSchema;
 
-use crate::{
-  modules::auth::model::AuthTokens,
-  services::otp::{Method, Purpose},
-};
+pub use crate::services::otp::Purpose;
 
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SendVerificationRequest {
+pub struct SendCodeRequest {
   pub email: String,
-  /// `email_verify`, `login` (passwordless sign-in), or `email_change`.
-  /// Password resets use `/auth/password/forgot`.
+  /// `email_verify` or `login`. Password resets use
+  /// `/auth/password/forgot`, email changes `/auth/email/change`.
   pub purpose: Purpose,
-  pub method: Method,
-  /// Where a link leads. Must be one of the client's redirect URLs.
-  pub redirect_url: Option<String>,
 }
 
-/// Prove the email with the code or the token from the link.
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ConfirmVerificationRequest {
-  pub purpose: Purpose,
-  /// Required with `code`.
-  pub email: Option<String>,
-  pub code: Option<String>,
-  pub token: Option<String>,
-}
-
-#[derive(Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct VerificationResult {
+pub struct ConfirmCodeRequest {
+  /// The address the code was sent to. For `email_change`, the new address.
   pub email: String,
+  /// `email_verify`, `login`, or `email_change`.
   pub purpose: Purpose,
-  /// Set for `login`: the user is now signed in.
-  pub tokens: Option<AuthTokens>,
+  /// The 6-digit code. Spaces and dashes are ignored.
+  pub code: String,
 }

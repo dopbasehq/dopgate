@@ -3,7 +3,13 @@
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 
-use crate::support::{PASSWORD, TestApp};
+use crate::support::{PASSWORD, TestApp, smtp::FakeSmtp, use_smtp};
+
+async fn app_with_mail() -> (TestApp, FakeSmtp) {
+  let smtp = FakeSmtp::start().await;
+  let app = TestApp::with(|config| use_smtp(config, &smtp)).await;
+  (app, smtp)
+}
 
 async fn signup(
   app: &TestApp,
@@ -18,14 +24,31 @@ async fn signup(
     .await
 }
 
+async fn confirm(
+  app: &TestApp,
+  email: &str,
+  purpose: &str,
+  code: &str,
+) -> (StatusCode, Value) {
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/verification/confirm",
+      Some(json!({ "email": email, "purpose": purpose, "code": code })),
+    )
+    .await
+}
+
 #[tokio::test]
-async fn sign_in_waits_for_a_verified_email_by_default() {
-  let app = TestApp::new().await;
+async fn signup_sends_a_code_and_sign_in_waits_for_it() {
+  let (app, smtp) = app_with_mail().await;
   let (status, body) = signup(&app, " Ada@Example.com ").await;
   assert_eq!(status, StatusCode::CREATED, "{body}");
   assert_eq!(body["data"]["user"]["email"], "ada@example.com");
+  assert_eq!(body["data"]["user"]["emailVerified"], false);
   assert_eq!(body["data"]["verificationRequired"], true);
   assert!(body["data"]["tokens"].is_null());
+
   let (status, body) = app
     .request(
       Method::POST,
@@ -35,6 +58,22 @@ async fn sign_in_waits_for_a_verified_email_by_default() {
     .await;
   assert_eq!(status, StatusCode::FORBIDDEN);
   assert!(body["error"]["EMAIL_NOT_VERIFIED"].is_string());
+
+  let code = smtp.code_for("ada@example.com").await;
+  let (status, body) = confirm(&app, "ada@example.com", "email_verify", &code).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["user"]["emailVerified"], true);
+  assert!(
+    body["data"]["refreshToken"]
+      .as_str()
+      .unwrap()
+      .starts_with("dgr_")
+  );
+
+  // The code works once.
+  let (status, _) = confirm(&app, "ada@example.com", "email_verify", &code).await;
+  assert_eq!(status, StatusCode::BAD_REQUEST);
+  app.login("ada@example.com", PASSWORD).await;
 }
 
 #[tokio::test]
@@ -82,6 +121,55 @@ async fn signup_refuses_taken_emails_weak_passwords_and_closed_signup() {
   let (status, body) = signup(&app, "carl@example.com").await;
   assert_eq!(status, StatusCode::FORBIDDEN);
   assert!(body["error"]["SIGNUP_DISABLED"].is_string());
+}
+
+#[tokio::test]
+async fn wrong_passwords_lock_the_account_with_the_same_answer() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com", "member").await;
+  let attempt = |password: &'static str| {
+    let app = &app;
+    async move {
+      app
+        .request(
+          Method::POST,
+          "/api/v1/auth/login",
+          Some(json!({ "email": "ada@example.com", "password": password })),
+        )
+        .await
+    }
+  };
+  for _ in 0..5 {
+    let (status, body) = attempt("wrong password").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+  }
+  // Locked: even the right password gets the wrong-password answer.
+  let (status, body) = attempt(PASSWORD).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+
+  // Unknown emails get the same answer too.
+  let (status, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "nobody@example.com", "password": PASSWORD })),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+
+  let (_, user) = app
+    .request_with(
+      Method::GET,
+      "/api/v1/admin/users?search=ada",
+      None,
+      Some(&root),
+    )
+    .await;
+  assert!(user["data"]["items"][0]["lockedUntil"].is_string());
 }
 
 #[tokio::test]
@@ -199,11 +287,14 @@ async fn the_profile_reads_and_changes_its_own_fields_only() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
   let id = app.create_user(&root, "ada@example.com", "member").await;
-  sqlx::query("UPDATE users SET public_metadata = '{\"plan\":\"pro\"}' WHERE id = $1")
-    .bind(&id)
-    .execute(app.state.db.pool())
-    .await
-    .unwrap();
+  app
+    .request_with(
+      Method::PATCH,
+      &format!("/api/v1/admin/users/{id}"),
+      Some(json!({ "publicMetadata": { "plan": "pro" } })),
+      Some(&root),
+    )
+    .await;
   let token = app.login("ada@example.com", PASSWORD).await;
   let (status, body) = app
     .request_with(
@@ -253,8 +344,8 @@ async fn the_profile_reads_and_changes_its_own_fields_only() {
 }
 
 #[tokio::test]
-async fn changing_the_password_ends_other_sessions() {
-  let app = TestApp::new().await;
+async fn changing_the_password_ends_other_sessions_and_sends_a_notice() {
+  let (app, smtp) = app_with_mail().await;
   let root = app.root_token().await;
   app.create_user(&root, "ada@example.com", "member").await;
   let laptop = app.login("ada@example.com", PASSWORD).await;
@@ -281,7 +372,40 @@ async fn changing_the_password_ends_other_sessions() {
   assert_eq!(status, StatusCode::OK);
   assert_eq!(me(&app, &laptop).await, StatusCode::OK);
   assert_eq!(me(&app, &phone).await, StatusCode::UNAUTHORIZED);
+  assert_eq!(smtp.wait_for("ada@example.com", 1).await, 1);
   app.login("ada@example.com", "a brand new password").await;
+}
+
+#[tokio::test]
+async fn changing_the_email_needs_the_password_and_a_code_from_the_new_address() {
+  let (app, smtp) = app_with_mail().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "taken@example.com", "member").await;
+  let token = app.login("ada@example.com", PASSWORD).await;
+  let change = |body: Value| {
+    app.request_with(
+      Method::POST,
+      "/api/v1/auth/email/change",
+      Some(body),
+      Some(&token),
+    )
+  };
+
+  let (status, _) = change(json!({ "newEmail": "new@example.com" })).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  let (status, _) = change(json!({ "newEmail": "taken@example.com", "password": PASSWORD })).await;
+  assert_eq!(status, StatusCode::CONFLICT);
+  let (status, body) = change(json!({ "newEmail": "New@Example.com", "password": PASSWORD })).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+
+  let code = smtp.code_for("new@example.com").await;
+  let (status, body) = confirm(&app, "new@example.com", "email_change", &code).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["email"], "new@example.com");
+  // The old address hears about it.
+  assert_eq!(smtp.wait_for("ada@example.com", 1).await, 1);
+  app.login("new@example.com", PASSWORD).await;
 }
 
 #[tokio::test]

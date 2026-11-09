@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use sqlx::{PgConnection, PgExecutor};
+use sqlx::{PgConnection, PgExecutor, PgPool};
 
 use super::model::AdminUser;
 use crate::models::{Role, User, UserStatus};
@@ -90,6 +90,19 @@ pub async fn find_by_id(
     .await
 }
 
+/// Lock the row for the rest of the transaction.
+pub async fn find_by_id_for_update(
+  connection: &mut PgConnection,
+  id: &str,
+) -> Result<Option<UserRow>, sqlx::Error> {
+  sqlx::query_as(&format!(
+    "SELECT {COLUMNS} FROM users WHERE id = $1 FOR UPDATE"
+  ))
+  .bind(id)
+  .fetch_optional(connection)
+  .await
+}
+
 /// `email` must already be normalized.
 pub async fn find_by_email(
   executor: impl PgExecutor<'_>,
@@ -133,6 +146,19 @@ pub async fn insert(
   .await
 }
 
+pub async fn mark_verified(
+  executor: impl PgExecutor<'_>,
+  id: &str,
+) -> Result<(), sqlx::Error> {
+  sqlx::query(
+    "UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()), updated_at = now() WHERE id = $1",
+  )
+  .bind(id)
+  .execute(executor)
+  .await
+  .map(|_| ())
+}
+
 /// Record a successful sign-in and clear failed attempts.
 pub async fn record_sign_in(
   executor: impl PgExecutor<'_>,
@@ -145,6 +171,28 @@ pub async fn record_sign_in(
   .execute(executor)
   .await
   .map(|_| ())
+}
+
+/// Count a wrong password. Locks the account for `lock_minutes` once the
+/// count reaches `max_attempts`, and starts counting again. Returns whether
+/// this attempt locked it.
+pub async fn record_failure(
+  executor: impl PgExecutor<'_>,
+  id: &str,
+  max_attempts: i32,
+  lock_minutes: i32,
+) -> Result<bool, sqlx::Error> {
+  sqlx::query_scalar(
+    "UPDATE users SET \
+       locked_until = CASE WHEN failed_login_count + 1 >= $2 THEN now() + make_interval(mins => $3) ELSE locked_until END, \
+       failed_login_count = CASE WHEN failed_login_count + 1 >= $2 THEN 0 ELSE failed_login_count + 1 END \
+     WHERE id = $1 RETURNING locked_until IS NOT NULL AND locked_until > now()",
+  )
+  .bind(id)
+  .bind(max_attempts)
+  .bind(lock_minutes)
+  .fetch_one(executor)
+  .await
 }
 
 pub async fn set_password(
@@ -160,6 +208,38 @@ pub async fn set_password(
   .execute(executor)
   .await
   .map(|_| ())
+}
+
+pub async fn set_email(
+  executor: impl PgExecutor<'_>,
+  id: &str,
+  email: &str,
+) -> Result<UserRow, sqlx::Error> {
+  sqlx::query_as(&format!(
+    "UPDATE users SET email = $2, email_verified_at = now(), updated_at = now() WHERE id = $1 RETURNING {COLUMNS}"
+  ))
+  .bind(id)
+  .bind(email)
+  .fetch_one(executor)
+  .await
+}
+
+pub async fn set_status(
+  executor: impl PgExecutor<'_>,
+  id: &str,
+  status: UserStatus,
+) -> Result<UserRow, sqlx::Error> {
+  let status = match status {
+    UserStatus::Active => "active",
+    UserStatus::Disabled => "disabled",
+  };
+  sqlx::query_as(&format!(
+    "UPDATE users SET status = $2, updated_at = now() WHERE id = $1 RETURNING {COLUMNS}"
+  ))
+  .bind(id)
+  .bind(status)
+  .fetch_one(executor)
+  .await
 }
 
 /// The profile fields a user or an admin changes. `None` leaves a field as
@@ -204,6 +284,65 @@ pub async fn update_profile(
   .bind(changes.email_verified)
   .bind(changes.role.map(Role::as_str))
   .fetch_one(executor)
+  .await
+}
+
+pub async fn delete(
+  executor: impl PgExecutor<'_>,
+  id: &str,
+) -> Result<bool, sqlx::Error> {
+  sqlx::query("DELETE FROM users WHERE id = $1")
+    .bind(id)
+    .execute(executor)
+    .await
+    .map(|result| result.rows_affected() > 0)
+}
+
+pub struct ListFilter<'a> {
+  pub search: Option<&'a str>,
+  pub role: Option<Role>,
+  pub status: Option<UserStatus>,
+  /// Rows strictly older than this (created_at, id).
+  pub before: Option<(DateTime<Utc>, &'a str)>,
+  pub limit: i64,
+}
+
+pub async fn list(
+  pool: &PgPool,
+  filter: &ListFilter<'_>,
+) -> Result<Vec<UserRow>, sqlx::Error> {
+  let pattern = filter.search.map(|search| {
+    format!(
+      "%{}%",
+      search
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+    )
+  });
+  let status = filter.status.map(|status| match status {
+    UserStatus::Active => "active",
+    UserStatus::Disabled => "disabled",
+  });
+  let (before_time, before_id) = match filter.before {
+    Some((time, id)) => (Some(time), Some(id)),
+    None => (None, None),
+  };
+  sqlx::query_as(&format!(
+    "SELECT {COLUMNS} FROM users \
+     WHERE ($1::TEXT IS NULL OR email ILIKE $1 OR display_name ILIKE $1) \
+       AND ($2::TEXT IS NULL OR role = $2) \
+       AND ($3::TEXT IS NULL OR status = $3) \
+       AND ($4::TIMESTAMPTZ IS NULL OR (created_at, id) < ($4, $5)) \
+     ORDER BY created_at DESC, id DESC LIMIT $6"
+  ))
+  .bind(pattern)
+  .bind(filter.role.map(Role::as_str))
+  .bind(status)
+  .bind(before_time)
+  .bind(before_id)
+  .bind(filter.limit)
+  .fetch_all(pool)
   .await
 }
 

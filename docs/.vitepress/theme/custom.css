@@ -1,35 +1,62 @@
 :root {
-  --dopgate-teal: #0d9488;
-  --dopgate-teal-light: #2dd4bf;
-  --dopgate-ink: #0f172a;
-  --vp-c-brand-1: var(--dopgate-teal);
-  --vp-c-brand-2: #0f766e;
-  --vp-c-brand-3: #115e59;
-  --vp-c-brand-soft: rgba(13, 148, 136, 0.14);
+  /* Values from the "Dopgate · Brand reference" page in Figma. Gate Red
+     carries the logo and primary actions; Red Deep ends the app icon
+     gradient. Coral is for errors only, never brand decoration. */
+  --dopgate-red: #ff4053;
+  --dopgate-red-light: #ff8593;
+  --dopgate-red-deep: #b0182c;
+  --dopgate-red-text: #d4213a;
+  --vp-font-family-brand:
+    "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --dopgate-ink: #18181b;
+  --vp-c-brand-1: var(--dopgate-red-text);
+  --vp-c-brand-2: #b81a31;
+  --vp-c-brand-3: #9c1529;
+  --vp-c-brand-soft: rgba(212, 33, 58, 0.12);
+  --vp-button-brand-bg: var(--dopgate-red-text);
+  --vp-button-brand-hover-bg: #b81a31;
+  --vp-button-brand-active-bg: #9c1529;
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: linear-gradient(
     135deg,
-    var(--dopgate-teal) 0%,
-    #38bdf8 90%
+    var(--dopgate-red) 0%,
+    var(--dopgate-red-deep) 100%
   );
 }
 
 .dark {
-  --vp-c-brand-1: var(--dopgate-teal-light);
-  --vp-c-brand-2: #5eead4;
-  --vp-c-brand-3: #14b8a6;
-  --vp-c-brand-soft: rgba(45, 212, 191, 0.16);
+  --vp-c-brand-1: var(--dopgate-red);
+  --vp-c-brand-2: #ff6b7a;
+  --vp-c-brand-3: #ff9aa3;
+  --vp-c-brand-soft: rgba(255, 64, 83, 0.16);
+  --vp-button-brand-bg: var(--dopgate-red-text);
+  --vp-button-brand-hover-bg: #e2304a;
+  --vp-button-brand-active-bg: #b81a31;
+  --vp-home-hero-name-background: linear-gradient(
+    135deg,
+    var(--dopgate-red) 0%,
+    var(--dopgate-red-light) 100%
+  );
 }
 
+/* The mark is 48 x 52; keep that ratio so it never stretches. */
 .VPNavBarTitle .logo {
-  border-radius: 8px;
-  height: 28px;
-  width: 28px;
+  height: 26px;
+  width: 24px;
+}
+
+/* The wordmark: Geist SemiBold at -2% tracking, as in the logo lockup. */
+.VPNavBarTitle .title {
+  font-family: var(--vp-font-family-brand);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  gap: 7px;
 }
 
 .VPHero .name,
 .VPHero .text {
-  letter-spacing: -0.04em;
+  font-family: var(--vp-font-family-brand);
+  letter-spacing: -0.02em;
 }
 
 .VPHero .tagline {

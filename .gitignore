@@ -10,3 +10,6 @@ app/target
 # Docs build output
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+# Local secrets for docker compose
+.env

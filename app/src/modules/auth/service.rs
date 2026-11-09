@@ -1,5 +1,7 @@
 //! Sign-up, sign-in, and the signed-in account.
 
+use axum::http::StatusCode;
+
 use super::model::*;
 use crate::{
   constants::{
@@ -13,12 +15,13 @@ use crate::{
   http::HttpError,
   models::{Role, User},
   modules::{
-    audit,
+    audit, email_templates,
     sessions::{self, model::SignInMethod},
     settings,
     users::repository::{self as users, ProfileChanges, UserRow},
+    verification::service::{self as verification, CodeTarget},
   },
-  services::password,
+  services::{limits, otp::Purpose, password},
   state::AppState,
   utils::validate,
 };
@@ -57,6 +60,7 @@ pub async fn signup(
   request: SignupRequest,
   user_agent: Option<&str>,
 ) -> Result<SignupResult, HttpError> {
+  limits::per_address(state).await?;
   let pool = state.db.pool();
   let signup = settings::service::signup(pool).await?;
   if !signup.enabled {
@@ -114,25 +118,36 @@ pub async fn signup(
     Some(sessions::service::start(state, &mut tx, &user, SignInMethod::Password, user_agent).await?)
   };
   tx.commit().await?;
+  verification::issue(state, Purpose::EmailVerify, code_target(&user)).await?;
   Ok(SignupResult {
     user: tokens
       .as_ref()
       .map_or_else(|| user.to_user(), |tokens| tokens.user.clone()),
     verification_required: signup.require_email_verification,
-    // Codes arrive with email verification.
-    verification_sent: false,
+    verification_sent: true,
     tokens,
   })
 }
 
-/// Sign in with an email and password. A disabled or unverified account is
-/// only reported after the right password, so the answer never reveals that
-/// an account exists.
+fn code_target(user: &UserRow) -> CodeTarget<'_> {
+  CodeTarget {
+    email: &user.email,
+    user_id: Some(&user.id),
+    display_name: user.display_name.as_deref(),
+    current_email: None,
+  }
+}
+
+/// Sign in with an email and password. Wrong passwords count toward the
+/// account lockout. While locked, every attempt gets the same answer as a
+/// wrong password. A disabled or unverified account is only reported after
+/// the right password, so the answer never reveals that an account exists.
 pub async fn login(
   state: &AppState,
   request: LoginRequest,
   user_agent: Option<&str>,
 ) -> Result<AuthTokens, HttpError> {
+  limits::per_address(state).await?;
   let pool = state.db.pool();
   let Some(email) = crate::utils::email::normalize(&request.email) else {
     return Err(wrong_credentials());
@@ -146,11 +161,28 @@ pub async fn login(
   let Some(user) = user else {
     return Err(wrong_credentials());
   };
-  if !matches || user.password_hash.is_none() {
+  if user.is_locked() {
     audit::service::record_now(
       pool,
       audit::service::Event::user(&user.id, &user.email, &user.role, "user.sign_in_failed")
-        .metadata(serde_json::json!({ "reason": "password" })),
+        .metadata(serde_json::json!({ "reason": "locked" })),
+    )
+    .await;
+    return Err(wrong_credentials());
+  }
+  if !matches || user.password_hash.is_none() {
+    let config = settings::service::limits(pool).await?;
+    let locked = users::record_failure(
+      pool,
+      &user.id,
+      i32::try_from(config.lockout_attempts).unwrap_or(i32::MAX),
+      i32::try_from(config.lockout_minutes).unwrap_or(i32::MAX),
+    )
+    .await?;
+    audit::service::record_now(
+      pool,
+      audit::service::Event::user(&user.id, &user.email, &user.role, "user.sign_in_failed")
+        .metadata(serde_json::json!({ "reason": "password", "locked": locked })),
     )
     .await;
     return Err(wrong_credentials());
@@ -323,5 +355,48 @@ pub async fn change_password(
   )
   .await?;
   tx.commit().await?;
-  Ok(())
+  let values =
+    email_templates::service::base_values(state, &account.email, account.display_name.as_deref())
+      .await?;
+  email_templates::service::send(state, "password_changed", &account.email, values).await
+}
+
+/// Start an email change: a code goes to the new address. The account moves
+/// once the code is confirmed with `/auth/verification/confirm`.
+pub async fn change_email(
+  state: &AppState,
+  user: &UserIdentity,
+  request: ChangeEmailRequest,
+) -> Result<(), HttpError> {
+  let account = current(state, &user.user_id).await?;
+  let new_email = validate::email(&request.new_email)?;
+  if new_email == account.email {
+    return Err(HttpError::new(
+      StatusCode::UNPROCESSABLE_ENTITY,
+      crate::constants::errors::EMAIL_INVALID,
+      "That is already the email on this account.",
+    ));
+  }
+  confirm_password(&account, request.password).await?;
+  if users::find_by_email(state.db.pool(), &new_email)
+    .await?
+    .is_some()
+  {
+    return Err(HttpError::conflict(
+      EMAIL_TAKEN,
+      "Another account already uses this email.",
+    ));
+  }
+  verification::check_send_limits(state, Purpose::EmailChange, &new_email).await?;
+  verification::issue(
+    state,
+    Purpose::EmailChange,
+    CodeTarget {
+      email: &new_email,
+      user_id: Some(&account.id),
+      display_name: account.display_name.as_deref(),
+      current_email: Some(&account.email),
+    },
+  )
+  .await
 }

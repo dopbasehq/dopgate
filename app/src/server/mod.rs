@@ -33,7 +33,7 @@ use crate::{
   },
   http::HttpError,
   middlewares, modules,
-  services::{db::DbClient, keys::KeyStore, rate_limit::RateLimiter, token},
+  services::{db::DbClient, keys::KeyStore, limits::Limits, rate_limit::RateLimiter, token},
   state::{AppState, SetupState},
 };
 
@@ -119,6 +119,7 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
     db,
     setup: Arc::new(tokio::sync::RwLock::new(SetupState { token: setup_token })),
     rate_limiter: RateLimiter::default(),
+    limits: Limits::default(),
     keys,
     oidc: Default::default(),
     started_at: std::time::Instant::now(),

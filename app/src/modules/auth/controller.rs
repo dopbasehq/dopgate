@@ -242,3 +242,31 @@ pub async fn change_password(
   service::change_password(&state, &user, request).await?;
   Ok(HttpResponse::done("PASSWORD_CHANGED"))
 }
+
+/// Change email
+///
+/// Email a 6-digit code to the new address. Confirm it with
+/// `/auth/verification/confirm` (purpose `email_change`, the new address as
+/// `email`) to move the account. A notice then goes to the old address.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::auth::EMAIL_CHANGE,
+  tag = "auth",
+  security(("bearerAuth" = [])),
+  request_body = ChangeEmailRequest,
+  responses(
+    (status = 200, description = "Code sent to the new address", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 401, description = "Authentication is required, or the password is wrong", body = crate::http::ErrorBody),
+    (status = 409, description = "Another account uses the new email", body = crate::http::ErrorBody),
+    (status = 422, description = "The new email was refused", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many codes", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn change_email(
+  State(state): State<AppState>,
+  user: UserIdentity,
+  Json(request): Json<ChangeEmailRequest>,
+) -> Result<HttpResponse<serde_json::Value>, AuthError> {
+  service::change_email(&state, &user, request).await?;
+  Ok(HttpResponse::done("EMAIL_CHANGE_CODE_SENT"))
+}

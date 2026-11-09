@@ -1,38 +1,56 @@
 ---
 title: "Errors"
-description: "The shape of dopgate error responses and every error code."
+description: "The shape of Dopgate error responses and every error code, with its HTTP status and when it happens."
 ---
 
 # Errors
 
-Every error is JSON, with the HTTP status telling the class of problem and a code telling the exact one:
+Every error answers with JSON in the same shape:
 
 ```json
-{ "success": false, "error": { "PASSWORD_INVALID": "Use at least 8 characters." } }
+{
+  "success": false,
+  "error": {
+    "CODE_INVALID": "That code is wrong. 4 tries left."
+  }
+}
 ```
 
-`error` maps codes to messages. It usually holds one entry; validation errors can hold several. Branch on the code. The message is for people and may change.
+`error` maps one code to a message. Branch on the code; the message is plain English you can show to a user, and its wording may change. Answers with status `429` also carry a `Retry-After` header in seconds.
 
-Every response also carries an `x-request-id` header. Quote it when reporting a problem; the server log has the same ID.
+Errors that come from the HTTP layer itself, such as malformed JSON, a missing field, an unknown route, or a request that took longer than 30 seconds, use the same shape with `REQUEST_INVALID`, or `INTERNAL_ERROR` for `5xx`. Request bodies are limited to 3 MB.
 
 ## Codes
 
-| Code | Status | Meaning |
+| Code | Status | When |
 | --- | --- | --- |
-| `REQUEST_INVALID` | 400, 404, other 4xx | The request is malformed, such as bad JSON, or the route does not exist. |
-| `EMAIL_INVALID` | 400 | The email is not a usable address. |
-| `PASSWORD_INVALID` | 400 | The new password breaks the policy. |
-| `SETTINGS_INVALID` | 400 | A settings value was refused. The message names the field. |
-| `SMTP_NOT_CONFIGURED` | 400 | A test message needs an SMTP host first. |
-| `AUTHENTICATION_REQUIRED` | 401 | No `Authorization` header. |
-| `AUTHENTICATION_INVALID` | 401 | The header or token is malformed, wrong, or expired. |
-| `SETUP_TOKEN_INVALID` | 401 | The setup token is wrong. |
-| `AUTHORIZATION_DENIED` | 403 | The caller is signed in but their role does not allow this. |
-| `ALREADY_INITIALIZED` | 409 | The root account already exists. |
-| `RATE_LIMITED` | 429 | Too many attempts. The message says how long to wait. |
-| `INTERNAL_ERROR` | 500 | Something failed on the server. The log has details. |
-| `NOT_IMPLEMENTED` | 501 | The endpoint is planned and not built yet. |
-| `SMTP_SEND_FAILED` | 502 | The SMTP server refused the message or could not be reached. The message carries its answer. |
-| `INSTANCE_RESTORING` | 503 | A backup is being restored. Retry shortly. |
+| `ACCOUNT_DISABLED` | 403 | The account is disabled: at sign-in after the right password, at refresh, at code confirmation, at password reset, or when its access token is used on Dopgate. |
+| `ALREADY_INITIALIZED` | 409 | `POST /bootstrap/root` on an instance that already has root. |
+| `AUTHENTICATION_INVALID` | 401 | Wrong email or password, a locked account, a wrong current password, an `Authorization` header that isn't `Bearer <token>`, or a bearer token that is neither a JWT nor the service key. |
+| `AUTHENTICATION_REQUIRED` | 401 | No `Authorization` header, or `POST /auth/logout` with neither an access token nor a refresh token. |
+| `AUTHORIZATION_DENIED` | 403 | The caller's role can't do this: a member on the admin API, an admin managing an admin, anyone but root rotating keys or changing roles, or the service key on an endpoint for a signed-in user. |
+| `CODE_EXPIRED` | 400 | The emailed code is past its lifetime. |
+| `CODE_INVALID` | 400 | The code is wrong, used up after too many wrong tries, or there is no code for this email and purpose. |
+| `EMAIL_INVALID` | 422 | The email isn't valid, or an email change names the current address. `400` for the `to` of an SMTP test, and when the service key asks for a test email it has no address for. |
+| `EMAIL_NOT_VERIFIED` | 403 | Sign-in with the right password while the email is unconfirmed and settings require it. |
+| `EMAIL_TAKEN` | 409 | Another account already uses this email. |
+| `INTERNAL_ERROR` | 500 | Something failed on the server, such as a database error. The log has the details. |
+| `METADATA_INVALID` | 422 | A metadata value isn't a JSON object, or is larger than 16 KB. |
+| `NOT_FOUND` | 404 | No such user, session, or email template, or the signed-in account was deleted. |
+| `NOT_IMPLEMENTED` | 501 | A planned endpoint: single sign-on or multi-factor authentication. |
+| `PASSWORD_INVALID` | 422 | The new password is shorter than the minimum length or longer than 1024 bytes. |
+| `PROFILE_INVALID` | 422 | The display name is longer than 255 characters or has a line break, or the avatar URL isn't an `http(s)` URL of at most 2048 characters. |
+| `RATE_LIMITED` | 429 | Too many requests from this address, too many codes for this email, or too many wrong setup tokens. |
+| `REQUEST_INVALID` | 400, 404, 422, and others | A malformed request: bad JSON, a missing field, an invalid pagination cursor, an incomplete audit anchor, a code purpose the endpoint doesn't take (`422`), or an unknown API route (`404`). |
+| `ROOT_PROTECTED` | 403 | An attempt to update, disable, enable, delete, end the sessions of, or send a reset code to root through the admin API. |
+| `SETTINGS_INVALID` | 422 | A settings value is out of range, or the request tried to change SMTP. |
+| `SETUP_TOKEN_INVALID` | 401 | The setup token for `POST /bootstrap/root` is wrong. |
+| `SIGNUP_DISABLED` | 403 | Sign-up is turned off in settings. |
+| `SMTP_NOT_CONFIGURED` | 400 | An SMTP test while no SMTP host or from address is set. |
+| `SMTP_SEND_FAILED` | 502 | The SMTP server refused a test message or couldn't be reached. |
+| `TEMPLATE_INVALID` | 422 | An email template draft has an empty or too long subject, an empty or too large body, an unclosed placeholder, or an unknown variable. |
+| `TOKEN_INVALID` | 401 | The access token is invalid, expired, signed by an unknown key, or its session ended; or the refresh token is unknown, used, expired, or its session ended. |
 
-Features add their own codes as they land, and this table grows with them.
+## CLI errors
+
+The CLI uses two more codes in `--json` mode: `CLI_ERROR` for any failure and `CLI_CANCELLED` when you cancel a prompt. See [the CLI overview](/cli/#json-output).
