@@ -18,7 +18,9 @@ use crate::{
   },
   http::HttpError,
   models::{AccessClaims, ConsoleClaims, Realm},
-  modules::{admins, sessions::repository as sessions},
+  modules::{
+    admins, personal_tokens::repository as personal_tokens, sessions::repository as sessions,
+  },
   state::AppState,
 };
 
@@ -113,10 +115,16 @@ async fn verify_app(
   let mut claims = decode::<AccessClaims>(token, &key, &rules)
     .map_err(|_| invalid())?
     .claims;
-  let (email, status, verified) =
-    sessions::live_account(state.db.pool(), Realm::App, &claims.sid, &claims.sub)
-      .await?
-      .ok_or_else(invalid)?;
+  // A personal token's access token stays valid only while the token is
+  // there and unexpired; a sign-in's only while its session is live.
+  let live = match (&claims.tid, &claims.sid) {
+    (Some(tid), _) => personal_tokens::live_owner(state.db.pool(), tid, &claims.sub).await?,
+    (None, Some(sid)) => {
+      sessions::live_account(state.db.pool(), Realm::App, sid, &claims.sub).await?
+    }
+    (None, None) => None,
+  };
+  let (email, status, verified) = live.ok_or_else(invalid)?;
   if status != "active" {
     return Err(disabled());
   }

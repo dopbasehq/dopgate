@@ -19,9 +19,31 @@ pub struct Settings {
   pub password: PasswordSettings,
   pub tokens: TokenSettings,
   pub limits: LimitSettings,
+  /// What your app's users may make for themselves.
+  pub self_service: SelfServiceSettings,
   /// Read-only while `DOPGATE_SMTP_HOST` (or the config file) sets a host.
   pub smtp: SmtpSettings,
   pub branding: BrandingSettings,
+}
+
+/// What your app's users may make for themselves. Off until an admin turns
+/// it on; what already exists keeps working when it is turned off.
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SelfServiceSettings {
+  /// Users can create personal tokens that sign in as themselves.
+  pub personal_tokens: bool,
+  /// Personal tokens one user can have, 1 to 1000.
+  pub max_personal_tokens_per_user: u32,
+}
+
+impl Default for SelfServiceSettings {
+  fn default() -> Self {
+    Self {
+      personal_tokens: false,
+      max_personal_tokens_per_user: 10,
+    }
+  }
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
@@ -190,6 +212,7 @@ pub struct UpdateSettingsRequest {
   pub password: Option<PasswordSettings>,
   pub tokens: Option<TokenSettings>,
   pub limits: Option<LimitSettings>,
+  pub self_service: Option<SelfServiceSettings>,
   pub branding: Option<BrandingSettings>,
   /// Refused while `DOPGATE_SMTP_HOST` or the config file sets SMTP.
   pub smtp: Option<SmtpSettingsInput>,

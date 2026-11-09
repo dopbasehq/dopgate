@@ -6,7 +6,7 @@ use axum::{
 use crate::{
   constants::errors::{AUTHENTICATION_INVALID, AUTHENTICATION_REQUIRED, AUTHORIZATION_DENIED},
   http::HttpError,
-  models::{AuthIdentity, Role},
+  models::{AuthIdentity, Role, UserVia},
   services::{
     authz,
     jwt::{self, Verified},
@@ -60,9 +60,18 @@ impl FromRequestParts<AppState> for AuthIdentity {
     }
     Ok(match jwt::verify(state, token).await? {
       Verified::App(claims) => Self::User {
+        via: match (claims.tid, claims.sid) {
+          (Some(tid), _) => UserVia::PersonalToken(tid),
+          (None, Some(sid)) => UserVia::Session(sid),
+          (None, None) => {
+            return Err(HttpError::unauthorized(
+              crate::constants::errors::TOKEN_INVALID,
+              "The token is not a valid access token.",
+            ));
+          }
+        },
         user_id: claims.sub,
         email: claims.email,
-        session_id: claims.sid,
       },
       Verified::Console(claims) => Self::Admin {
         admin_id: claims.sub,
@@ -74,8 +83,23 @@ impl FromRequestParts<AppState> for AuthIdentity {
   }
 }
 
-/// A user of your app, signed in with a session. Admins and the service key
-/// are refused: they have no app account.
+/// The refusal for an admin or the service key on a user endpoint.
+fn not_a_user(identity: &AuthIdentity) -> HttpError {
+  match identity {
+    AuthIdentity::Admin { .. } => HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "Admins have no app account. Use the console endpoints under /console.",
+    ),
+    _ => HttpError::forbidden(
+      AUTHORIZATION_DENIED,
+      "The service key has no account. Use a user's access token.",
+    ),
+  }
+}
+
+/// A user of your app, signed in with a password or a code. A token from a
+/// personal token is refused, so a leaked one can't change the account or
+/// make more tokens. Admins and the service key have no app account.
 pub struct UserIdentity {
   pub user_id: String,
   pub email: String,
@@ -93,20 +117,50 @@ impl FromRequestParts<AppState> for UserIdentity {
       AuthIdentity::User {
         user_id,
         email,
-        session_id,
+        via: UserVia::Session(session_id),
       } => Ok(Self {
         user_id,
         email,
         session_id,
       }),
-      AuthIdentity::Admin { .. } => Err(HttpError::forbidden(
+      AuthIdentity::User {
+        via: UserVia::PersonalToken(_),
+        ..
+      } => Err(HttpError::forbidden(
         AUTHORIZATION_DENIED,
-        "Admins have no app account. Use the console endpoints under /console.",
+        "Sign in with a password or a code to do this. A personal token can't.",
       )),
-      AuthIdentity::Service => Err(HttpError::forbidden(
-        AUTHORIZATION_DENIED,
-        "The service key has no account. Use a user's access token.",
-      )),
+      other => Err(not_a_user(&other)),
+    }
+  }
+}
+
+/// A user of your app, signed in any way, personal tokens included. For
+/// reading and updating the profile.
+pub struct AnyUserIdentity {
+  pub user_id: String,
+  pub email: String,
+  pub via: UserVia,
+}
+
+impl FromRequestParts<AppState> for AnyUserIdentity {
+  type Rejection = HttpError;
+
+  async fn from_request_parts(
+    parts: &mut Parts,
+    state: &AppState,
+  ) -> Result<Self, Self::Rejection> {
+    match AuthIdentity::from_request_parts(parts, state).await? {
+      AuthIdentity::User {
+        user_id,
+        email,
+        via,
+      } => Ok(Self {
+        user_id,
+        email,
+        via,
+      }),
+      other => Err(not_a_user(&other)),
     }
   }
 }

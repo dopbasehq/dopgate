@@ -1,5 +1,5 @@
 //! Runtime settings: sign-up rules, the password policy, token lifetimes,
-//! limits, branding, and SMTP. Each section is one JSON row in `settings`.
+//! limits, self-service, branding, and SMTP. Each section is one JSON row in `settings`.
 //!
 //! SMTP is resolved in order: the server config (`DOPGATE_SMTP_*` or the
 //! config file) when it sets a host, then the section saved here, then the
@@ -33,6 +33,7 @@ const PASSWORD: &str = "password";
 const TOKENS: &str = "tokens";
 const LIMITS: &str = "limits";
 const BRANDING: &str = "branding";
+const SELF_SERVICE: &str = "selfService";
 const SMTP: &str = "smtp";
 
 /// Keeps the SMTP password key apart from keys for other secrets.
@@ -72,6 +73,10 @@ pub async fn limits(pool: &PgPool) -> Result<LimitSettings, HttpError> {
   section(pool, LIMITS).await
 }
 
+pub async fn self_service(pool: &PgPool) -> Result<SelfServiceSettings, HttpError> {
+  section(pool, SELF_SERVICE).await
+}
+
 pub async fn branding(pool: &PgPool) -> Result<BrandingSettings, HttpError> {
   section(pool, BRANDING).await
 }
@@ -83,6 +88,7 @@ pub async fn get(state: &AppState) -> Result<Settings, HttpError> {
     password: password(pool).await?,
     tokens: tokens(pool).await?,
     limits: limits(pool).await?,
+    self_service: self_service(pool).await?,
     smtp: smtp_settings(state).await?,
     branding: branding(pool).await?,
   })
@@ -215,6 +221,9 @@ pub async fn update(
   if let Some(limits) = &request.limits {
     check_limits(limits)?;
   }
+  if let Some(self_service) = &request.self_service {
+    check_self_service(self_service)?;
+  }
   let branding = request.branding.map(clean_branding).transpose()?;
 
   let mut sections = Vec::new();
@@ -235,6 +244,10 @@ pub async fn update(
   if let Some(limits) = &request.limits {
     save(&mut tx, LIMITS, limits, user_id).await?;
     sections.push(LIMITS);
+  }
+  if let Some(self_service) = &request.self_service {
+    save(&mut tx, SELF_SERVICE, self_service, user_id).await?;
+    sections.push(SELF_SERVICE);
   }
   if let Some(branding) = &branding {
     save(&mut tx, BRANDING, branding, user_id).await?;
@@ -364,6 +377,15 @@ fn check_tokens(tokens: &TokenSettings) -> Result<(), HttpError> {
   if tokens.refresh_token_idle_days > tokens.session_absolute_days {
     return Err(invalid(
       "The idle limit can't be longer than the session's maximum age.",
+    ));
+  }
+  Ok(())
+}
+
+fn check_self_service(self_service: &SelfServiceSettings) -> Result<(), HttpError> {
+  if !(1..=1000).contains(&self_service.max_personal_tokens_per_user) {
+    return Err(invalid(
+      "Allow between 1 and 1000 personal tokens per user.",
     ));
   }
   Ok(())

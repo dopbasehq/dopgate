@@ -1,6 +1,6 @@
 use super::{error::AuthError, model::*, service};
 use crate::{
-  extractors::{RequestContext, SessionMode, UserIdentity},
+  extractors::{AnyUserIdentity, RequestContext, SessionMode, UserIdentity},
   http::{HttpError, HttpResponse, HttpResponseFormat},
   models::{Realm, User},
   modules::sessions,
@@ -205,10 +205,10 @@ pub async fn logout(
 )]
 pub async fn me(
   State(state): State<AppState>,
-  user: UserIdentity,
+  user: AnyUserIdentity,
 ) -> Result<HttpResponse<User>, AuthError> {
   Ok(HttpResponse::ok(
-    service::me(&state, &user).await?,
+    service::me(&state, &user.user_id).await?,
     "ACCOUNT_FETCHED",
   ))
 }
@@ -231,11 +231,11 @@ pub async fn me(
 )]
 pub async fn update_me(
   State(state): State<AppState>,
-  user: UserIdentity,
+  user: AnyUserIdentity,
   Json(request): Json<UpdateProfileRequest>,
 ) -> Result<HttpResponse<User>, AuthError> {
   Ok(HttpResponse::ok(
-    service::update_me(&state, &user, request).await?,
+    service::update_me(&state, &user.user_id, request).await?,
     "PROFILE_UPDATED",
   ))
 }

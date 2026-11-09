@@ -6,6 +6,7 @@ mod console;
 mod docs;
 mod email_templates;
 mod health;
+mod personal_tokens;
 mod recovery;
 mod routes;
 mod sessions;
