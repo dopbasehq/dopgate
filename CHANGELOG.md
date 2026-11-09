@@ -33,7 +33,10 @@ with an admin console and Docker images. Nothing below has shipped before.
   test, and reset at `/api/v1/admin/email-templates`.
 - Limits: per-address and per-email request limits, code resend waits, and
   account lockout after five wrong passwords, all editable in settings.
-- SMTP through `DOPGATE_SMTP_*`. Without a host, emails go to the log.
+- SMTP through `DOPGATE_SMTP_*`, or from the console when `DOPGATE_SMTP_HOST`
+  is empty. The environment wins over the console, and with neither, emails
+  go to the log. A password saved in the console is encrypted with a key
+  from `DOPGATE_SERVICE_KEY`. The sender defaults to `no-reply@dopgate.com`.
 - A hash-chained audit log with retention (`DOPGATE_AUDIT_RETENTION_DAYS`,
   365 days by default) and a verify endpoint.
 - The admin console at `/`: users, email templates, settings, signing keys,
