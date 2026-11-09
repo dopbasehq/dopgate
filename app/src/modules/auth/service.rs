@@ -21,7 +21,7 @@ use crate::{
     users::repository::{self as users, ProfileChanges, UserRow},
     verification::service::{self as verification, CodeTarget},
   },
-  services::{otp::Purpose, password},
+  services::{limits, otp::Purpose, password},
   state::AppState,
   utils::validate,
 };
@@ -60,6 +60,7 @@ pub async fn signup(
   request: SignupRequest,
   user_agent: Option<&str>,
 ) -> Result<SignupResult, HttpError> {
+  limits::per_address(state).await?;
   let pool = state.db.pool();
   let signup = settings::service::signup(pool).await?;
   if !signup.enabled {
@@ -137,14 +138,16 @@ fn code_target(user: &UserRow) -> CodeTarget<'_> {
   }
 }
 
-/// Sign in with an email and password. A disabled or unverified account is
-/// only reported after the right password, so the answer never reveals that
-/// an account exists.
+/// Sign in with an email and password. Wrong passwords count toward the
+/// account lockout. While locked, every attempt gets the same answer as a
+/// wrong password. A disabled or unverified account is only reported after
+/// the right password, so the answer never reveals that an account exists.
 pub async fn login(
   state: &AppState,
   request: LoginRequest,
   user_agent: Option<&str>,
 ) -> Result<AuthTokens, HttpError> {
+  limits::per_address(state).await?;
   let pool = state.db.pool();
   let Some(email) = crate::utils::email::normalize(&request.email) else {
     return Err(wrong_credentials());
@@ -158,11 +161,28 @@ pub async fn login(
   let Some(user) = user else {
     return Err(wrong_credentials());
   };
-  if !matches || user.password_hash.is_none() {
+  if user.is_locked() {
     audit::service::record_now(
       pool,
       audit::service::Event::user(&user.id, &user.email, &user.role, "user.sign_in_failed")
-        .metadata(serde_json::json!({ "reason": "password" })),
+        .metadata(serde_json::json!({ "reason": "locked" })),
+    )
+    .await;
+    return Err(wrong_credentials());
+  }
+  if !matches || user.password_hash.is_none() {
+    let config = settings::service::limits(pool).await?;
+    let locked = users::record_failure(
+      pool,
+      &user.id,
+      i32::try_from(config.lockout_attempts).unwrap_or(i32::MAX),
+      i32::try_from(config.lockout_minutes).unwrap_or(i32::MAX),
+    )
+    .await?;
+    audit::service::record_now(
+      pool,
+      audit::service::Event::user(&user.id, &user.email, &user.role, "user.sign_in_failed")
+        .metadata(serde_json::json!({ "reason": "password", "locked": locked })),
     )
     .await;
     return Err(wrong_credentials());

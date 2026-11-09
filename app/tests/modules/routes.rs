@@ -194,7 +194,6 @@ async fn planned_admin_routes_answer_not_implemented_for_root() {
   for (method, path) in [
     (Method::GET, "/api/v1/admin/sso/providers"),
     (Method::POST, "/api/v1/auth/mfa/totp/enroll"),
-    (Method::GET, "/api/v1/admin/users"),
   ] {
     let (status, body) = app
       .request_with(method.clone(), path, Some(json!({})), Some(&root))

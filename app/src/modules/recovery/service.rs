@@ -9,7 +9,7 @@ use crate::{
     users::repository as users,
     verification::service::{self as verification, CodeTarget},
   },
-  services::{otp::Purpose, password},
+  services::{limits, otp::Purpose, password},
   state::AppState,
   utils::validate,
 };
@@ -20,6 +20,7 @@ pub async fn forgot(
   state: &AppState,
   request: ForgotPasswordRequest,
 ) -> Result<(), HttpError> {
+  limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
   verification::check_send_limits(state, Purpose::PasswordReset, &email).await?;
   if let Some(user) = users::find_by_email(state.db.pool(), &email).await?
@@ -47,6 +48,7 @@ pub async fn reset(
   state: &AppState,
   request: ResetPasswordRequest,
 ) -> Result<(), HttpError> {
+  limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
   let policy = settings::service::password(state.db.pool()).await?;
   validate::new_password(&request.new_password, policy.min_length)?;

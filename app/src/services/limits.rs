@@ -98,3 +98,21 @@ impl Limits {
     self.buckets.lock().await.remove(key);
   }
 }
+
+/// One request from the caller's address toward sign-in, sign-up, or codes.
+/// Every such endpoint shares one budget per address.
+pub async fn per_address(state: &crate::state::AppState) -> Result<(), crate::http::HttpError> {
+  let Some(address) = crate::services::client_ip::current() else {
+    return Ok(());
+  };
+  let limits = crate::modules::settings::service::limits(state.db.pool()).await?;
+  state
+    .limits
+    .hit(
+      &format!("ip:{address}"),
+      limits.ip_requests_per_minute,
+      Duration::from_secs(60),
+    )
+    .await
+    .map_err(|limited| crate::http::HttpError::rate_limited(limited.retry_after))
+}

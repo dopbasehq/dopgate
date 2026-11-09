@@ -26,13 +26,16 @@ PostgreSQL. Nothing below has shipped before.
 - ES256 access tokens with `/.well-known/jwks.json`, key rotation, and
   single-use refresh tokens that end the session when reused.
 - Sessions: list devices and sign out one or all at `/api/v1/auth/sessions`.
+- Admin API for users: search, create, update metadata, disable, delete, send
+  reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it;
+  only root manages admins.
 - Six email templates with built-in defaults that admins can edit, preview,
   test, and reset at `/api/v1/admin/email-templates`.
-- Code limits: a wait before the same email gets another code, and a cap per
-  hour, both editable in settings.
+- Limits: per-address and per-email request limits, code resend waits, and
+  account lockout after five wrong passwords, all editable in settings.
 - SMTP through `DOPGATE_SMTP_*`. Without a host, emails go to the log.
 - A hash-chained audit log with retention (`DOPGATE_AUDIT_RETENTION_DAYS`,
   365 days by default) and a verify endpoint.
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
-- Routes still being built (admin users, single sign-on, and MFA) are listed
-  in the API and answer `501 NOT_IMPLEMENTED`.
+- Single sign-on and MFA routes are listed in the API and answer
+  `501 NOT_IMPLEMENTED` until they are built.
