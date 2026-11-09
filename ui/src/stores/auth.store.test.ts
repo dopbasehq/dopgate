@@ -77,7 +77,7 @@ describe("useAuthStore", () => {
       ),
     );
     await expect(api("/auth/me")).rejects.toBeTruthy();
-    expect(auth.user).toBeNull();
+    expect(auth.admin).toBeNull();
     expect(auth.sessionExpired).toBe(true);
   });
 
@@ -87,7 +87,7 @@ describe("useAuthStore", () => {
     const auth = useAuthStore();
     await auth.login(root.email, "secret");
     await expect(auth.logout()).rejects.toBeTruthy();
-    expect(auth.user).toBeNull();
+    expect(auth.admin).toBeNull();
     expect(auth.accessToken).toBeNull();
     expect(auth.sessionExpired).toBe(false);
   });

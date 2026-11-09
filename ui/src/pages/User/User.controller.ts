@@ -13,24 +13,19 @@ import {
 import type { AdminUser } from "~/services/types";
 import { userQuery, userSessionsQuery } from "~/queries/admin";
 import { useInvalidate } from "~/queries/invalidate";
-import { useAuthStore } from "~/stores/auth.store";
 import { formatJson, parseJsonObject } from "~/utils/json";
 
 /** Actions that ask before they run. */
 export type ConfirmKind = "disable" | "delete" | "sign-out-all";
 
 /**
- * User page controller: one account's profile, sessions and metadata,
- * and what an admin may do to it.
- *
- * Root can't be changed here at all. Admins manage members; only root
- * manages admins and changes roles. Your own account can't be turned off
- * or deleted from here. The server refuses all of that too.
+ * User page controller: one of your app's users, with their profile,
+ * sessions and metadata, and what an admin may do to them. Every admin
+ * manages every user; admins themselves live on the Admins page.
  */
 export function useUserController() {
   const route = useRoute();
   const router = useRouter();
-  const auth = useAuthStore();
   const invalidate = useInvalidate();
 
   const id = computed(() => String(route.params.id ?? ""));
@@ -50,26 +45,9 @@ export function useUserController() {
       : null,
   );
 
-  const isRootAccount = computed(() => user.value?.role === "root");
-  const isSelf = computed(() => user.value?.id === auth.user?.id);
-  /** Root manages everyone but root; admins manage members. */
-  const canManage = computed(() => {
-    const target = user.value;
-    if (!target || target.role === "root") return false;
-    return auth.isRoot || target.role === "member" || isSelf.value;
-  });
-  /** Why the actions are hidden, when they are. */
-  const protectedNote = computed(() => {
-    if (!user.value) return null;
-    if (isRootAccount.value)
-      return "Root account. It can't be changed, turned off or deleted here.";
-    if (!canManage.value) return "Only root can change admin accounts.";
-    return null;
-  });
-  const canChangeRole = computed(
-    () => auth.isRoot && canManage.value && !isSelf.value,
-  );
-  const canDisableOrDelete = computed(() => canManage.value && !isSelf.value);
+  /** Every admin manages every user, once the user has loaded. */
+  const canManage = computed(() => user.value !== null);
+  const canDisableOrDelete = canManage;
 
   // Profile and metadata drafts follow the loaded user until edited.
   const displayName = ref("");
@@ -197,17 +175,6 @@ export function useUserController() {
     );
   }
 
-  function setRole(role: "admin" | "member"): Promise<boolean> {
-    return run(
-      "role",
-      async () => {
-        await changed(await updateUser(id.value, { role }));
-        notice.value = role === "admin" ? "Now an admin." : "Now a member.";
-      },
-      "Couldn't change the role.",
-    );
-  }
-
   function markVerified(): Promise<boolean> {
     return run(
       "verify",
@@ -283,12 +250,8 @@ export function useUserController() {
     loadError,
     sessions,
     sessionsError,
-    isRootAccount,
-    isSelf,
     canManage,
-    canChangeRole,
     canDisableOrDelete,
-    protectedNote,
     displayName,
     publicMetadata,
     privateMetadata,
@@ -302,7 +265,6 @@ export function useUserController() {
     saveProfile,
     saveMetadata,
     enable,
-    setRole,
     markVerified,
     sendReset,
     confirming,

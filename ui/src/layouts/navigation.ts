@@ -1,5 +1,6 @@
 /** The sidebar's pages. Each lives at `/<name>`. */
-export type PageName = "users" | "templates" | "settings" | "keys" | "audit";
+export type PageName =
+  "users" | "templates" | "admins" | "settings" | "keys" | "audit";
 
 export interface SidebarSection {
   label: string;
@@ -12,6 +13,7 @@ export const SIDEBAR: SidebarSection[] = [
   {
     label: "Instance",
     items: [
+      { name: "admins", label: "Admins" },
       { name: "settings", label: "Settings" },
       { name: "keys", label: "Signing keys" },
       { name: "audit", label: "Audit log" },

@@ -1,7 +1,13 @@
 import { ApiError } from "~/services/api";
-import type { AdminUser, AuthTokens, Session, User } from "~/services/types";
+import type {
+  Admin,
+  AdminUser,
+  ConsoleTokens,
+  Session,
+} from "~/services/types";
 import { useAuthStore } from "~/stores/auth.store";
 
+/** A user of the app, as the admin API returns it. */
 export function userFixture(overrides: Partial<AdminUser> = {}): AdminUser {
   return {
     id: "usr_maya",
@@ -9,7 +15,6 @@ export function userFixture(overrides: Partial<AdminUser> = {}): AdminUser {
     emailVerified: true,
     displayName: "Maya",
     avatarUrl: null,
-    role: "member",
     status: "active",
     publicMetadata: {},
     userMetadata: {},
@@ -23,35 +28,49 @@ export function userFixture(overrides: Partial<AdminUser> = {}): AdminUser {
   };
 }
 
-export const root = userFixture({
-  id: "usr_root",
+/** Root or an admin, as the console sees them. */
+export function adminFixture(overrides: Partial<Admin> = {}): Admin {
+  return {
+    id: "adm_ada",
+    email: "admin@example.com",
+    displayName: "Ada",
+    avatarUrl: null,
+    role: "admin",
+    status: "active",
+    hasPassword: true,
+    lockedUntil: null,
+    lastSignInAt: null,
+    createdAt: "2026-11-01T10:00:00Z",
+    updatedAt: "2026-11-01T10:00:00Z",
+    ...overrides,
+  };
+}
+
+export const root = adminFixture({
+  id: "adm_root",
   email: "root@example.com",
   displayName: null,
   role: "root",
 });
-export const admin = userFixture({
-  id: "usr_admin",
-  email: "admin@example.com",
-  displayName: "Ada",
-  role: "admin",
-});
-export const member = userFixture();
+export const admin = adminFixture();
+/** A user of the app. */
+export const maya = userFixture();
 
-export function tokensFor(user: User): AuthTokens {
+export function tokensFor(signedIn: Admin): ConsoleTokens {
   return {
-    accessToken: `token-${user.id}`,
+    accessToken: `token-${signedIn.id}`,
     tokenType: "Bearer",
     expiresIn: 900,
     refreshToken: null,
-    user,
+    admin: signedIn,
   };
 }
 
-/** Signs the test in as `user` without calling the server. */
-export function signInAs(user: User = root): void {
+/** Signs the test in as `signedIn` without calling the server. */
+export function signInAs(signedIn: Admin = root): void {
   const auth = useAuthStore();
   auth.initialized = true;
-  auth.adopt(tokensFor(user));
+  auth.adopt(tokensFor(signedIn));
 }
 
 export function sessionFixture(overrides: Partial<Session> = {}): Session {

@@ -1,6 +1,7 @@
 /** Shapes from the Dopgate v1 API. Timestamps are RFC 3339 strings. */
 
-export type Role = "root" | "admin" | "member";
+/** An admin's role. Your app's users have none. */
+export type Role = "root" | "admin";
 export type UserStatus = "active" | "disabled";
 export type Metadata = Record<string, unknown>;
 
@@ -10,7 +11,6 @@ export interface User {
   emailVerified: boolean;
   displayName: string | null;
   avatarUrl: string | null;
-  role: Role;
   status: UserStatus;
   publicMetadata: Metadata;
   userMetadata: Metadata;
@@ -25,12 +25,28 @@ export interface AdminUser extends User {
   lockedUntil: string | null;
 }
 
-export interface AuthTokens {
+/** Root or an admin: the people who sign in to this console. */
+export interface Admin {
+  id: string;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  role: Role;
+  status: UserStatus;
+  hasPassword: boolean;
+  lockedUntil: string | null;
+  lastSignInAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What a console sign-in or refresh returns. */
+export interface ConsoleTokens {
   accessToken: string;
   tokenType: "Bearer";
   expiresIn: number;
   refreshToken: string | null;
-  user: User;
+  admin: Admin;
 }
 
 export interface Session {
@@ -43,7 +59,7 @@ export interface Session {
   current: boolean;
 }
 
-export type CodePurpose = "login" | "email_verify" | "email_change";
+export type CodePurpose = "login" | "email_change";
 
 export interface Branding {
   appName: string;

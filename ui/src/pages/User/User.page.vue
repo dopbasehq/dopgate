@@ -19,15 +19,12 @@ import {
   KeyIcon,
   LockIcon,
   LogOutIcon,
-  ShieldIcon,
   TrashIcon,
-  UserIcon,
 } from "~/assets/icons";
 import {
   describeUserAgent,
   formatDateTime,
   formatRelativeTime,
-  formatRole,
   formatSignInMethod,
 } from "~/utils/format";
 import { useUserController } from "./User.controller";
@@ -37,11 +34,8 @@ const {
   loadError,
   sessions,
   sessionsError,
-  isSelf,
   canManage,
-  canChangeRole,
   canDisableOrDelete,
-  protectedNote,
   displayName,
   publicMetadata,
   privateMetadata,
@@ -55,7 +49,6 @@ const {
   saveProfile,
   saveMetadata,
   enable,
-  setRole,
   markVerified,
   sendReset,
   confirming,
@@ -125,9 +118,6 @@ const card = "rounded-card border border-line bg-panel";
           :trail="[{ label: 'Users', to: { name: 'users' } }]">
           <template #meta>
             <div class="mt-2 flex flex-wrap items-center gap-1.5">
-              <DgBadge :tone="user.role === 'root' ? 'accent' : 'neutral'">
-                {{ formatRole(user.role) }}
-              </DgBadge>
               <DgBadge :tone="user.status === 'active' ? 'ok' : 'crit'">
                 {{ user.status === "active" ? "Active" : "Disabled" }}
               </DgBadge>
@@ -140,7 +130,6 @@ const card = "rounded-card border border-line bg-panel";
               <DgBadge v-if="locked" tone="warn">
                 Locked until {{ formatDateTime(user.lockedUntil) }}
               </DgBadge>
-              <DgBadge v-if="isSelf">You</DgBadge>
             </div>
           </template>
           <template v-if="canManage" #actions>
@@ -171,20 +160,6 @@ const card = "rounded-card border border-line bg-panel";
                 <template #icon><CheckIcon class="h-4 w-4" /></template>
                 Mark email verified
               </DgMenuItem>
-              <DgMenuItem
-                v-if="canChangeRole && user.role === 'member'"
-                :disabled="busy !== null"
-                @select="setRole('admin')">
-                <template #icon><ShieldIcon class="h-4 w-4" /></template>
-                Make admin
-              </DgMenuItem>
-              <DgMenuItem
-                v-if="canChangeRole && user.role === 'admin'"
-                :disabled="busy !== null"
-                @select="setRole('member')">
-                <template #icon><UserIcon class="h-4 w-4" /></template>
-                Make member
-              </DgMenuItem>
               <template v-if="canDisableOrDelete">
                 <DgMenuItem
                   v-if="user.status === 'active'"
@@ -203,9 +178,6 @@ const card = "rounded-card border border-line bg-panel";
           </template>
         </PageHeader>
 
-        <DgAlert v-if="protectedNote" tone="info" data-testid="protected-note">
-          {{ protectedNote }}
-        </DgAlert>
         <DgAlert v-if="notice" tone="success">{{ notice }}</DgAlert>
         <DgAlert v-if="error">{{ error }}</DgAlert>
 

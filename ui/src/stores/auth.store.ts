@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import * as authApi from "~/services/auth.api";
 import { registerAuth } from "~/services/api";
-import type { AuthTokens, CodePurpose, User } from "~/services/types";
+import type { Admin, ConsoleTokens } from "~/services/types";
 import { clearQueryCache } from "~/queries/session-cache";
 
 /**
@@ -15,7 +15,8 @@ import { clearQueryCache } from "~/queries/session-cache";
  * cache, so no data read as one account is shown to the next.
  */
 export const useAuthStore = defineStore("auth", () => {
-  const user = ref<User | null>(null);
+  /** The signed-in admin. */
+  const admin = ref<Admin | null>(null);
   const accessToken = ref<string | null>(null);
   /** Whether the server has a root account. `null` until asked. */
   const initialized = ref<boolean | null>(null);
@@ -24,16 +25,13 @@ export const useAuthStore = defineStore("auth", () => {
   /** A signed-in call failed and the refresh did too. */
   const sessionExpired = ref(false);
 
-  const isSignedIn = computed(() => user.value !== null);
-  const isRoot = computed(() => user.value?.role === "root");
-  const isAdmin = computed(
-    () => user.value?.role === "root" || user.value?.role === "admin",
-  );
+  const isSignedIn = computed(() => admin.value !== null);
+  const isRoot = computed(() => admin.value?.role === "root");
 
-  function adopt(tokens: AuthTokens): void {
-    if (user.value?.id !== tokens.user.id) clearQueryCache();
+  function adopt(tokens: ConsoleTokens): void {
+    if (admin.value?.id !== tokens.admin.id) clearQueryCache();
     accessToken.value = tokens.accessToken;
-    user.value = tokens.user;
+    admin.value = tokens.admin;
     sessionExpired.value = false;
     restored.value = true;
   }
@@ -41,7 +39,7 @@ export const useAuthStore = defineStore("auth", () => {
   function clear(): void {
     clearQueryCache();
     accessToken.value = null;
-    user.value = null;
+    admin.value = null;
   }
 
   /** Gets a new access token from the refresh cookie. */
@@ -58,7 +56,7 @@ export const useAuthStore = defineStore("auth", () => {
     token: () => accessToken.value,
     refresh,
     signedOut: () => {
-      if (user.value) sessionExpired.value = true;
+      if (admin.value) sessionExpired.value = true;
       clear();
     },
   });
@@ -78,24 +76,20 @@ export const useAuthStore = defineStore("auth", () => {
 
   /** Restores the session from the refresh cookie, once per page load. */
   async function restore(): Promise<boolean> {
-    if (user.value) return true;
+    if (admin.value) return true;
     if (restored.value) return false;
     restored.value = true;
     return refresh();
   }
 
-  async function login(email: string, password: string): Promise<User> {
+  async function login(email: string, password: string): Promise<Admin> {
     adopt(await authApi.login(email, password));
-    return user.value as User;
+    return admin.value as Admin;
   }
 
-  async function confirmCode(
-    email: string,
-    purpose: Exclude<CodePurpose, "email_change">,
-    code: string,
-  ): Promise<User> {
-    adopt(await authApi.confirmSignInCode(email, purpose, code));
-    return user.value as User;
+  async function confirmCode(email: string, code: string): Promise<Admin> {
+    adopt(await authApi.confirmSignInCode(email, code));
+    return admin.value as Admin;
   }
 
   /** Creates the root account with the setup token, then signs in. */
@@ -119,20 +113,19 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  /** Takes on a newer copy of the signed-in account. */
-  function setUser(next: User): void {
-    if (user.value?.id === next.id) user.value = next;
+  /** Takes on a newer copy of the signed-in admin. */
+  function setAdmin(next: Admin): void {
+    if (admin.value?.id === next.id) admin.value = next;
   }
 
   return {
-    user,
+    admin,
     accessToken,
     initialized,
     restored,
     sessionExpired,
     isSignedIn,
     isRoot,
-    isAdmin,
     adopt,
     clear,
     refresh,
@@ -142,6 +135,6 @@ export const useAuthStore = defineStore("auth", () => {
     confirmCode,
     setup,
     logout,
-    setUser,
+    setAdmin,
   };
 });

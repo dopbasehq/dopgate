@@ -17,7 +17,6 @@ const {
   sending,
   submitPassword,
   emailMeACode,
-  sendVerifyCode,
   resend,
   submitCode,
   usePassword,
@@ -58,14 +57,6 @@ const {
           :title="problem.title"
           data-testid="sign-in-problem">
           {{ problem.message }}
-          <DgButton
-            v-if="problem.offerVerify"
-            size="sm"
-            class="mt-2"
-            :loading="sending"
-            @click="sendVerifyCode">
-            Send a verification code
-          </DgButton>
         </DgAlert>
 
         <DgButton
@@ -88,7 +79,7 @@ const {
 
     <template v-else>
       <h1 class="text-[28px] font-semibold leading-tight text-ink-strong">
-        {{ step === "verify" ? "Verify your email" : "Check your email" }}
+        Check your email
       </h1>
       <p class="mt-2 text-sm text-ink-muted">
         Enter the 6-digit code we sent to
@@ -114,7 +105,7 @@ const {
           variant="primary"
           size="lg"
           :loading="submitting">
-          {{ step === "verify" ? "Verify and sign in" : "Sign in" }}
+          Sign in
         </DgButton>
         <div class="flex items-center justify-between gap-3 text-sm">
           <button

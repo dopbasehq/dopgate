@@ -1,5 +1,6 @@
 import { api } from "./api";
 import type {
+  Admin,
   AdminUser,
   AuditEvent,
   AuditVerification,
@@ -25,7 +26,6 @@ const templatePath = (name: TemplateName) =>
 
 export interface UserFilters {
   search: string;
-  role: "root" | "admin" | "member" | null;
   status: "active" | "disabled" | null;
 }
 
@@ -39,7 +39,6 @@ export function listUsers(
   return api("/admin/users", {
     query: {
       search: filters.search.trim(),
-      role: filters.role,
       status: filters.status,
       cursor,
       limit: PAGE_SIZE,
@@ -51,8 +50,6 @@ export function listUsers(
 export interface NewUser {
   email: string;
   password?: string;
-  /** Creating an admin is root-only. */
-  role?: "admin" | "member";
   displayName?: string;
   emailVerified?: boolean;
 }
@@ -72,8 +69,6 @@ export interface UserChanges {
   displayName?: string | null;
   avatarUrl?: string | null;
   emailVerified?: boolean;
-  /** Root only. */
-  role?: "admin" | "member";
   publicMetadata?: Metadata;
   privateMetadata?: Metadata;
 }
@@ -108,6 +103,41 @@ export function fetchUserSessions(
 
 export function revokeUserSessions(id: string): Promise<null> {
   return api(`${userPath(id)}/sessions`, { method: "DELETE" });
+}
+
+// Admins. Everyone on the admin side can read the list; changes are
+// root-only, and root itself can't be changed here.
+
+const adminPath = (id: string) => `/admin/admins/${encodeURIComponent(id)}`;
+
+export function listAdmins(signal?: AbortSignal): Promise<{ items: Admin[] }> {
+  return api("/admin/admins", { signal });
+}
+
+export interface NewAdmin {
+  email: string;
+  password?: string;
+  displayName?: string;
+}
+
+/** Root only. */
+export function createAdmin(body: NewAdmin): Promise<Admin> {
+  return api("/admin/admins", { method: "POST", body });
+}
+
+/** Root only. */
+export function disableAdmin(id: string): Promise<Admin> {
+  return api(`${adminPath(id)}/disable`, { method: "POST" });
+}
+
+/** Root only. */
+export function enableAdmin(id: string): Promise<Admin> {
+  return api(`${adminPath(id)}/enable`, { method: "POST" });
+}
+
+/** Root only. */
+export function deleteAdmin(id: string): Promise<null> {
+  return api(adminPath(id), { method: "DELETE" });
 }
 
 // Signing keys

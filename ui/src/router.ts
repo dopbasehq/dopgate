@@ -19,11 +19,6 @@ export const router = createRouter({
       meta: { public: true, guestOnly: true },
     },
     {
-      path: "/no-access",
-      name: "no-access",
-      component: () => import("~/pages/NoAccess/NoAccess.page.vue"),
-    },
-    {
       path: "/users",
       name: "users",
       component: () => import("~/pages/Users/Users.page.vue"),
@@ -32,6 +27,11 @@ export const router = createRouter({
       path: "/users/:id",
       name: "user",
       component: () => import("~/pages/User/User.page.vue"),
+    },
+    {
+      path: "/admins",
+      name: "admins",
+      component: () => import("~/pages/Admins/Admins.page.vue"),
     },
     {
       path: "/templates",

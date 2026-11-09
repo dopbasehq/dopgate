@@ -12,7 +12,7 @@ vi.mock("~/services/auth.api");
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(authApi.createRoot).mockResolvedValue({
-    userId: root.id,
+    adminId: root.id,
     email: root.email,
   });
   vi.mocked(authApi.login).mockResolvedValue(tokensFor(root));
@@ -60,7 +60,7 @@ describe("useSetupController", () => {
     );
     const auth = useAuthStore();
     expect(auth.initialized).toBe(true);
-    expect(auth.user?.id).toBe(root.id);
+    expect(auth.admin?.id).toBe(root.id);
     expect(auth.accessToken).toBe(`token-${root.id}`);
     expect(replace).toHaveBeenCalledWith({ name: "users" });
   });

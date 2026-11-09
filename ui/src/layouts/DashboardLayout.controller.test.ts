@@ -38,7 +38,7 @@ describe("useDashboardLayoutController", () => {
     vi.mocked(authApi.logout).mockResolvedValue(null);
     const { controller: c } = mountController(useDashboardLayoutController);
     await c.signOut();
-    expect(useAuthStore().user).toBeNull();
+    expect(useAuthStore().admin).toBeNull();
     expect(push).toHaveBeenCalledWith({ name: "sign-in" });
   });
 
