@@ -1,7 +1,8 @@
 mod assets;
+mod cors;
 mod instance;
 
-pub use instance::{InstanceLock, is_initialized};
+pub use instance::is_initialized;
 
 use std::{sync::Arc, time::Duration};
 
@@ -10,9 +11,8 @@ use anyhow::{Context, Result};
 use axum::{
   Router,
   extract::DefaultBodyLimit,
-  http::{HeaderName, Request, StatusCode},
+  http::{HeaderName, StatusCode},
   middleware,
-  middleware::Next,
   response::{IntoResponse, Response},
 };
 use tower_http::{
@@ -20,31 +20,33 @@ use tower_http::{
   timeout::TimeoutLayer,
   trace::TraceLayer,
 };
-use utoipa::openapi::security::{ApiKey, ApiKeyValue, Http, HttpAuthScheme, SecurityScheme};
+use utoipa::openapi::security::{Http, HttpAuthScheme, SecurityScheme};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-  config::{ServerConfig, ensure_data_dir},
+  config::{ServerConfig, redact_database_url},
   constants::{
     api,
     config::AUDIT_RETENTION_INTERVAL,
     errors::{INTERNAL_ERROR, REQUEST_INVALID},
     tokens::SETUP_TOKEN_PREFIX,
   },
-  extractors::CLIENT_KEY_HEADER,
   http::HttpError,
   middlewares, modules,
-  services::{crypto::CryptoService, db::DbClient, rate_limit::RateLimiter, token},
+  services::{db::DbClient, keys::KeyStore, limits::Limits, rate_limit::RateLimiter, token},
   state::{AppState, SetupState},
 };
 
-/// Open the database, apply migrations and audit retention, and load the
-/// master key. Everything that touches an instance starts here.
-pub async fn prepare_instance(config: &ServerConfig) -> Result<(DbClient, CryptoService)> {
-  ensure_data_dir(&config.data_dir)?;
-  let db = DbClient::connect(&config.database_url)
-    .await
-    .context("failed to open SQLite")?;
+/// Connect to Postgres, apply migrations and audit retention. Everything
+/// that touches an instance starts here.
+pub async fn prepare_instance(config: &ServerConfig) -> Result<DbClient> {
+  let db = DbClient::connect_with(
+    &config.database_url,
+    &config.database_schema,
+    crate::constants::config::DATABASE_READY_TIMEOUT,
+    config.database_max_connections,
+  )
+  .await?;
   db.migrate()
     .await
     .context("failed to run database migrations")?;
@@ -53,43 +55,85 @@ pub async fn prepare_instance(config: &ServerConfig) -> Result<(DbClient, Crypto
       .await
       .context("failed to apply audit retention")?;
   }
-  let crypto = CryptoService::initialize(db.pool(), &config.master_key.path)
-    .await
-    .context("failed to initialize master key")?;
-  Ok((db, crypto))
+  Ok(db)
 }
 
-/// Build runtime state. An instance without a root account gets a one-time
+/// What startup did about the root account.
+pub enum RootSetup {
+  /// Root already existed.
+  Exists,
+  /// Root was created from `DOPGATE_ROOT_EMAIL` with this generated
+  /// password, which is shown once.
+  Created { email: String, password: String },
+  /// No root yet: `POST /bootstrap/root` needs this token.
+  SetupToken(String),
+}
+
+/// Build runtime state. Creates the root account from `DOPGATE_ROOT_EMAIL`
+/// on a fresh database; otherwise an instance without root gets a one-time
 /// setup token.
 pub async fn build_state(config: ServerConfig) -> Result<AppState> {
-  let (db, crypto) = prepare_instance(&config).await?;
+  Ok(build_state_with_setup(config).await?.0)
+}
+
+pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, RootSetup)> {
+  let db = prepare_instance(&config).await?;
   // The presets are compiled in; a broken file fails here, not at the first
   // sign-in.
   modules::sso::presets::all();
-  let setup_token = if is_initialized(db.pool()).await? {
-    None
+  let keys = KeyStore::default();
+  keys
+    .initialize(db.pool())
+    .await
+    .context("failed to load the signing keys")?;
+  let root = if is_initialized(db.pool()).await? {
+    RootSetup::Exists
+  } else if let Some(email) = &config.root_email {
+    let password = std::env::var(crate::constants::config::ENV_ROOT_PASSWORD)
+      .ok()
+      .filter(|value| !value.is_empty());
+    let generated = password.is_none();
+    let password = match password {
+      Some(password) => password,
+      None => crate::services::password::generate(),
+    };
+    match modules::bootstrap::service::create_root(&db, email, &password).await {
+      Ok(_) if generated => RootSetup::Created {
+        email: email.clone(),
+        password,
+      },
+      Ok(_) => RootSetup::Exists,
+      // Another instance created root at the same moment.
+      Err(error) if error.status == StatusCode::CONFLICT => RootSetup::Exists,
+      Err(error) => anyhow::bail!("failed to create the root account: {:?}", error.errors),
+    }
   } else {
-    Some(token::generate(SETUP_TOKEN_PREFIX)?)
+    RootSetup::SetupToken(token::generate(SETUP_TOKEN_PREFIX)?)
   };
-  Ok(AppState {
+  let setup_token = match &root {
+    RootSetup::SetupToken(token) => Some(token.clone()),
+    _ => None,
+  };
+  let state = AppState {
     config: Arc::new(config),
     db,
-    crypto,
     setup: Arc::new(tokio::sync::RwLock::new(SetupState { token: setup_token })),
     rate_limiter: RateLimiter::default(),
+    limits: Limits::default(),
+    keys,
     oidc: Default::default(),
-    maintenance: Arc::new(std::sync::atomic::AtomicBool::new(false)),
     started_at: std::time::Instant::now(),
-  })
+  };
+  Ok((state, root))
 }
 
 /// The OpenAPI document, with the security schemes every module refers to.
 pub fn openapi() -> utoipa::openapi::OpenApi {
   let mut openapi = modules::openapi();
-  openapi.info.title = "dopgate API".to_string();
+  openapi.info.title = "Dopgate API".to_string();
   openapi.info.version = env!("CARGO_PKG_VERSION").to_string();
   openapi.info.description = Some(
-    "Sign users up and in, verify email addresses, reset passwords, issue JWTs, and manage users, clients, and settings."
+    "Sign users up and in, verify email addresses, reset passwords, issue JWTs, and manage users, email templates, and settings."
       .to_string(),
   );
   prefix_operation_ids(&mut openapi);
@@ -98,16 +142,12 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     "bearerAuth",
     SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
   );
-  components.add_security_scheme(
-    "clientKey",
-    SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new(CLIENT_KEY_HEADER))),
-  );
   openapi
 }
 
 /// Modules name their handlers `list`, `get`, `create`, and so on, which
 /// repeat across modules. OpenAPI needs every operation ID to be unique, so
-/// each one gets its tag in front: `users_list`, `clients_list`.
+/// each one gets its tag in front: `users_list`, `audit_list`.
 fn prefix_operation_ids(openapi: &mut utoipa::openapi::OpenApi) {
   for item in openapi.paths.paths.values_mut() {
     for operation in [
@@ -138,6 +178,7 @@ fn prefix_operation_ids(openapi: &mut utoipa::openapi::OpenApi) {
 pub fn router(state: AppState) -> Router {
   let request_id = HeaderName::from_static("x-request-id");
   let mut router = Router::new().merge(modules::routes());
+  let cors = cors::layer(&state.config.allowed_origins);
   if state.config.docs_enabled {
     router = router.merge(SwaggerUi::new(api::docs::UI).url(api::docs::OPENAPI, openapi()));
   }
@@ -152,34 +193,13 @@ pub fn router(state: AppState) -> Router {
     .layer(PropagateRequestIdLayer::new(request_id.clone()))
     .layer(SetRequestIdLayer::new(request_id, MakeRequestUuid))
     .layer(middleware::map_response(normalize_error_response))
-    .layer(middleware::from_fn_with_state(
-      state.clone(),
-      maintenance_gate,
-    ))
+    .layer(cors)
     .layer(axum::middleware::from_fn(middlewares::security::headers))
     .layer(middleware::from_fn_with_state(
       state.clone(),
       middlewares::client_ip::capture,
     ))
     .with_state(state)
-}
-
-async fn maintenance_gate(
-  axum::extract::State(state): axum::extract::State<AppState>,
-  request: Request<axum::body::Body>,
-  next: Next,
-) -> Response {
-  if state.maintenance.load(std::sync::atomic::Ordering::SeqCst)
-    && request.uri().path().starts_with(api::PREFIX)
-  {
-    return HttpError::new(
-      StatusCode::SERVICE_UNAVAILABLE,
-      "INSTANCE_RESTORING",
-      "A backup is being restored. Try again shortly.",
-    )
-    .into_response();
-  }
-  next.run(request).await
 }
 
 /// Errors from axum itself (bad JSON, unknown method, timeouts) come back
@@ -217,21 +237,27 @@ async fn normalize_error_response(response: Response) -> Response {
 pub fn startup_banner(
   public_url: &str,
   bind_address: &str,
-  data_dir: &std::path::Path,
+  database: &str,
+  schema: &str,
   docs_enabled: bool,
+  web_ui_enabled: bool,
 ) -> String {
   let public_url = public_url.trim_end_matches('/');
   let heading = Style::new().effects(Effects::BOLD);
   let mut rows = vec![
-    format!("{heading}dopgate{heading:#}"),
+    format!("{heading}Dopgate{heading:#}"),
     "Authentication you host yourself".to_string(),
     format!("Version {}", env!("CARGO_PKG_VERSION")),
     String::new(),
     format!("Public URL: {public_url}"),
     format!("Bind:       {bind_address}"),
     format!("API:        {public_url}/api/v1"),
-    format!("Data:       {}", data_dir.display()),
+    format!("JWKS:       {public_url}{}", api::keys::JWKS),
+    format!("Database:   {database} (schema {schema})"),
   ];
+  if web_ui_enabled {
+    rows.push(format!("Console:    {public_url}/"));
+  }
   if docs_enabled {
     rows.push(format!("API docs:   {public_url}{}", api::docs::UI));
   }
@@ -249,42 +275,69 @@ pub fn startup_warning(warning: &str) -> String {
 pub fn setup_token_message(
   public_url: &str,
   token: &str,
+  web_ui_enabled: bool,
 ) -> String {
   let base = public_url.trim_end_matches('/');
+  let console = if web_ui_enabled {
+    format!("Open {base}/setup and paste it there, or send it with curl:\n\n")
+  } else {
+    "Send it with curl:\n\n".to_string()
+  };
   format!(
-    "\nNo root account yet. Create one with `dopgate init`, or send this one-time setup token:\n\n{token}\n\n\
+    "\nNo root account yet. Set DOPGATE_ROOT_EMAIL, run `dopgate init`, or use this one-time setup token:\n\n{token}\n\n{console}\
      curl -X POST {base}{} \\\n  -H 'content-type: application/json' \\\n  -d '{{\"setupToken\":\"{token}\",\"email\":\"you@example.com\",\"password\":\"...\"}}'\n",
     api::bootstrap::ROOT
   )
 }
 
+/// The generated root password, shown once.
+pub fn root_created_message(
+  email: &str,
+  password: &str,
+) -> String {
+  let style = Style::new()
+    .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+    .effects(Effects::BOLD);
+  format!(
+    "\n{style}Root account created for {email}.{style:#}\nPassword: {password}\n\nThis password is shown once. Sign in and change it, and clear DOPGATE_ROOT_EMAIL if you like; later starts ignore it.\n"
+  )
+}
+
 /// Run the server until Ctrl-C or SIGTERM.
 pub async fn serve(config: ServerConfig) -> Result<()> {
-  ensure_data_dir(&config.data_dir)?;
-  let _lock = InstanceLock::acquire(&config.database_url)?;
   let address = config.bind_addr()?;
-  let state = build_state(config).await?;
+  let (state, root) = build_state_with_setup(config).await?;
   let listener = tokio::net::TcpListener::bind(address)
     .await
     .with_context(|| format!("failed to bind {address}"))?;
-  state.config.ensure_reference_files()?;
   let public_url = state.config.public_url.trim_end_matches('/');
   anstream::eprintln!(
     "\n{}\n",
     startup_banner(
       public_url,
       &state.config.bind_address,
-      &state.config.data_dir,
+      &redact_database_url(&state.config.database_url),
+      state.db.schema(),
       state.config.docs_enabled,
+      state.config.web_ui_enabled,
     )
   );
   if let Some(warning) = state.config.public_url_warning() {
     anstream::eprintln!("{}\n", startup_warning(&warning));
   }
-  if let Some(setup) = state.setup.read().await.token.as_deref() {
-    eprintln!("{}", setup_token_message(public_url, setup));
+  match &root {
+    RootSetup::Created { email, password } => {
+      anstream::eprintln!("{}", root_created_message(email, password));
+    }
+    RootSetup::SetupToken(token) => {
+      eprintln!(
+        "{}",
+        setup_token_message(public_url, token, state.config.web_ui_enabled)
+      );
+    }
+    RootSetup::Exists => {}
   }
-  tracing::info!(%address, "dopgate server started");
+  tracing::info!(%address, "Dopgate server started");
   // The audit head goes to the log at startup and shutdown, so the log
   // collector keeps a copy of it outside the database.
   crate::services::audit_chain::log_checkpoint(state.db.pool()).await;
@@ -297,6 +350,21 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
       AUDIT_RETENTION_INTERVAL,
     )
   });
+  // Keys rotated by another process (`dopgate keys rotate`, another
+  // replica) are picked up within a minute.
+  let key_reload_task = {
+    let state = state.clone();
+    tokio::spawn(async move {
+      let mut ticker = tokio::time::interval(Duration::from_secs(60));
+      ticker.tick().await;
+      loop {
+        ticker.tick().await;
+        if let Err(error) = state.keys.reload(state.db.pool()).await {
+          tracing::warn!(%error, "failed to reload signing keys");
+        }
+      }
+    })
+  };
   let grace = state.config.shutdown_grace_seconds;
   // Connection info carries the peer address rate limits and audit records use.
   let serve_result = axum::serve(
@@ -308,11 +376,9 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
   if let Some(task) = retention_task {
     task.abort();
   }
+  key_reload_task.abort();
   serve_result?;
   crate::services::audit_chain::log_checkpoint(state.db.pool()).await;
-  if let Err(error) = state.db.checkpoint().await {
-    tracing::warn!(%error, "failed to checkpoint SQLite WAL during shutdown");
-  }
   let _ = tokio::time::timeout(Duration::from_secs(grace), state.db.close()).await;
   Ok(())
 }

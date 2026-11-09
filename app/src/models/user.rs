@@ -7,9 +7,9 @@ use utoipa::ToSchema;
 pub enum Role {
   /// The instance owner, created at setup. Exactly one exists.
   Root,
-  /// Manages users, clients, and settings.
+  /// Manages members and settings.
   Admin,
-  /// An end user of your apps.
+  /// An end user of your app.
   Member,
 }
 
@@ -59,12 +59,14 @@ pub struct User {
   pub avatar_url: Option<String>,
   pub role: Role,
   pub status: UserStatus,
-  /// Free-form JSON your app can read and the user can see.
+  /// JSON the user can read and change, such as preferences.
+  pub user_metadata: serde_json::Value,
+  /// JSON your app and admins set; the user can read it but not change it.
   pub public_metadata: serde_json::Value,
-  /// Whether the account has a password. Accounts created through single
-  /// sign-on may not.
+  /// Whether the account has a password. Accounts created for sign-in by
+  /// emailed code may not.
   pub has_password: bool,
-  pub last_sign_in_at: Option<String>,
-  pub created_at: String,
-  pub updated_at: String,
+  pub last_sign_in_at: Option<chrono::DateTime<chrono::Utc>>,
+  pub created_at: chrono::DateTime<chrono::Utc>,
+  pub updated_at: chrono::DateTime<chrono::Utc>,
 }

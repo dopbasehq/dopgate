@@ -2,16 +2,21 @@ use super::{error::UsersError, model::*, service};
 use crate::{
   extractors::AdminIdentity,
   http::{HttpResponse, HttpResponseFormat},
+  models::UserStatus,
+  modules::sessions::model::SessionResponse,
   state::AppState,
 };
 use axum::{
   Json,
   extract::{Path, Query, State},
+  http::StatusCode,
+  response::{IntoResponse, Response},
 };
 
 /// List users
 ///
-/// Search and page through accounts, newest first.
+/// Search and page through accounts, newest first. `search` matches the
+/// email or display name.
 #[utoipa::path(
   get,
   path = crate::constants::api::users::COLLECTION,
@@ -21,8 +26,7 @@ use axum::{
   responses(
     (status = 200, description = "Users fetched", body = inline(HttpResponseFormat<UserPage>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "Only root, admins, and client secret keys may manage users", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
+    (status = 403, description = "Only root, admins, and the service key", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn list(
@@ -45,10 +49,7 @@ pub async fn list(
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
     (status = 200, description = "User fetched", body = inline(HttpResponseFormat<AdminUser>)),
-    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "Only root, admins, and client secret keys may manage users", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn get(
@@ -64,7 +65,8 @@ pub async fn get(
 
 /// Create a user
 ///
-/// Create an admin or member account. Root cannot be created here.
+/// Create an account without sending any email. Leave out `password` for an
+/// account that signs in with emailed codes. Only root creates admins.
 #[utoipa::path(
   post,
   path = crate::constants::api::users::COLLECTION,
@@ -73,11 +75,9 @@ pub async fn get(
   request_body = CreateUserRequest,
   responses(
     (status = 201, description = "User created", body = inline(HttpResponseFormat<AdminUser>)),
-    (status = 400, description = "The email, password, or role was refused", body = crate::http::ErrorBody),
-    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "Only root, admins, and client secret keys may manage users", body = crate::http::ErrorBody),
-    (status = 409, description = "An account with this email exists", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
+    (status = 403, description = "Only root creates admins", body = crate::http::ErrorBody),
+    (status = 409, description = "The email is taken", body = crate::http::ErrorBody),
+    (status = 422, description = "A value was refused", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn create(
@@ -93,8 +93,8 @@ pub async fn create(
 
 /// Update a user
 ///
-/// Change any field, including role and status. Disabling an account ends
-/// its sessions. Nobody can change root here.
+/// Change the profile, metadata, verified flag, or (root only) the role.
+/// Root can't be changed; admins manage members only.
 #[utoipa::path(
   patch,
   path = crate::constants::api::users::ITEM,
@@ -104,11 +104,9 @@ pub async fn create(
   request_body = UpdateUserRequest,
   responses(
     (status = 200, description = "User updated", body = inline(HttpResponseFormat<AdminUser>)),
-    (status = 400, description = "A field was refused", body = crate::http::ErrorBody),
-    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "You may not change this account", body = crate::http::ErrorBody),
+    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
+    (status = 422, description = "A value was refused", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn update(
@@ -125,8 +123,8 @@ pub async fn update(
 
 /// Delete a user
 ///
-/// Delete the account with its sessions and linked identities. Root cannot
-/// be deleted.
+/// Remove the account, its sessions, and its codes. The audit log keeps a
+/// `user.deleted` event. The email can sign up again as a new account.
 #[utoipa::path(
   delete,
   path = crate::constants::api::users::ITEM,
@@ -134,25 +132,121 @@ pub async fn update(
   security(("bearerAuth" = [])),
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
-    (status = 200, description = "User deleted", body = inline(HttpResponseFormat<serde_json::Value>)),
-    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "You may not delete this account", body = crate::http::ErrorBody),
+    (status = 204, description = "User deleted"),
+    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn delete(
   State(state): State<AppState>,
   AdminIdentity(actor): AdminIdentity,
   Path(id): Path<String>,
-) -> Result<HttpResponse<serde_json::Value>, UsersError> {
+) -> Result<Response, UsersError> {
   service::delete(&state, &actor, &id).await?;
-  Ok(HttpResponse::done("USER_DELETED"))
+  Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+/// Disable a user
+///
+/// Refuse new sign-ins and end every session.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::users::DISABLE,
+  tag = "users",
+  security(("bearerAuth" = [])),
+  params(("id" = String, Path, description = "User ID with the usr_ prefix")),
+  responses(
+    (status = 200, description = "User disabled", body = inline(HttpResponseFormat<AdminUser>)),
+    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 404, description = "No such user", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn disable(
+  State(state): State<AppState>,
+  AdminIdentity(actor): AdminIdentity,
+  Path(id): Path<String>,
+) -> Result<HttpResponse<AdminUser>, UsersError> {
+  Ok(HttpResponse::ok(
+    service::set_status(&state, &actor, &id, UserStatus::Disabled).await?,
+    "USER_DISABLED",
+  ))
+}
+
+/// Enable a user
+#[utoipa::path(
+  post,
+  path = crate::constants::api::users::ENABLE,
+  tag = "users",
+  security(("bearerAuth" = [])),
+  params(("id" = String, Path, description = "User ID with the usr_ prefix")),
+  responses(
+    (status = 200, description = "User enabled", body = inline(HttpResponseFormat<AdminUser>)),
+    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 404, description = "No such user", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn enable(
+  State(state): State<AppState>,
+  AdminIdentity(actor): AdminIdentity,
+  Path(id): Path<String>,
+) -> Result<HttpResponse<AdminUser>, UsersError> {
+  Ok(HttpResponse::ok(
+    service::set_status(&state, &actor, &id, UserStatus::Active).await?,
+    "USER_ENABLED",
+  ))
+}
+
+/// Send a password reset code
+///
+/// Email the user a 6-digit code they can reset their password with.
+#[utoipa::path(
+  post,
+  path = crate::constants::api::users::PASSWORD_RESET,
+  tag = "users",
+  security(("bearerAuth" = [])),
+  params(("id" = String, Path, description = "User ID with the usr_ prefix")),
+  responses(
+    (status = 200, description = "Code sent", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 404, description = "No such user", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn password_reset(
+  State(state): State<AppState>,
+  AdminIdentity(actor): AdminIdentity,
+  Path(id): Path<String>,
+) -> Result<HttpResponse<serde_json::Value>, UsersError> {
+  service::send_password_reset(&state, &actor, &id).await?;
+  Ok(HttpResponse::done("PASSWORD_RESET_SENT"))
+}
+
+/// List a user's sessions
+#[utoipa::path(
+  get,
+  path = crate::constants::api::users::SESSIONS,
+  tag = "users",
+  security(("bearerAuth" = [])),
+  params(("id" = String, Path, description = "User ID with the usr_ prefix")),
+  responses(
+    (status = 200, description = "Sessions fetched", body = inline(HttpResponseFormat<Vec<SessionResponse>>)),
+    (status = 404, description = "No such user", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn sessions(
+  State(state): State<AppState>,
+  AdminIdentity(_actor): AdminIdentity,
+  Path(id): Path<String>,
+) -> Result<HttpResponse<Vec<SessionResponse>>, UsersError> {
+  Ok(HttpResponse::ok(
+    service::sessions(&state, &id).await?,
+    "SESSIONS_FETCHED",
+  ))
 }
 
 /// Sign a user out everywhere
 ///
-/// End every session of the account.
+/// End every session of the account. Dopgate refuses their access tokens at
+/// once; backends that verify offline accept them until they expire.
 #[utoipa::path(
   delete,
   path = crate::constants::api::users::SESSIONS,
@@ -161,10 +255,8 @@ pub async fn delete(
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
     (status = 200, description = "Sessions ended", body = inline(HttpResponseFormat<serde_json::Value>)),
-    (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
-    (status = 403, description = "You may not change this account", body = crate::http::ErrorBody),
+    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn revoke_sessions(
@@ -173,5 +265,5 @@ pub async fn revoke_sessions(
   Path(id): Path<String>,
 ) -> Result<HttpResponse<serde_json::Value>, UsersError> {
   service::revoke_sessions(&state, &actor, &id).await?;
-  Ok(HttpResponse::done("USER_SESSIONS_REVOKED"))
+  Ok(HttpResponse::done("SESSIONS_REVOKED"))
 }

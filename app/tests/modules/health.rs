@@ -9,5 +9,6 @@ async fn health_reports_dopgate() {
   assert_eq!(status, StatusCode::OK);
   assert_eq!(body["data"]["product"], "dopgate");
   assert_eq!(body["data"]["status"], "ok");
+  assert_eq!(body["data"]["database"], "ok");
   assert_eq!(body["data"]["version"], env!("CARGO_PKG_VERSION"));
 }

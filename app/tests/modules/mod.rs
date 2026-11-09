@@ -1,7 +1,13 @@
 mod audit;
+mod auth;
 mod bootstrap;
 mod docs;
+mod email_templates;
 mod health;
+mod recovery;
 mod routes;
+mod sessions;
 mod settings;
 mod sso;
+mod users;
+mod verification;

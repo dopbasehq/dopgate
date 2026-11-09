@@ -41,6 +41,53 @@ pub fn hash(password: &str) -> anyhow::Result<String> {
     .map_err(|error| anyhow::anyhow!("password hashing failed: {error}"))
 }
 
+/// A random password for the root account startup creates: 24 characters
+/// from an alphabet without look-alikes, in groups of four.
+pub fn generate() -> String {
+  const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let mut bytes = [0_u8; 24];
+  getrandom::fill(&mut bytes).expect("the system random number generator failed");
+  let characters: Vec<char> = bytes
+    .iter()
+    .map(|byte| ALPHABET[usize::from(*byte) % ALPHABET.len()] as char)
+    .collect();
+  characters
+    .chunks(4)
+    .map(|chunk| chunk.iter().collect::<String>())
+    .collect::<Vec<_>>()
+    .join("-")
+}
+
+/// Hash on a blocking thread: Argon2 takes tens of milliseconds of CPU and
+/// would stall the async workers.
+pub async fn hash_async(password: String) -> anyhow::Result<String> {
+  tokio::task::spawn_blocking(move || hash(&password)).await?
+}
+
+/// Verify on a blocking thread, for the same reason as [`hash_async`].
+pub async fn verify_async(
+  password: String,
+  stored: String,
+) -> bool {
+  tokio::task::spawn_blocking(move || verify(&password, &stored))
+    .await
+    .unwrap_or(false)
+}
+
+/// Check the policy with an admin-configured minimum length.
+pub fn check_policy_with(
+  password: &str,
+  min_length: usize,
+) -> Result<(), PolicyViolation> {
+  if password.chars().count() < min_length.max(PASSWORD_MIN_LENGTH) {
+    return Err(PolicyViolation(format!(
+      "Use at least {} characters.",
+      min_length.max(PASSWORD_MIN_LENGTH)
+    )));
+  }
+  check_policy(password)
+}
+
 /// True when `password` matches the stored PHC string. A malformed hash
 /// never matches.
 pub fn verify(

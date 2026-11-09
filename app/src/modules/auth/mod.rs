@@ -3,12 +3,13 @@ use axum::{
   Router,
   routing::{get, post},
 };
+
 pub mod controller;
 pub mod doc;
 pub mod error;
 pub mod model;
-mod repository;
 pub mod service;
+
 pub fn routes() -> Router<AppState> {
   use crate::constants::api::auth;
   Router::new()
@@ -19,4 +20,5 @@ pub fn routes() -> Router<AppState> {
     .route(auth::LOGOUT, post(controller::logout))
     .route(auth::ME, get(controller::me).patch(controller::update_me))
     .route(auth::PASSWORD_CHANGE, post(controller::change_password))
+    .route(auth::EMAIL_CHANGE, post(controller::change_email))
 }

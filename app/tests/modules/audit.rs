@@ -1,5 +1,4 @@
-//! The audit list and verify services. The HTTP routes need an admin token,
-//! which arrives in phase 2, so these call the services directly.
+//! The audit list and verify services, and their routes.
 
 use app::modules::audit::{
   model::{AuditQuery, ChainVerifyQuery},
@@ -14,13 +13,7 @@ async fn record(
   action: &str,
   actor: &str,
 ) {
-  let mut tx = app
-    .state
-    .db
-    .pool()
-    .begin_with("BEGIN IMMEDIATE")
-    .await
-    .unwrap();
+  let mut tx = app.state.db.pool().begin().await.unwrap();
   service::record(
     &mut tx,
     Event {
@@ -154,4 +147,46 @@ async fn verify_checks_an_anchor_and_refuses_half_of_one() {
   .err()
   .unwrap();
   assert_eq!(error.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn admins_read_the_log_over_http_and_members_do_not() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  let (status, body) = app
+    .request_with(
+      axum::http::Method::GET,
+      "/api/v1/admin/audit-events?action=user.signed_in",
+      None,
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(body["data"]["items"][0]["action"], "user.signed_in");
+  assert_eq!(body["data"]["items"][0]["metadata"]["method"], "password");
+
+  let (status, body) = app
+    .request_with(
+      axum::http::Method::GET,
+      "/api/v1/admin/audit-events/verify",
+      None,
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(body["data"]["ok"], true, "{body}");
+
+  app.create_user(&root, "member@example.com", "member").await;
+  let member = app
+    .login("member@example.com", crate::support::PASSWORD)
+    .await;
+  let (status, _) = app
+    .request_with(
+      axum::http::Method::GET,
+      "/api/v1/admin/audit-events",
+      None,
+      Some(&member),
+    )
+    .await;
+  assert_eq!(status, StatusCode::FORBIDDEN);
 }

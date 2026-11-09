@@ -4,6 +4,7 @@ use crate::{
   http::{HttpResponse, HttpResponseFormat},
   state::AppState,
 };
+use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State};
 
 /// Public signing keys
@@ -17,11 +18,16 @@ use axum::{Json, extract::State};
   tag = "keys",
   responses(
     (status = 200, description = "Key set", body = Jwks),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
-pub async fn jwks(State(state): State<AppState>) -> Result<Json<Jwks>, KeysError> {
-  Ok(Json(service::jwks(&state).await?))
+pub async fn jwks(State(state): State<AppState>) -> Result<Response, KeysError> {
+  let mut response = Json(service::jwks(&state).await).into_response();
+  // Backends cache the key set; a rotated key is picked up within minutes.
+  response.headers_mut().insert(
+    axum::http::header::CACHE_CONTROL,
+    axum::http::HeaderValue::from_static("public, max-age=300"),
+  );
+  Ok(response)
 }
 
 /// List signing keys
@@ -34,7 +40,6 @@ pub async fn jwks(State(state): State<AppState>) -> Result<Json<Jwks>, KeysError
     (status = 200, description = "Keys fetched", body = inline(HttpResponseFormat<Vec<SigningKeyResponse>>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Only root and admins may read keys", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn list(
@@ -60,7 +65,6 @@ pub async fn list(
     (status = 200, description = "Key rotated", body = inline(HttpResponseFormat<SigningKeyResponse>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Only root may rotate keys", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn rotate(
@@ -68,7 +72,7 @@ pub async fn rotate(
   RootIdentity(actor): RootIdentity,
 ) -> Result<HttpResponse<SigningKeyResponse>, KeysError> {
   Ok(HttpResponse::ok(
-    service::rotate(&state, &actor).await?,
+    service::rotate(&state, Some(&actor)).await?,
     "SIGNING_KEY_ROTATED",
   ))
 }

@@ -1,8 +1,5 @@
 use super::{controller, model::*};
-use crate::{
-  http::{ErrorBody, HttpResponseFormat},
-  services::otp::Method,
-};
+use crate::http::{ErrorBody, HttpResponseFormat};
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
@@ -11,7 +8,6 @@ use utoipa::OpenApi;
   components(schemas(
     ForgotPasswordRequest,
     ResetPasswordRequest,
-    Method,
     ErrorBody,
     HttpResponseFormat<serde_json::Value>
   )),

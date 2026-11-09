@@ -5,13 +5,11 @@ use crate::state::AppState;
 
 pub mod audit;
 pub mod auth;
-pub mod backups;
 pub mod bootstrap;
-pub mod clients;
+pub mod email_templates;
 pub mod health;
 pub mod keys;
 pub mod mfa;
-pub mod oidc_provider;
 pub mod recovery;
 pub mod sessions;
 pub mod settings;
@@ -30,12 +28,10 @@ pub fn routes() -> Router<AppState> {
     .merge(mfa::routes())
     .merge(sso::routes())
     .merge(users::routes())
-    .merge(clients::routes())
     .merge(keys::routes())
-    .merge(oidc_provider::routes())
     .merge(settings::routes())
+    .merge(email_templates::routes())
     .merge(audit::routes())
-    .merge(backups::routes())
 }
 
 pub fn openapi() -> OpenApi {
@@ -48,11 +44,9 @@ pub fn openapi() -> OpenApi {
   doc.merge(mfa::doc::build());
   doc.merge(sso::doc::build());
   doc.merge(users::doc::build());
-  doc.merge(clients::doc::build());
   doc.merge(keys::doc::build());
-  doc.merge(oidc_provider::doc::build());
   doc.merge(settings::doc::build());
+  doc.merge(email_templates::doc::build());
   doc.merge(audit::doc::build());
-  doc.merge(backups::doc::build());
   doc
 }

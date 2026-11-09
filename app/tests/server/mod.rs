@@ -1,9 +1,6 @@
-//! The router around the modules: error shapes, headers, the maintenance
-//! gate, the page fallback, and the single-server lock.
+//! The router around the modules: error shapes, headers, CORS, and the
+//! console fallback.
 
-use std::sync::atomic::Ordering;
-
-use app::server::InstanceLock;
 use axum::http::{Method, StatusCode, header};
 
 use crate::support::TestApp;
@@ -61,31 +58,49 @@ async fn unknown_routes_and_wrong_methods_get_json_errors() {
 
 #[tokio::test]
 async fn pages_are_not_served_while_the_web_ui_is_off() {
-  let app = TestApp::new().await;
-  let reply = app.send(Method::GET, "/login", &[], "").await;
+  let app = TestApp::with(|config| config.web_ui_enabled = false).await;
+  let reply = app.send(Method::GET, "/sign-in", &[], "").await;
   assert_eq!(reply.status, StatusCode::NOT_FOUND);
   assert!(reply.json["error"]["REQUEST_INVALID"].is_string());
 }
 
 #[tokio::test]
-async fn maintenance_answers_api_requests_with_503() {
+async fn missing_assets_are_404_not_the_page() {
   let app = TestApp::new().await;
-  app.state.maintenance.store(true, Ordering::SeqCst);
-  let (status, body) = app.request(Method::GET, "/api/v1/health", None).await;
-  assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-  assert!(body["error"]["INSTANCE_RESTORING"].is_string());
-  app.state.maintenance.store(false, Ordering::SeqCst);
-  let (status, _) = app.request(Method::GET, "/api/v1/health", None).await;
-  assert_eq!(status, StatusCode::OK);
+  let reply = app
+    .send(Method::GET, "/assets/missing-file.js", &[], "")
+    .await;
+  assert_eq!(reply.status, StatusCode::NOT_FOUND);
 }
 
-#[test]
-fn only_one_server_holds_a_database() {
-  let directory = tempfile::TempDir::new().unwrap();
-  let url = app::config::sqlite_url(&directory.path().join("dopgate.db"));
-  let first = InstanceLock::acquire(&url).unwrap();
-  assert!(first.is_some());
-  assert!(InstanceLock::acquire(&url).is_err());
-  drop(first);
-  assert!(InstanceLock::acquire(&url).unwrap().is_some());
+#[tokio::test]
+async fn allowed_origins_pass_cors_and_others_do_not() {
+  let app = TestApp::with(|config| {
+    config.allowed_origins = vec!["https://app.example.com".into()];
+  })
+  .await;
+  let preflight = |origin: &'static str| {
+    let app = &app;
+    async move {
+      app
+        .send(
+          Method::OPTIONS,
+          "/api/v1/auth/login",
+          &[
+            ("origin", origin),
+            ("access-control-request-method", "POST"),
+            ("access-control-request-headers", "content-type"),
+          ],
+          "",
+        )
+        .await
+    }
+  };
+  let allowed = preflight("https://app.example.com").await;
+  assert_eq!(
+    allowed.headers.get("access-control-allow-origin").unwrap(),
+    "https://app.example.com"
+  );
+  let refused = preflight("https://evil.example.com").await;
+  assert!(refused.headers.get("access-control-allow-origin").is_none());
 }

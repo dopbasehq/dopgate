@@ -22,8 +22,10 @@ pub mod bootstrap {
   pub const ROOT: &str = api_path!("/bootstrap/root");
 }
 
-/// End-user authentication. Apps call these with their publishable key.
+/// End-user authentication. Your app's frontend calls these.
 pub mod auth {
+  /// The cookie path for the console's refresh token.
+  pub const COOKIE_PATH: &str = "/api/v1/auth";
   pub const METHODS: &str = api_path!("/auth/methods");
   pub const SIGNUP: &str = api_path!("/auth/signup");
   pub const LOGIN: &str = api_path!("/auth/login");
@@ -31,6 +33,7 @@ pub mod auth {
   pub const LOGOUT: &str = api_path!("/auth/logout");
   pub const ME: &str = api_path!("/auth/me");
   pub const PASSWORD_CHANGE: &str = api_path!("/auth/password/change");
+  pub const EMAIL_CHANGE: &str = api_path!("/auth/email/change");
 }
 
 pub mod recovery {
@@ -69,26 +72,22 @@ pub mod users {
   pub const COLLECTION: &str = api_path!("/admin/users");
   pub const ITEM: &str = api_path!("/admin/users/{id}");
   pub const SESSIONS: &str = api_path!("/admin/users/{id}/sessions");
+  pub const DISABLE: &str = api_path!("/admin/users/{id}/disable");
+  pub const ENABLE: &str = api_path!("/admin/users/{id}/enable");
+  pub const PASSWORD_RESET: &str = api_path!("/admin/users/{id}/password-reset");
 }
 
-pub mod clients {
-  pub const COLLECTION: &str = api_path!("/admin/clients");
-  pub const ITEM: &str = api_path!("/admin/clients/{id}");
-  pub const SECRET: &str = api_path!("/admin/clients/{id}/secret");
+pub mod email_templates {
+  pub const COLLECTION: &str = api_path!("/admin/email-templates");
+  pub const ITEM: &str = api_path!("/admin/email-templates/{name}");
+  pub const PREVIEW: &str = api_path!("/admin/email-templates/{name}/preview");
+  pub const TEST: &str = api_path!("/admin/email-templates/{name}/test");
 }
 
 pub mod keys {
   pub const JWKS: &str = "/.well-known/jwks.json";
   pub const COLLECTION: &str = api_path!("/admin/keys");
   pub const ROTATE: &str = api_path!("/admin/keys/rotate");
-}
-
-/// dopgate as an OpenID Connect provider for other apps. Planned.
-pub mod oidc_provider {
-  pub const DISCOVERY: &str = "/.well-known/openid-configuration";
-  pub const AUTHORIZE: &str = "/oauth/authorize";
-  pub const TOKEN: &str = "/oauth/token";
-  pub const USERINFO: &str = "/oauth/userinfo";
 }
 
 pub mod settings {
@@ -99,12 +98,4 @@ pub mod settings {
 pub mod audit {
   pub const COLLECTION: &str = api_path!("/admin/audit-events");
   pub const VERIFY: &str = api_path!("/admin/audit-events/verify");
-}
-
-pub mod backups {
-  pub const COLLECTION: &str = api_path!("/admin/backups");
-  pub const ITEM: &str = api_path!("/admin/backups/{key}");
-  pub const RESTORE: &str = api_path!("/admin/backups/{key}/restore");
-  pub const EXPORT: &str = api_path!("/admin/export");
-  pub const IMPORT: &str = api_path!("/admin/import");
 }

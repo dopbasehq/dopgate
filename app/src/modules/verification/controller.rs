@@ -1,62 +1,73 @@
 use super::{error::VerificationError, model::*, service};
 use crate::{
-  extractors::ClientKey,
+  extractors::RequestContext,
   http::{HttpResponse, HttpResponseFormat},
+  modules::{auth::model::AuthTokens, sessions},
   state::AppState,
 };
-use axum::{Json, extract::State};
+use axum::{
+  Json,
+  extract::State,
+  http::StatusCode,
+  response::{IntoResponse, Response},
+};
 
-/// Send a code or link
+/// Send a code
 ///
-/// Email a one-time code or a link that proves the user owns the address.
-/// Use it to verify an email, to sign in without a password, or to move an
-/// account to a new email. Sending again replaces the previous code.
+/// Email a 6-digit code to verify an address (`email_verify`) or to sign in
+/// without a password (`login`). The answer is the same whether or not the
+/// email has an account. Asking again replaces the earlier code, after a
+/// short wait.
 #[utoipa::path(
   post,
   path = crate::constants::api::verification::SEND,
   tag = "verification",
-  security((), ("clientKey" = [])),
-  request_body = SendVerificationRequest,
+  request_body = SendCodeRequest,
   responses(
-    (status = 200, description = "Message on its way", body = inline(HttpResponseFormat<serde_json::Value>)),
-    (status = 400, description = "The email or redirect URL was refused", body = crate::http::ErrorBody),
-    (status = 429, description = "Too many messages for this email or address", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
+    (status = 200, description = "A code was sent if the email can receive one", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 422, description = "The email or purpose was refused", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many codes; see Retry-After", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn send(
   State(state): State<AppState>,
-  ClientKey(client_key): ClientKey,
-  Json(request): Json<SendVerificationRequest>,
+  Json(request): Json<SendCodeRequest>,
 ) -> Result<HttpResponse<serde_json::Value>, VerificationError> {
-  service::send(&state, client_key, request).await?;
-  Ok(HttpResponse::done("VERIFICATION_SENT"))
+  service::send(&state, request).await?;
+  Ok(HttpResponse::done("CODE_SENT"))
 }
 
-/// Confirm a code or link
+/// Confirm a code
 ///
-/// Check the code the user typed or the token from the link. For a
-/// passwordless sign-in the response carries tokens.
+/// For `email_verify` and `login`, marks the email verified and signs the
+/// user in. For `email_change`, moves the account to the new address (pass
+/// the new address as `email`) and returns the account.
 #[utoipa::path(
   post,
   path = crate::constants::api::verification::CONFIRM,
   tag = "verification",
-  security((), ("clientKey" = [])),
-  request_body = ConfirmVerificationRequest,
+  request_body = ConfirmCodeRequest,
   responses(
-    (status = 200, description = "Verified", body = inline(HttpResponseFormat<VerificationResult>)),
-    (status = 400, description = "The code or token is wrong, used, or expired", body = crate::http::ErrorBody),
-    (status = 429, description = "Too many wrong codes", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
+    (status = 200, description = "Confirmed. Tokens for email_verify and login, the user for email_change", body = inline(HttpResponseFormat<AuthTokens>)),
+    (status = 400, description = "The code is wrong, used up, or expired", body = crate::http::ErrorBody),
+    (status = 403, description = "The account is disabled", body = crate::http::ErrorBody),
+    (status = 409, description = "The new email is taken", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many attempts", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn confirm(
   State(state): State<AppState>,
-  ClientKey(client_key): ClientKey,
-  Json(request): Json<ConfirmVerificationRequest>,
-) -> Result<HttpResponse<VerificationResult>, VerificationError> {
-  Ok(HttpResponse::ok(
-    service::confirm(&state, client_key, request).await?,
-    "VERIFIED",
-  ))
+  context: RequestContext,
+  Json(request): Json<ConfirmCodeRequest>,
+) -> Result<Response, VerificationError> {
+  match service::confirm(&state, request, context.user_agent.as_deref()).await? {
+    service::Confirmed::SignedIn(tokens) => Ok(
+      sessions::service::deliver(&state, &context, tokens, "SIGNED_IN", StatusCode::OK)
+        .await?
+        .into_response(),
+    ),
+    service::Confirmed::EmailChanged(user) => {
+      Ok(HttpResponse::ok(user, "EMAIL_CHANGED").into_response())
+    }
+  }
 }

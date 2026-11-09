@@ -16,7 +16,6 @@ use axum::{Json, extract::State};
     (status = 200, description = "Settings fetched", body = inline(HttpResponseFormat<Settings>)),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Only root and admins may read settings", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn get(
@@ -38,10 +37,9 @@ pub async fn get(
   request_body = UpdateSettingsRequest,
   responses(
     (status = 200, description = "Settings saved", body = inline(HttpResponseFormat<Settings>)),
-    (status = 400, description = "A value was refused", body = crate::http::ErrorBody),
+    (status = 422, description = "A value was refused", body = crate::http::ErrorBody),
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Only root and admins may change settings", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn update(
@@ -57,8 +55,8 @@ pub async fn update(
 
 /// Send a test email
 ///
-/// Send a message through the saved SMTP settings and report the server's
-/// answer.
+/// Send a message through the SMTP server from `DOPGATE_SMTP_*` and report
+/// the server's answer. Without `to`, it goes to the caller's own email.
 #[utoipa::path(
   post,
   path = crate::constants::api::settings::SMTP_TEST,
@@ -71,14 +69,14 @@ pub async fn update(
     (status = 401, description = "Authentication is required", body = crate::http::ErrorBody),
     (status = 403, description = "Only root and admins may test SMTP", body = crate::http::ErrorBody),
     (status = 502, description = "The SMTP server refused the message", body = crate::http::ErrorBody),
-    (status = 501, description = "Not built yet", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn test_smtp(
   State(state): State<AppState>,
-  AdminIdentity(_actor): AdminIdentity,
-  Json(request): Json<SmtpTestRequest>,
+  AdminIdentity(actor): AdminIdentity,
+  request: Option<Json<SmtpTestRequest>>,
 ) -> Result<HttpResponse<serde_json::Value>, SettingsError> {
-  service::test_smtp(&state, request).await?;
+  let request = request.map(|Json(request)| request).unwrap_or_default();
+  service::test_smtp(&state, &actor, request).await?;
   Ok(HttpResponse::done("SMTP_TEST_SENT"))
 }

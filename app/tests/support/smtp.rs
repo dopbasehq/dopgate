@@ -71,3 +71,77 @@ impl FakeSmtp {
     self.received.lock().unwrap().join("\n")
   }
 }
+
+impl FakeSmtp {
+  /// The newest 6-digit code sent to `to`, waiting up to two seconds for the
+  /// message: dopgate sends mail in the background.
+  pub async fn code_for(
+    &self,
+    to: &str,
+  ) -> String {
+    for _ in 0..40 {
+      if let Some(code) = self.last_code_for(to) {
+        return code;
+      }
+      tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    panic!("no code was sent to {to}:\n{}", self.received());
+  }
+
+  /// Wait until a message to `to` arrived and return how many did.
+  pub async fn wait_for(
+    &self,
+    to: &str,
+    count: usize,
+  ) -> usize {
+    for _ in 0..40 {
+      let found = self.messages_to(to).len();
+      if found >= count {
+        return found;
+      }
+      tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    self.messages_to(to).len()
+  }
+
+  /// Each message's lines, split on the end-of-data marker.
+  pub fn messages_to(
+    &self,
+    to: &str,
+  ) -> Vec<String> {
+    let log = self.received.lock().unwrap().clone();
+    let mut messages = Vec::new();
+    let mut current: Option<(String, Vec<String>)> = None;
+    let mut recipient = String::new();
+    for line in log {
+      let upper = line.to_ascii_uppercase();
+      if upper.starts_with("RCPT TO:") {
+        recipient = line[8..].trim().trim_matches(['<', '>']).to_owned();
+      } else if upper == "DATA" {
+        current = Some((recipient.clone(), Vec::new()));
+      } else if line == "." {
+        if let Some((rcpt, lines)) = current.take()
+          && rcpt.eq_ignore_ascii_case(to)
+        {
+          messages.push(lines.join("\n"));
+        }
+      } else if let Some((_, lines)) = current.as_mut() {
+        lines.push(line);
+      }
+    }
+    messages
+  }
+
+  fn last_code_for(
+    &self,
+    to: &str,
+  ) -> Option<String> {
+    self.messages_to(to).iter().rev().find_map(|message| {
+      message
+        .lines()
+        .map(str::trim)
+        .find(|line| line.len() == 6 && line.bytes().all(|byte| byte.is_ascii_digit()))
+        .map(str::to_owned)
+    })
+  }
+}

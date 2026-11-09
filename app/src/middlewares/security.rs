@@ -24,7 +24,7 @@ pub async fn headers(
   insert_if_absent(header::REFERRER_POLICY, "no-referrer");
   insert_if_absent(
     HeaderName::from_static("content-security-policy"),
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'",
   );
   if is_api {
     insert_if_absent(header::CACHE_CONTROL, "no-store");

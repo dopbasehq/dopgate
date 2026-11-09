@@ -1,7 +1,7 @@
 //! Request extractors that resolve who is calling.
 
 mod auth;
-mod client;
+mod context;
 
-pub use auth::{AdminIdentity, RootIdentity};
-pub use client::{CLIENT_KEY_HEADER, ClientKey};
+pub use auth::{AdminIdentity, RootIdentity, UserIdentity};
+pub use context::{RequestContext, SessionMode};

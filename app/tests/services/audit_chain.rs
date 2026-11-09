@@ -5,13 +5,11 @@ use app::{
     db::DbClient,
   },
 };
-use tempfile::TempDir;
 
-async fn database(directory: &TempDir) -> DbClient {
-  let url = app::config::sqlite_url(&directory.path().join("test.db"));
-  let db = DbClient::connect(&url).await.unwrap();
-  db.migrate().await.unwrap();
-  db
+use crate::support::{self, SchemaGuard};
+
+fn at(time: chrono::DateTime<chrono::Utc>) -> String {
+  audit_chain::timestamp(time)
 }
 
 async fn append(
@@ -19,7 +17,7 @@ async fn append(
   id: &str,
   created_at: &str,
 ) {
-  let mut tx = db.pool().begin_with("BEGIN IMMEDIATE").await.unwrap();
+  let mut tx = db.pool().begin().await.unwrap();
   audit_chain::append(
     &mut tx,
     &AuditEntry {
@@ -40,20 +38,18 @@ async fn append(
   tx.commit().await.unwrap();
 }
 
-async fn chain_of_three(directory: &TempDir) -> DbClient {
-  let db = database(directory).await;
+async fn chain_of_three() -> (DbClient, SchemaGuard) {
+  let (db, guard) = support::database().await;
   let now = chrono::Utc::now();
   for (index, id) in ["aud_1", "aud_2", "aud_3"].iter().enumerate() {
-    let at = (now + chrono::Duration::seconds(index as i64)).to_rfc3339();
-    append(&db, id, &at).await;
+    append(&db, id, &at(now + chrono::Duration::seconds(index as i64))).await;
   }
-  db
+  (db, guard)
 }
 
 #[tokio::test]
 async fn intact_chain_verifies() {
-  let directory = TempDir::new().unwrap();
-  let db = chain_of_three(&directory).await;
+  let (db, _guard) = chain_of_three().await;
   let report = audit_chain::verify(db.pool()).await.unwrap();
   assert!(report.ok);
   assert_eq!(report.records, 3);
@@ -63,8 +59,7 @@ async fn intact_chain_verifies() {
 
 #[tokio::test]
 async fn sealed_records_cannot_be_updated() {
-  let directory = TempDir::new().unwrap();
-  let db = chain_of_three(&directory).await;
+  let (db, _guard) = chain_of_three().await;
   let error = sqlx::query("UPDATE audit_events SET action='edited' WHERE id='aud_2'")
     .execute(db.pool())
     .await
@@ -76,9 +71,8 @@ async fn sealed_records_cannot_be_updated() {
 /// the edit away.
 #[tokio::test]
 async fn an_edited_record_breaks_the_chain() {
-  let directory = TempDir::new().unwrap();
-  let db = chain_of_three(&directory).await;
-  sqlx::query("DROP TRIGGER audit_events_sealed_immutable")
+  let (db, _guard) = chain_of_three().await;
+  sqlx::query("DROP TRIGGER audit_events_sealed_immutable ON audit_events")
     .execute(db.pool())
     .await
     .unwrap();
@@ -93,8 +87,7 @@ async fn an_edited_record_breaks_the_chain() {
 
 #[tokio::test]
 async fn a_deleted_record_breaks_the_chain() {
-  let directory = TempDir::new().unwrap();
-  let db = chain_of_three(&directory).await;
+  let (db, _guard) = chain_of_three().await;
   sqlx::query("DELETE FROM audit_events WHERE id='aud_2'")
     .execute(db.pool())
     .await
@@ -108,8 +101,7 @@ async fn a_deleted_record_breaks_the_chain() {
 /// anchor saved earlier catches it.
 #[tokio::test]
 async fn an_anchor_catches_deleted_newest_records() {
-  let directory = TempDir::new().unwrap();
-  let db = chain_of_three(&directory).await;
+  let (db, _guard) = chain_of_three().await;
   let before = audit_chain::verify(db.pool()).await.unwrap();
   let anchor = audit_chain::Anchor {
     seq: before.head_seq.unwrap(),
@@ -128,17 +120,14 @@ async fn an_anchor_catches_deleted_newest_records() {
 }
 
 #[tokio::test]
-async fn retention_archives_old_records_and_keeps_the_chain_whole() {
-  let directory = TempDir::new().unwrap();
-  let db = database(&directory).await;
-  let old = (chrono::Utc::now() - chrono::Duration::days(400)).to_rfc3339();
+async fn retention_removes_old_records_and_keeps_the_chain_whole() {
+  let (db, _guard) = support::database().await;
+  let old = at(chrono::Utc::now() - chrono::Duration::days(400));
   append(&db, "aud_old1", &old).await;
   append(&db, "aud_old2", &old).await;
-  append(&db, "aud_new", &chrono::Utc::now().to_rfc3339()).await;
+  append(&db, "aud_new", &at(chrono::Utc::now())).await;
 
-  let archive = directory.path().join("audit-archive");
-  let retention = Retention::new(archive.clone(), 365);
-  let pruned = audit_chain::apply_retention(db.pool(), &retention)
+  let pruned = audit_chain::apply_retention(db.pool(), &Retention::new(365))
     .await
     .unwrap();
   assert_eq!(pruned, 2);
@@ -151,14 +140,50 @@ async fn retention_archives_old_records_and_keeps_the_chain_whole() {
   // Retention records what it removed, as the newest record.
   assert_eq!(remaining.len(), 2);
 
-  let archived: usize = std::fs::read_dir(&archive)
-    .unwrap()
-    .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap())
-    .map(|contents| contents.lines().count())
-    .sum();
-  assert_eq!(archived, 2);
-
   let report = audit_chain::verify(db.pool()).await.unwrap();
   assert!(report.ok, "{report:?}");
   assert_eq!(report.pruned_seq, Some(2));
+}
+
+/// Moving the anchor forward to hide old records is caught: no
+/// `audit.pruned` record vouches for the new position.
+#[tokio::test]
+async fn a_moved_anchor_fails_verification() {
+  let (db, _guard) = chain_of_three().await;
+  let hash: String = sqlx::query_scalar("SELECT record_hash FROM audit_events WHERE seq = 2")
+    .fetch_one(db.pool())
+    .await
+    .unwrap();
+  sqlx::query("DELETE FROM audit_events WHERE seq <= 2")
+    .execute(db.pool())
+    .await
+    .unwrap();
+  sqlx::query(
+    "INSERT INTO audit_chain_anchor(id,pruned_seq,pruned_hash,pruned_at) VALUES('chain',2,$1,'x')",
+  )
+  .bind(hash)
+  .execute(db.pool())
+  .await
+  .unwrap();
+  let report = audit_chain::verify(db.pool()).await.unwrap();
+  assert!(!report.ok);
+}
+
+/// Appends from many connections at once still form one chain.
+#[tokio::test]
+async fn concurrent_appends_form_one_chain() {
+  let (db, _guard) = support::database().await;
+  let mut tasks = Vec::new();
+  for index in 0..20 {
+    let db = db.clone();
+    tasks.push(tokio::spawn(async move {
+      append(&db, &format!("aud_c{index}"), &at(chrono::Utc::now())).await;
+    }));
+  }
+  for task in tasks {
+    task.await.unwrap();
+  }
+  let report = audit_chain::verify(db.pool()).await.unwrap();
+  assert!(report.ok, "{report:?}");
+  assert_eq!(report.records, 20);
 }

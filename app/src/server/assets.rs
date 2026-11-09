@@ -15,7 +15,7 @@ pub async fn static_fallback(
   State(state): State<AppState>,
   uri: Uri,
 ) -> Response {
-  if uri.path().starts_with(api::PREFIX) {
+  if uri.path().starts_with(api::PREFIX) || uri.path().starts_with("/.well-known/") {
     return HttpError::not_found(REQUEST_INVALID, "The requested API route was not found.")
       .into_response();
   }

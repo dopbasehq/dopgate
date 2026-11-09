@@ -1,4 +1,4 @@
-//! OpenID Connect relying party for single sign-on. dopgate only talks to
+//! OpenID Connect relying party for single sign-on. Dopgate only talks to
 //! the provider here: discovery, the authorization redirect, and the code
 //! exchange. Provider tokens never leave this module; callers receive the
 //! verified identity and nothing else.

@@ -8,7 +8,7 @@ use crate::{
   cli::{CliCancelled, InitArgs, output},
   constants::config::{ENV_ROOT_EMAIL, ENV_ROOT_PASSWORD},
   modules::bootstrap,
-  server::{InstanceLock, is_initialized, prepare_instance},
+  server::{is_initialized, prepare_instance},
 };
 
 /// Create the root account without starting the server.
@@ -17,12 +17,11 @@ pub async fn run(
   json: bool,
 ) -> Result<i32> {
   let config = load_config(&instance_overrides(args.instance))?;
-  let _lock = InstanceLock::acquire(&config.database_url)?;
-  let (db, _crypto) = prepare_instance(&config).await?;
+  let db = prepare_instance(&config).await?;
   if is_initialized(db.pool()).await? {
     bail!(
-      "this instance already has a root account ({})",
-      config.data_dir.display()
+      "this instance already has a root account (schema {})",
+      db.schema()
     );
   }
   let email = match args.email.or_else(|| std::env::var(ENV_ROOT_EMAIL).ok()) {
@@ -30,21 +29,20 @@ pub async fn run(
     None => prompt(inquire::Text::new("Root email:").prompt())?,
   };
   let password = Zeroizing::new(read_password(args.password_stdin)?);
-  let user_id = bootstrap::service::create_root(&db, &email, &password).await?;
+  let user_id = bootstrap::service::create_root(&db, &email, &password)
+    .await
+    .map_err(|error| anyhow::anyhow!("{error}"))?;
   let email = crate::utils::email::normalize(&email).unwrap_or(email);
-  config.ensure_reference_files()?;
+  let schema = db.schema().to_owned();
   db.close().await;
   if json {
     output::print_json(&serde_json::json!({
       "success": true,
-      "data": { "userId": user_id, "email": email, "dataDir": config.data_dir },
+      "data": { "userId": user_id, "email": email, "schema": schema },
     }));
   } else {
     output::print_success(&format!("Root account created for {email}."));
-    output::print_info(&format!(
-      "Data directory: {}\nStart the server with `dopgate serve`.",
-      config.data_dir.display()
-    ));
+    output::print_info("Start the server with `dopgate serve`.");
   }
   Ok(0)
 }
