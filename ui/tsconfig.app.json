@@ -2,8 +2,13 @@
   "extends": "@vue/tsconfig/tsconfig.dom.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "types": ["vite/client"],
+    "types": ["vite/client", "vitest/globals"],
     "allowArbitraryExtensions": true,
+
+    /* Path aliases (must match vite.config.ts `resolve.alias`) */
+    "paths": {
+      "~/*": ["./src/*"]
+    },
 
     /* Linting */
     "noUnusedLocals": true,

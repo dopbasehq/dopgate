@@ -9,4 +9,5 @@ mod routes;
 mod sessions;
 mod settings;
 mod sso;
+mod users;
 mod verification;

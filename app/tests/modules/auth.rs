@@ -124,6 +124,55 @@ async fn signup_refuses_taken_emails_weak_passwords_and_closed_signup() {
 }
 
 #[tokio::test]
+async fn wrong_passwords_lock_the_account_with_the_same_answer() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com", "member").await;
+  let attempt = |password: &'static str| {
+    let app = &app;
+    async move {
+      app
+        .request(
+          Method::POST,
+          "/api/v1/auth/login",
+          Some(json!({ "email": "ada@example.com", "password": password })),
+        )
+        .await
+    }
+  };
+  for _ in 0..5 {
+    let (status, body) = attempt("wrong password").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+  }
+  // Locked: even the right password gets the wrong-password answer.
+  let (status, body) = attempt(PASSWORD).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+
+  // Unknown emails get the same answer too.
+  let (status, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "nobody@example.com", "password": PASSWORD })),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+
+  let (_, user) = app
+    .request_with(
+      Method::GET,
+      "/api/v1/admin/users?search=ada",
+      None,
+      Some(&root),
+    )
+    .await;
+  assert!(user["data"]["items"][0]["lockedUntil"].is_string());
+}
+
+#[tokio::test]
 async fn refresh_tokens_rotate_and_a_reused_one_ends_the_session() {
   let app = TestApp::new().await;
   app.root_token().await;
@@ -238,11 +287,14 @@ async fn the_profile_reads_and_changes_its_own_fields_only() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
   let id = app.create_user(&root, "ada@example.com", "member").await;
-  sqlx::query("UPDATE users SET public_metadata = '{\"plan\":\"pro\"}' WHERE id = $1")
-    .bind(&id)
-    .execute(app.state.db.pool())
-    .await
-    .unwrap();
+  app
+    .request_with(
+      Method::PATCH,
+      &format!("/api/v1/admin/users/{id}"),
+      Some(json!({ "publicMetadata": { "plan": "pro" } })),
+      Some(&root),
+    )
+    .await;
   let token = app.login("ada@example.com", PASSWORD).await;
   let (status, body) = app
     .request_with(

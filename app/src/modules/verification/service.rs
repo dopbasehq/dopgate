@@ -24,7 +24,7 @@ use crate::{
     settings,
     users::repository::{self as users, UserRow},
   },
-  services::{client_ip, otp, token},
+  services::{client_ip, limits, otp, token},
   state::AppState,
   utils::validate,
 };
@@ -184,6 +184,7 @@ pub async fn send(
   state: &AppState,
   request: SendCodeRequest,
 ) -> Result<(), HttpError> {
+  limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
   if !matches!(request.purpose, Purpose::EmailVerify | Purpose::Login) {
     return Err(HttpError::new(
@@ -245,6 +246,7 @@ pub async fn confirm(
   request: ConfirmCodeRequest,
   user_agent: Option<&str>,
 ) -> Result<Confirmed, HttpError> {
+  limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
   match request.purpose {
     Purpose::EmailVerify | Purpose::Login => {

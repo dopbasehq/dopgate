@@ -246,28 +246,23 @@ impl TestApp {
     body["data"]["accessToken"].as_str().unwrap().to_owned()
   }
 
-  /// Create a verified account directly in the database and return its
-  /// ID. The admin user API arrives later.
+  /// Create a verified account through the admin API and return its ID.
   pub async fn create_user(
     &self,
-    _admin_token: &str,
+    admin_token: &str,
     email: &str,
     role: &str,
   ) -> String {
-    let id = format!("usr_{}", ulid::Ulid::new());
-    let hash = app::services::password::hash(PASSWORD).unwrap();
-    sqlx::query(
-      "INSERT INTO users(id,email,email_verified_at,password_hash,role,status,created_at,updated_at) \
-       VALUES($1,$2,now(),$3,$4,'active',now(),now())",
-    )
-    .bind(&id)
-    .bind(email)
-    .bind(hash)
-    .bind(role)
-    .execute(self.state.db.pool())
-    .await
-    .unwrap();
-    id
+    let (status, body) = self
+      .request_with(
+        Method::POST,
+        "/api/v1/admin/users",
+        Some(json!({ "email": email, "password": PASSWORD, "role": role, "emailVerified": true })),
+        Some(admin_token),
+      )
+      .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    body["data"]["id"].as_str().unwrap().to_owned()
   }
 
   /// Change runtime settings as root.

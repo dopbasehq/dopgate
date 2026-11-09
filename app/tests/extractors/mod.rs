@@ -71,7 +71,7 @@ async fn the_service_key_is_an_admin_without_an_account() {
   let reply = app
     .send(
       Method::GET,
-      "/api/v1/admin/settings",
+      "/api/v1/admin/users",
       &[(header::AUTHORIZATION.as_str(), bearer.as_str())],
       "",
     )

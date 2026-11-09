@@ -63,3 +63,36 @@ async fn unknown_emails_get_the_same_answer_and_no_mail() {
   tokio::time::sleep(std::time::Duration::from_millis(300)).await;
   assert!(smtp.messages_to("nobody@example.com").is_empty());
 }
+
+#[tokio::test]
+async fn a_reset_unlocks_a_locked_account() {
+  let smtp = FakeSmtp::start().await;
+  let app = TestApp::with(|config| use_smtp(config, &smtp)).await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com", "member").await;
+  for _ in 0..5 {
+    app
+      .request(
+        Method::POST,
+        "/api/v1/auth/login",
+        Some(json!({ "email": "ada@example.com", "password": "wrong" })),
+      )
+      .await;
+  }
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/password/forgot",
+      Some(json!({ "email": "ada@example.com" })),
+    )
+    .await;
+  let code = smtp.code_for("ada@example.com").await;
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/password/reset",
+      Some(json!({ "email": "ada@example.com", "code": code, "newPassword": "a fresh password" })),
+    )
+    .await;
+  app.login("ada@example.com", "a fresh password").await;
+}
