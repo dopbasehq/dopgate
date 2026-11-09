@@ -9,3 +9,4 @@ mod migrations;
 mod otp;
 mod password;
 mod rate_limit;
+mod secret_box;

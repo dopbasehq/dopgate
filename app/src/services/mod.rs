@@ -10,4 +10,5 @@ pub mod oidc;
 pub mod otp;
 pub mod password;
 pub mod rate_limit;
+pub mod secret_box;
 pub mod token;

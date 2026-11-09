@@ -254,7 +254,8 @@ pub async fn test(
     text: content.text,
     html: Some(content.html),
   };
-  mailer::send(state.config.smtp.mailer_config().as_ref(), &message)
+  let config = settings::service::smtp(state).await?;
+  mailer::send(config.as_ref(), &message)
     .await
     .map_err(|error| {
       HttpError::new(
@@ -309,7 +310,14 @@ pub async fn send(
     text: content.text,
     html: Some(content.html),
   };
-  let config = state.config.smtp.mailer_config();
+  // A broken SMTP setup must not fail the request that sends the email.
+  let config = match settings::service::smtp(state).await {
+    Ok(config) => config,
+    Err(error) => {
+      tracing::error!(%error, template = name, to = %message.to, "the email was not sent");
+      return Ok(());
+    }
+  };
   tokio::spawn(async move {
     if let Err(error) = mailer::send(config.as_ref(), &message).await {
       tracing::error!(%error, template = name, to = %message.to, "failed to send an email");

@@ -10,12 +10,13 @@ use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
 use crate::constants::config::{
-  DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_DATABASE_SCHEMA, DEFAULT_PORT, ENV_ALLOWED_ORIGINS,
-  ENV_AUDIT_RETENTION_DAYS, ENV_CONFIG, ENV_DATABASE_MAX_CONNECTIONS, ENV_DATABASE_SCHEMA,
-  ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_PORT, ENV_PUBLIC_URL, ENV_ROOT_EMAIL, ENV_SERVICE_KEY,
-  ENV_SHUTDOWN_GRACE_SECONDS, ENV_SMTP_FROM_EMAIL, ENV_SMTP_FROM_NAME, ENV_SMTP_HOST,
-  ENV_SMTP_PASSWORD, ENV_SMTP_PORT, ENV_SMTP_SECURITY, ENV_SMTP_USERNAME, ENV_TRUSTED_PROXIES,
-  ENV_WEB_UI, SERVER_HOST_PLACEHOLDER, SERVICE_KEY_MIN_LENGTH,
+  DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_DATABASE_SCHEMA, DEFAULT_PORT, DEFAULT_SMTP_FROM_EMAIL,
+  ENV_ALLOWED_ORIGINS, ENV_AUDIT_RETENTION_DAYS, ENV_CONFIG, ENV_DATABASE_MAX_CONNECTIONS,
+  ENV_DATABASE_SCHEMA, ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_PORT, ENV_PUBLIC_URL,
+  ENV_ROOT_EMAIL, ENV_SERVICE_KEY, ENV_SHUTDOWN_GRACE_SECONDS, ENV_SMTP_FROM_EMAIL,
+  ENV_SMTP_FROM_NAME, ENV_SMTP_HOST, ENV_SMTP_PASSWORD, ENV_SMTP_PORT, ENV_SMTP_SECURITY,
+  ENV_SMTP_USERNAME, ENV_TRUSTED_PROXIES, ENV_WEB_UI, SERVER_HOST_PLACEHOLDER,
+  SERVICE_KEY_MIN_LENGTH,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 use crate::services::mailer::{self, SmtpSecurity};
@@ -68,8 +69,9 @@ pub struct ServerConfig {
   pub docs_enabled: bool,
   #[serde(skip)]
   pub web_ui_enabled: bool,
-  /// SMTP from the config file or `DOPGATE_SMTP_*`. Without a host, mail is
-  /// written to the server log.
+  /// SMTP from the config file or `DOPGATE_SMTP_*`. When it sets a host it
+  /// wins over the dashboard. Without one, the SMTP settings saved in the
+  /// dashboard apply, and with neither, mail is written to the server log.
   #[serde(skip)]
   pub smtp: SmtpServerConfig,
   /// Records whether the public URL was configured or derived at startup.
@@ -114,7 +116,8 @@ pub fn redact_database_url(url: &str) -> String {
   }
 }
 
-/// The SMTP settings. No host means no SMTP server: mail goes to the log.
+/// The SMTP settings from the config file or the environment. No host means
+/// the dashboard's SMTP settings apply instead.
 #[derive(Clone, Default)]
 pub struct SmtpServerConfig {
   pub host: Option<String>,
@@ -710,15 +713,17 @@ impl SmtpServerConfig {
           .with_context(|| format!("smtp from_email \"{address}\" is not a valid address"))?,
       );
     }
-    if self.host.is_some() && self.from_email.is_none() {
-      bail!("smtp from_email is required when smtp host is set");
-    }
     Ok(())
   }
 
-  /// The SMTP server to send through, when a host is set.
+  /// The SMTP server to send through, when a host is set. Without a sender
+  /// address, mail comes from `DEFAULT_SMTP_FROM_EMAIL`.
   pub fn mailer_config(&self) -> Option<mailer::SmtpConfig> {
-    let (host, from_email) = (self.host.clone()?, self.from_email.clone()?);
+    let host = self.host.clone()?;
+    let from_email = self
+      .from_email
+      .clone()
+      .unwrap_or_else(|| DEFAULT_SMTP_FROM_EMAIL.into());
     Some(mailer::SmtpConfig {
       host,
       port: self.port.unwrap_or_else(|| self.security.default_port()),

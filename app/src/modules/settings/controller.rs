@@ -55,8 +55,8 @@ pub async fn update(
 
 /// Send a test email
 ///
-/// Send a message through the SMTP server from `DOPGATE_SMTP_*` and report
-/// the server's answer. Without `to`, it goes to the caller's own email.
+/// Send a message through the SMTP server in use (`DOPGATE_SMTP_*`, or the
+/// one saved in settings) and report the server's answer. Without `to`, it goes to the caller's own email.
 #[utoipa::path(
   post,
   path = crate::constants::api::settings::SMTP_TEST,

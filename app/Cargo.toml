@@ -95,6 +95,10 @@ lettre = { version = "0.11.23", default-features = false, features = [
   "ring",
   "rustls-native-certs",
 ] }
+# Encrypts the SMTP password saved from the dashboard, with a key derived
+# from the service key.
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

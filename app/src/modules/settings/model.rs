@@ -10,8 +10,8 @@ use crate::{
   services::mailer::SmtpSecurity,
 };
 
-/// Every runtime setting. Server-level options such as the port and SMTP
-/// come from the environment instead.
+/// Every runtime setting. Server-level options such as the port come from
+/// the environment instead.
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -19,7 +19,7 @@ pub struct Settings {
   pub password: PasswordSettings,
   pub tokens: TokenSettings,
   pub limits: LimitSettings,
-  /// Read-only: set with `DOPGATE_SMTP_*`.
+  /// Read-only while `DOPGATE_SMTP_HOST` (or the config file) sets a host.
   pub smtp: SmtpSettings,
   pub branding: BrandingSettings,
 }
@@ -122,19 +122,47 @@ pub struct SmtpSettings {
   /// The password itself is never returned.
   pub password_set: bool,
   pub security: SmtpSecurity,
-  pub from_email: Option<String>,
+  /// Default: `no-reply@dopgate.com`.
+  pub from_email: String,
   pub from_name: Option<String>,
-  /// Where mail goes right now.
+  /// Where the settings come from, and so where mail goes right now.
   pub source: SmtpSource,
+  /// Whether a password can be saved here. Saved passwords are encrypted
+  /// with the service key, so this is false until `DOPGATE_SERVICE_KEY` is
+  /// set.
+  pub can_store_password: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SmtpSource {
-  /// The SMTP server from `DOPGATE_SMTP_*` or the config file.
+  /// `DOPGATE_SMTP_*` or the config file sets a host. These settings win and
+  /// can't be changed through the API.
   ServerConfig,
-  /// No SMTP server: messages are written to the server log.
+  /// The SMTP server saved through the API or the dashboard.
+  Database,
+  /// No SMTP host anywhere: messages are written to the server log.
   Log,
+}
+
+/// The SMTP server to save. Used only while the server config sets no SMTP
+/// host. The section is replaced whole, except the password.
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SmtpSettingsInput {
+  /// Empty turns SMTP off, and messages go to the server log.
+  pub host: Option<String>,
+  /// Unset means the usual port for `security`.
+  pub port: Option<u16>,
+  #[serde(default)]
+  pub security: SmtpSecurity,
+  pub username: Option<String>,
+  /// Left out or null keeps the saved password. An empty string removes it.
+  /// Needs `DOPGATE_SERVICE_KEY`, which encrypts it.
+  pub password: Option<String>,
+  /// Default: `no-reply@dopgate.com`.
+  pub from_email: Option<String>,
+  pub from_name: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
@@ -163,9 +191,8 @@ pub struct UpdateSettingsRequest {
   pub tokens: Option<TokenSettings>,
   pub limits: Option<LimitSettings>,
   pub branding: Option<BrandingSettings>,
-  /// Refused: SMTP is set with `DOPGATE_SMTP_*`.
-  #[schema(value_type = Option<Object>)]
-  pub smtp: Option<serde_json::Value>,
+  /// Refused while `DOPGATE_SMTP_HOST` or the config file sets SMTP.
+  pub smtp: Option<SmtpSettingsInput>,
 }
 
 #[derive(Deserialize, ToSchema, Default)]

@@ -24,6 +24,10 @@ pub const DATABASE_READY_TIMEOUT: std::time::Duration = std::time::Duration::fro
 /// The service key must be at least this long, so it cannot be guessed.
 pub const SERVICE_KEY_MIN_LENGTH: usize = 32;
 
+/// The sender address when neither the environment nor the dashboard sets
+/// one.
+pub const DEFAULT_SMTP_FROM_EMAIL: &str = "no-reply@dopgate.com";
+
 pub const ENV_ALLOWED_ORIGINS: &str = "DOPGATE_ALLOWED_ORIGINS";
 pub const ENV_AUDIT_RETENTION_DAYS: &str = "DOPGATE_AUDIT_RETENTION_DAYS";
 pub const ENV_CONFIG: &str = "DOPGATE_CONFIG";

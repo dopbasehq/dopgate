@@ -17,6 +17,7 @@ use utoipa::OpenApi;
     SmtpSettings,
     SmtpSecurity,
     SmtpSource,
+    SmtpSettingsInput,
     BrandingSettings,
     UpdateSettingsRequest,
     SmtpTestRequest,
@@ -24,7 +25,7 @@ use utoipa::OpenApi;
     HttpResponseFormat<Settings>,
     HttpResponseFormat<serde_json::Value>
   )),
-  tags((name = "settings", description = "Admin: sign-up rules, limits, token lifetimes, branding, and SMTP status"))
+  tags((name = "settings", description = "Admin: sign-up rules, limits, token lifetimes, branding, and SMTP"))
 )]
 struct SettingsApi;
 

@@ -232,7 +232,6 @@ fn invalid_values_are_refused() {
     ..Default::default()
   };
   refused(smtp("smtp.example.com:587", Some("no-reply@example.com")));
-  refused(smtp("smtp.example.com", None));
   refused(smtp("smtp.example.com", Some("not-an-address")));
   for (port, security) in [(Some("0"), None), (Some("x"), None), (None, Some("ssl"))] {
     let mut environment = smtp("smtp.example.com", Some("no-reply@example.com"));
@@ -240,6 +239,19 @@ fn invalid_values_are_refused() {
     environment.smtp_security = security.map(Into::into);
     refused(environment);
   }
+}
+
+/// A host without a sender address sends from the built-in default.
+#[test]
+fn an_smtp_host_without_a_sender_uses_the_default_address() {
+  let config = load(EnvironmentOverrides {
+    smtp_host: Some("smtp.example.com".into()),
+    ..Default::default()
+  })
+  .unwrap();
+  let smtp = config.smtp.mailer_config().unwrap();
+  assert_eq!(smtp.from_email, "no-reply@dopgate.com");
+  assert_eq!(smtp.port, 587);
 }
 
 /// The environment replaces single `[smtp]` fields and leaves the rest.
