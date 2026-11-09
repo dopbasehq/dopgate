@@ -14,7 +14,7 @@ const { templates, loadError, reload } = useTemplatesController();
     <div class="page-width flex flex-col gap-5 py-6 lg:py-8">
       <PageHeader
         title="Email templates"
-        subtitle="The emails dopgate sends. Change the wording and look, or keep the built-in ones." />
+        subtitle="The emails Dopgate sends. Change the wording and look, or keep the built-in ones." />
 
       <div v-if="loadError" class="flex flex-col items-start gap-3">
         <DgAlert>{{ loadError }}</DgAlert>

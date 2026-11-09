@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AlertTriangleIcon, DopgateIcon, MenuIcon } from "~/assets/icons";
 import { DgButton, DgModal, DgSheet } from "~/components/ui";
+import DopgateLockup from "~/components/app/DopgateLockup.vue";
 import DashboardNav from "./DashboardNav.vue";
 import { useDashboardLayoutController } from "./DashboardLayout.controller";
 
@@ -28,8 +29,7 @@ const {
   <div class="flex min-h-svh flex-col lg:flex-row">
     <header
       class="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-panel pl-4 pr-1 lg:hidden">
-      <DopgateIcon class="h-6 w-6 shrink-0" />
-      <p class="font-mono text-sm font-semibold text-ink-strong">dopgate</p>
+      <DopgateLockup :size="22" />
       <button
         type="button"
         class="ml-auto flex h-11 w-11 cursor-pointer items-center justify-center rounded-control text-ink-muted transition-colors hover:bg-raised hover:text-ink-strong"
@@ -41,7 +41,7 @@ const {
       </button>
     </header>
 
-    <DgSheet :open="navOpen" title="dopgate" @close="navOpen = false">
+    <DgSheet :open="navOpen" title="Dopgate" @close="navOpen = false">
       <DashboardNav
         :sections="sections"
         :active-page="activePage"
@@ -59,8 +59,8 @@ const {
         </span>
         <div class="min-w-0">
           <p
-            class="text-[15px] font-semibold leading-5 tracking-[-0.3px] text-ink-strong">
-            dopgate
+            class="font-brand text-[17px] font-semibold leading-5 tracking-[-0.02em] text-ink-strong">
+            Dopgate
           </p>
           <p class="truncate font-mono text-sm leading-5.5 text-ink-faint">
             Admin Console

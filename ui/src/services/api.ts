@@ -1,5 +1,5 @@
 /**
- * Thin typed wrapper around `fetch` for the dopgate API (`/api/v1`).
+ * Thin typed wrapper around `fetch` for the Dopgate API (`/api/v1`).
  *
  * - Parses the success envelope (`{ success, message, data }`) and the error
  *   envelope (`{ success: false, error: { CODE: message } }`).
@@ -151,7 +151,7 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     if (options.signal?.aborted) throw options.signal.reason ?? cause;
     throw new ApiError(
       0,
-      { NETWORK_ERROR: "Cannot reach the dopgate server." },
+      { NETWORK_ERROR: "Cannot reach the Dopgate server." },
       null,
       { cause },
     );

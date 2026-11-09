@@ -4,7 +4,7 @@ import { DopgateIcon } from "~/assets/icons";
 
 /**
  * AuthArtwork — the picture beside the sign-in form: nested rounded
- * frames closing in on the dopgate mark, like doors to pass through. Drawn
+ * frames closing in on the Dopgate mark, like doors to pass through. Drawn
  * from the Dopbase vault artwork on an 880×900 frame and coloured from the
  * theme tokens, so it follows the brand. It scales with the aside, capped
  * at the viewport height.

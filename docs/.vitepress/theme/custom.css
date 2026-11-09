@@ -1,7 +1,13 @@
 :root {
-  /* The dopgate red. Dopbase, its sibling, is purple. */
+  /* Values from the "Dopgate · Brand reference" page in Figma. Gate Red
+     carries the logo and primary actions; Red Deep ends the app icon
+     gradient. Coral is for errors only, never brand decoration. */
   --dopgate-red: #ff4053;
+  --dopgate-red-light: #ff8593;
+  --dopgate-red-deep: #b0182c;
   --dopgate-red-text: #d4213a;
+  --vp-font-family-brand:
+    "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --dopgate-ink: #18181b;
   --vp-c-brand-1: var(--dopgate-red-text);
   --vp-c-brand-2: #b81a31;
@@ -13,8 +19,8 @@
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: linear-gradient(
     135deg,
-    var(--dopgate-red-text) 0%,
-    #ff7a59 90%
+    var(--dopgate-red) 0%,
+    var(--dopgate-red-deep) 100%
   );
 }
 
@@ -29,19 +35,28 @@
   --vp-home-hero-name-background: linear-gradient(
     135deg,
     var(--dopgate-red) 0%,
-    #ff9aa3 90%
+    var(--dopgate-red-light) 100%
   );
 }
 
+/* The mark is 48 x 52; keep that ratio so it never stretches. */
 .VPNavBarTitle .logo {
-  border-radius: 8px;
-  height: 28px;
-  width: 28px;
+  height: 26px;
+  width: 24px;
+}
+
+/* The wordmark: Geist SemiBold at -2% tracking, as in the logo lockup. */
+.VPNavBarTitle .title {
+  font-family: var(--vp-font-family-brand);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  gap: 7px;
 }
 
 .VPHero .name,
 .VPHero .text {
-  letter-spacing: -0.04em;
+  font-family: var(--vp-font-family-brand);
+  letter-spacing: -0.02em;
 }
 
 .VPHero .tagline {

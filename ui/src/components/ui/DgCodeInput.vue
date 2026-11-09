@@ -4,7 +4,7 @@ import { AlertTriangleIcon } from "~/assets/icons";
 
 /**
  * DgCodeInput — one box per character for a short code, like the 6-digit
- * code dopgate emails. Typing moves to the next box, Backspace and the
+ * code Dopgate emails. Typing moves to the next box, Backspace and the
  * arrow keys move back, and pasting the whole code (with or without
  * spaces or a dash) fills every box. Only characters in `alphabet` are
  * accepted.

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DopgateIcon } from "~/assets/icons";
+import DopgateLockup from "~/components/app/DopgateLockup.vue";
 import AuthArtwork from "./AuthArtwork.vue";
 
 /**
@@ -16,9 +16,8 @@ import AuthArtwork from "./AuthArtwork.vue";
     <div
       class="flex min-h-svh w-full flex-col px-6 py-8 sm:px-12 sm:py-10 lg:w-[560px] lg:shrink-0 lg:border-r lg:border-line-soft lg:px-16">
       <div class="mx-auto flex w-full max-w-[432px] flex-1 flex-col">
-        <div class="flex items-center gap-2">
-          <DopgateIcon class="h-6 w-6 shrink-0" />
-          <span class="text-[15px] font-semibold text-ink-strong">dopgate</span>
+        <div class="flex items-center">
+          <DopgateLockup :size="26" />
         </div>
 
         <main class="flex flex-1 items-center py-10">
