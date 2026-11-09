@@ -34,14 +34,16 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | `EMAIL_INVALID` | 422 | The email isn't valid, or an email change names the current address. `400` for the `to` of an SMTP test, and when the service key asks for a test email it has no address for. |
 | `EMAIL_NOT_VERIFIED` | 403 | Sign-in with the right password while the email is unconfirmed and settings require it. |
 | `EMAIL_TAKEN` | 409 | Another account already uses this email. |
+| `FEATURE_DISABLED` | 403 | A user tried to make a personal token while `selfService.personalTokens` is off. |
 | `INTERNAL_ERROR` | 500 | Something failed on the server, such as a database error. The log has the details. |
+| `LIMIT_REACHED` | 409 | The user already has `selfService.maxPersonalTokensPerUser` personal tokens. |
 | `METADATA_INVALID` | 422 | A metadata value isn't a JSON object, or is larger than 16 KB. |
 | `NOT_FOUND` | 404 | No such user, session, or email template, or the signed-in account was deleted. |
 | `NOT_IMPLEMENTED` | 501 | A planned endpoint: single sign-on or multi-factor authentication. |
 | `PASSWORD_INVALID` | 422 | The new password is shorter than the minimum length or longer than 1024 bytes. |
 | `PROFILE_INVALID` | 422 | The display name is longer than 255 characters or has a line break, or the avatar URL isn't an `http(s)` URL of at most 2048 characters. |
 | `RATE_LIMITED` | 429 | Too many requests from this address, too many codes for this email, or too many wrong setup tokens. |
-| `REQUEST_INVALID` | 400, 404, 422, and others | A malformed request: bad JSON, a missing field, an invalid pagination cursor, an incomplete audit anchor, a code purpose the endpoint doesn't take (`422`), or an unknown API route (`404`). |
+| `REQUEST_INVALID` | 400, 404, 422, and others | A malformed request: bad JSON, a missing field, an invalid pagination cursor, an incomplete audit anchor, a code purpose the endpoint doesn't take (`422`), a personal token name or expiry out of range (`422`), or an unknown API route (`404`). |
 | `ROOT_PROTECTED` | 403 | An attempt to update, disable, enable, delete, end the sessions of, or send a reset code to root through the admin API. |
 | `SETTINGS_INVALID` | 422 | A settings value is out of range, the request tried to change SMTP while `DOPGATE_SMTP_HOST` is set, or it saved an SMTP password without `DOPGATE_SERVICE_KEY`. |
 | `SETUP_TOKEN_INVALID` | 401 | The setup token for `POST /bootstrap/root` is wrong. |
@@ -50,7 +52,9 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | `SMTP_PASSWORD_UNREADABLE` | 400 | The SMTP password saved in the console can't be decrypted because `DOPGATE_SERVICE_KEY` changed or was removed. |
 | `SMTP_SEND_FAILED` | 502 | The SMTP server refused a test message or couldn't be reached. |
 | `TEMPLATE_INVALID` | 422 | An email template draft has an empty or too long subject, an empty or too large body, an unclosed placeholder, or an unknown variable. |
-| `TOKEN_INVALID` | 401 | The access token is invalid, expired, signed by an unknown key, or its session ended; or the refresh token is unknown, used, expired, or its session ended. |
+| `TOKEN_EXPIRED` | 401 | A personal token traded at `/auth/token` is past its expiry. |
+| `TOKEN_INVALID` | 401 | The access token is invalid, expired, signed by an unknown key, or its session or personal token ended; the refresh token is unknown, used, expired, or its session ended; or the token traded at `/auth/token` is wrong or deleted. |
+| `TOKEN_NAME_TAKEN` | 409 | The user already has a personal token with this name. |
 
 ## CLI errors
 

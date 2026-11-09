@@ -56,6 +56,16 @@ Admins signing in to the console leave the same events with an `admin.` prefix, 
 
 A failed sign-in for an email with no account isn't recorded, because there is no account to attach it to.
 
+### Personal tokens
+
+| Action | Actor | Metadata |
+| --- | --- | --- |
+| `personal_token.created` | The user | `name`, `expiresAt`; the token is the resource |
+| `personal_token.deleted` | The user, or the admin who revoked it | `name`, and `userId` when an admin revoked it |
+| `token.rejected` | `anonymous`, label `token` | `kind` (`personal` or `unknown`) and `lastFour`. A token traded at `/auth/token` matched nothing. |
+
+Successful trades aren't recorded; they update the token's `lastUsedAt`, at most once a minute.
+
 ### Sessions
 
 | Action | Actor | Metadata |
