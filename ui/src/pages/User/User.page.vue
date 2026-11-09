@@ -34,6 +34,16 @@ const {
   loadError,
   sessions,
   sessionsError,
+  tokens,
+  tokensError,
+  agents,
+  agentsError,
+  tokenToRevoke,
+  revoking,
+  revokeError,
+  askRevoke,
+  cancelRevoke,
+  revokeToken,
   canManage,
   canDisableOrDelete,
   displayName,
@@ -270,6 +280,88 @@ const card = "rounded-card border border-line bg-panel";
           </section>
         </div>
 
+        <div class="grid gap-5 lg:grid-cols-2">
+          <section :class="card" aria-labelledby="tokens-heading">
+            <header class="border-b border-line-soft px-5 py-3.5">
+              <h2 id="tokens-heading" class="text-[15px]">Personal tokens</h2>
+              <p class="mt-0.5 text-sm text-ink-muted">
+                Tokens this user made to sign in as themselves. You never see
+                the tokens, but you can revoke them.
+              </p>
+            </header>
+            <div class="px-5 py-4">
+              <DgAlert v-if="tokensError">{{ tokensError }}</DgAlert>
+              <DgSkeleton v-else-if="!tokens" class="h-10 w-full" />
+              <p v-else-if="tokens.length === 0" class="text-sm text-ink-muted">
+                No personal tokens.
+              </p>
+              <ul
+                v-else
+                class="divide-y divide-line-soft"
+                data-testid="user-tokens">
+                <li
+                  v-for="token in tokens"
+                  :key="token.id"
+                  class="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <div class="flex min-w-0 flex-col gap-0.5">
+                    <span class="truncate text-ink-strong">
+                      {{ token.name }}
+                      <span class="font-mono text-ink-muted"
+                        >dgp_••••{{ token.lastFour }}</span
+                      >
+                    </span>
+                    <span class="text-ink-muted">
+                      <template v-if="token.expired">Expired</template>
+                      <template v-else-if="token.expiresAt">
+                        Expires {{ formatDateTime(token.expiresAt) }}
+                      </template>
+                      <template v-else>No expiry</template>
+                      · used {{ formatRelativeTime(token.lastUsedAt) }}
+                    </span>
+                  </div>
+                  <DgButton size="sm" variant="ghost" @click="askRevoke(token)">
+                    Revoke
+                  </DgButton>
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <section :class="card" aria-labelledby="agents-heading">
+            <header class="border-b border-line-soft px-5 py-3.5">
+              <h2 id="agents-heading" class="text-[15px]">Agents</h2>
+              <p class="mt-0.5 text-sm text-ink-muted">
+                Agents this user owns. They stop when the user is turned off.
+              </p>
+            </header>
+            <div class="px-5 py-4">
+              <DgAlert v-if="agentsError">{{ agentsError }}</DgAlert>
+              <DgSkeleton v-else-if="!agents" class="h-10 w-full" />
+              <p v-else-if="agents.length === 0" class="text-sm text-ink-muted">
+                No agents.
+              </p>
+              <ul
+                v-else
+                class="divide-y divide-line-soft"
+                data-testid="user-agents">
+                <li
+                  v-for="owned in agents"
+                  :key="owned.id"
+                  class="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <RouterLink
+                    :to="{ name: 'agent', params: { id: owned.id } }"
+                    class="truncate font-mono text-ink-strong hover:underline">
+                    {{ owned.name }}
+                  </RouterLink>
+                  <DgBadge :tone="owned.status === 'active' ? 'ok' : 'crit'">
+                    {{ owned.status === "active" ? "On" : "Turned off" }}
+                  </DgBadge>
+                </li>
+              </ul>
+            </div>
+          </section>
+        </div>
+
         <section :class="card" aria-labelledby="metadata-heading">
           <header class="border-b border-line-soft px-5 py-3.5">
             <h2 id="metadata-heading" class="text-[15px]">Metadata</h2>
@@ -316,6 +408,17 @@ const card = "rounded-card border border-line bg-panel";
         </section>
       </template>
     </div>
+
+    <DgConfirmDialog
+      :open="tokenToRevoke !== null"
+      :title="`Revoke “${tokenToRevoke?.name ?? ''}”?`"
+      description="The token stops signing in right away. Access tokens it already got keep working on backends that verify offline until they expire."
+      confirm-label="Revoke"
+      tone="danger"
+      :loading="revoking"
+      :error="revokeError"
+      @confirm="revokeToken"
+      @close="cancelRevoke" />
 
     <DgConfirmDialog
       :open="confirming !== null"

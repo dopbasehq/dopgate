@@ -105,8 +105,16 @@ interface SmtpDraft {
   fromName: string;
 }
 
+interface SelfServiceDraft {
+  agents: boolean;
+  maxAgentsPerUser: string;
+  personalTokens: boolean;
+  maxPersonalTokensPerUser: string;
+}
+
 interface Drafts {
   signup: Settings["signup"];
+  selfService: SelfServiceDraft;
   password: Strings<Settings["password"]>;
   limits: Strings<LimitSettings>;
   tokens: Strings<TokenSettings>;
@@ -126,6 +134,7 @@ const SECTIONS: SectionName[] = [
   "password",
   "limits",
   "tokens",
+  "selfService",
   "branding",
   "smtp",
 ];
@@ -143,6 +152,15 @@ function draftOf<S extends SectionName>(
   switch (section) {
     case "signup":
       return { ...settings.signup } as Drafts[S];
+    case "selfService": {
+      const rules = settings.selfService;
+      return {
+        agents: rules.agents,
+        maxAgentsPerUser: String(rules.maxAgentsPerUser),
+        personalTokens: rules.personalTokens,
+        maxPersonalTokensPerUser: String(rules.maxPersonalTokensPerUser),
+      } as Drafts[S];
+    }
     case "branding":
       return {
         appName: settings.branding.appName,
@@ -268,6 +286,7 @@ export function useSettingsController() {
           password: draftOf(next, "password"),
           limits: draftOf(next, "limits"),
           tokens: draftOf(next, "tokens"),
+          selfService: draftOf(next, "selfService"),
           branding: draftOf(next, "branding"),
           smtp: draftOf(next, "smtp"),
         };
@@ -320,6 +339,22 @@ export function useSettingsController() {
       case "tokens":
         body = { tokens: numbers(draft.tokens, errors) };
         break;
+      case "selfService": {
+        const { agents, personalTokens } = draft.selfService;
+        const limits = numbers(
+          {
+            maxAgentsPerUser: draft.selfService.maxAgentsPerUser,
+            maxPersonalTokensPerUser:
+              draft.selfService.maxPersonalTokensPerUser,
+          },
+          errors,
+        );
+        for (const [key, value] of Object.entries(limits)) {
+          if (!errors[key] && value > 1000) errors[key] = "Use 1000 or less.";
+        }
+        body = { selfService: { agents, personalTokens, ...limits } };
+        break;
+      }
       case "branding": {
         const appName = draft.branding.appName.trim();
         const logoUrl = draft.branding.logoUrl.trim();

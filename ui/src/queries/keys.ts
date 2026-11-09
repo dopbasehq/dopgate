@@ -24,6 +24,16 @@ export const keys = {
     ],
     one: (id: string): EntryKey => ["users", "one", id],
     sessions: (id: string): EntryKey => ["users", "sessions", id],
+    tokens: (id: string): EntryKey => ["users", "tokens", id],
+  },
+  agents: {
+    root: ["agents"] as EntryKey,
+    list: (filters: Record<string, string | null>): EntryKey => [
+      "agents",
+      "list",
+      filters,
+    ],
+    one: (id: string): EntryKey => ["agents", "one", id],
   },
   admins: ["admins"] as EntryKey,
   templates: {

@@ -28,6 +28,12 @@ const settings: Settings = {
     lockoutMinutes: 15,
     ipRequestsPerMinute: 60,
   },
+  selfService: {
+    agents: false,
+    maxAgentsPerUser: 10,
+    personalTokens: true,
+    maxPersonalTokensPerUser: 10,
+  },
   smtp: {
     host: "smtp.example.com",
     port: 587,
@@ -97,6 +103,39 @@ describe("useSettingsController", () => {
       "refreshTokenIdleDays",
     ]);
     expect(adminApi.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("saves the self-service switches and limits as numbers", async () => {
+    vi.mocked(adminApi.updateSettings).mockResolvedValue(settings);
+    const c = await mount();
+    expect(c.drafts.value?.selfService).toEqual({
+      agents: false,
+      maxAgentsPerUser: "10",
+      personalTokens: true,
+      maxPersonalTokensPerUser: "10",
+    });
+    c.drafts.value!.selfService.agents = true;
+    c.drafts.value!.selfService.maxAgentsPerUser = "5";
+    await c.save("selfService");
+    expect(adminApi.updateSettings).toHaveBeenCalledWith({
+      selfService: {
+        agents: true,
+        maxAgentsPerUser: 5,
+        personalTokens: true,
+        maxPersonalTokensPerUser: 10,
+      },
+    });
+  });
+
+  it("keeps self-service limits between 1 and 1000", async () => {
+    const c = await mount();
+    c.drafts.value!.selfService.maxAgentsPerUser = "0";
+    c.drafts.value!.selfService.maxPersonalTokensPerUser = "5000";
+    expect(await c.save("selfService")).toBe(false);
+    expect(c.state.selfService.fieldErrors).toEqual({
+      maxAgentsPerUser: "Enter a whole number of at least 1.",
+      maxPersonalTokensPerUser: "Use 1000 or less.",
+    });
   });
 
   it("checks branding and sends an empty logo as null", async () => {

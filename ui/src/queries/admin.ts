@@ -5,8 +5,12 @@ import {
   fetchTemplate,
   fetchTemplates,
   fetchUser,
+  fetchAgent,
   fetchUserSessions,
   listAdmins,
+  listAgents,
+  listUserTokens,
+  type AgentFilters,
   listAuditEvents,
   listUsers,
   type AuditFilters,
@@ -14,6 +18,7 @@ import {
 } from "~/services/admin.api";
 import type {
   AdminUser,
+  Agent,
   AuditEvent,
   Page,
   TemplateName,
@@ -41,6 +46,37 @@ export const userQuery = defineQueryOptions((id: string) => ({
 export const userSessionsQuery = defineQueryOptions((id: string) => ({
   key: keys.users.sessions(id),
   query: ({ signal }) => fetchUserSessions(id, signal),
+}));
+
+/** A user's personal tokens. */
+export const userTokensQuery = defineQueryOptions((id: string) => ({
+  key: keys.users.tokens(id),
+  query: async ({ signal }) => (await listUserTokens(id, signal)).items,
+}));
+
+/** The first page of agents a user owns. */
+export const userAgentsQuery = defineQueryOptions((id: string) => ({
+  key: keys.agents.list({ owner: id }),
+  query: async ({ signal }) =>
+    (await listAgents({ search: "", status: null, owner: id }, null, signal))
+      .items,
+}));
+
+/** Agents matching the filters, a page at a time. */
+export const agentsQuery = defineInfiniteQueryOptions(
+  (filters: AgentFilters) => ({
+    key: keys.agents.list({ ...filters }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page: Page<Agent> | undefined) =>
+      page?.nextCursor ?? null,
+    query: ({ signal, pageParam }) => listAgents(filters, pageParam, signal),
+    refetchOnWindowFocus: false,
+  }),
+);
+
+export const agentQuery = defineQueryOptions((id: string) => ({
+  key: keys.agents.one(id),
+  query: ({ signal }) => fetchAgent(id, signal),
 }));
 
 /** Root and every admin, root first. */

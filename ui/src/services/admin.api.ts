@@ -2,6 +2,10 @@ import { api } from "./api";
 import type {
   Admin,
   AdminUser,
+  Agent,
+  AgentWithToken,
+  CapabilityValue,
+  PersonalToken,
   AuditEvent,
   AuditVerification,
   EditableSettings,
@@ -138,6 +142,92 @@ export function enableAdmin(id: string): Promise<Admin> {
 /** Root only. */
 export function deleteAdmin(id: string): Promise<null> {
   return api(adminPath(id), { method: "DELETE" });
+}
+
+// Personal tokens. Admins list and revoke a user's tokens but never see one.
+
+export function listUserTokens(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<{ items: PersonalToken[] }> {
+  return api(`${userPath(userId)}/personal-tokens`, { signal });
+}
+
+export function revokeUserToken(
+  userId: string,
+  tokenId: string,
+): Promise<null> {
+  return api(
+    `${userPath(userId)}/personal-tokens/${encodeURIComponent(tokenId)}`,
+    { method: "DELETE" },
+  );
+}
+
+// Agents. Any admin turns an agent off, on, or deletes it; only the owner
+// edits it or regenerates its token.
+
+const agentPath = (id: string) => `/admin/agents/${encodeURIComponent(id)}`;
+
+export interface AgentFilters {
+  search: string;
+  status: "active" | "disabled" | null;
+  /** An admin or user ID. */
+  owner: string | null;
+}
+
+export function listAgents(
+  filters: AgentFilters,
+  cursor: string | null,
+  signal?: AbortSignal,
+): Promise<Page<Agent>> {
+  return api("/admin/agents", {
+    query: {
+      search: filters.search.trim(),
+      status: filters.status,
+      owner: filters.owner,
+      cursor,
+      limit: PAGE_SIZE,
+    },
+    signal,
+  });
+}
+
+export interface AgentInput {
+  name?: string;
+  /** Empty string clears it. */
+  description?: string;
+  capabilities?: Record<string, CapabilityValue>;
+}
+
+/** The signed-in admin owns the new agent. */
+export function createAgent(body: AgentInput): Promise<AgentWithToken> {
+  return api("/admin/agents", { method: "POST", body });
+}
+
+export function fetchAgent(id: string, signal?: AbortSignal): Promise<Agent> {
+  return api(agentPath(id), { signal });
+}
+
+/** Owner only. */
+export function updateAgent(id: string, body: AgentInput): Promise<Agent> {
+  return api(agentPath(id), { method: "PATCH", body });
+}
+
+/** Owner only. */
+export function regenerateAgent(id: string): Promise<AgentWithToken> {
+  return api(`${agentPath(id)}/regenerate`, { method: "POST" });
+}
+
+export function disableAgent(id: string): Promise<Agent> {
+  return api(`${agentPath(id)}/disable`, { method: "POST" });
+}
+
+export function enableAgent(id: string): Promise<Agent> {
+  return api(`${agentPath(id)}/enable`, { method: "POST" });
+}
+
+export function deleteAgent(id: string): Promise<null> {
+  return api(agentPath(id), { method: "DELETE" });
 }
 
 // Signing keys

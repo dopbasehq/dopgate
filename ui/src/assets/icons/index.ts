@@ -1,5 +1,6 @@
 export { default as AlertTriangleIcon } from "./AlertTriangle.icon.vue";
 export { default as ArrowLeftIcon } from "./ArrowLeft.icon.vue";
+export { default as BotIcon } from "./Bot.icon.vue";
 export { default as CheckIcon } from "./Check.icon.vue";
 export { default as ChevronDownIcon } from "./ChevronDown.icon.vue";
 export { default as ChevronRightIcon } from "./ChevronRight.icon.vue";

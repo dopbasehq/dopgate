@@ -1,5 +1,5 @@
 import { useQueryCache, type EntryKey } from "@pinia/colada";
-import type { AdminUser } from "~/services/types";
+import type { AdminUser, Agent } from "~/services/types";
 import { keys } from "./keys";
 
 /**
@@ -24,6 +24,13 @@ export function useInvalidate() {
       return refresh(["users", "list"], keys.users.sessions(user.id));
     },
     usersChanged: () => refresh(keys.users.root),
+    /** An agent changed: keep the server's copy and refresh the lists. */
+    agentChanged(agent: Agent): Promise<void> {
+      cache.setQueryData(keys.agents.one(agent.id), agent);
+      return refresh(["agents", "list"]);
+    },
+    agentsChanged: () => refresh(keys.agents.root),
+    userTokensChanged: (userId: string) => refresh(keys.users.tokens(userId)),
     adminsChanged: () => refresh(keys.admins),
     templatesChanged: () => refresh(keys.templates.root),
     settingsChanged: () => refresh(keys.settings),

@@ -143,6 +143,36 @@ describe("useUserController", () => {
     expect(c.notice.value).toBe(`Sent a password reset code to ${maya.email}.`);
   });
 
+  it("lists a user's personal tokens and agents, and revokes a token", async () => {
+    const token = {
+      id: "pat_ci",
+      name: "ci",
+      lastFour: "9c01",
+      expiresAt: null,
+      expired: false,
+      lastUsedAt: null,
+      createdAt: "2026-11-01T10:00:00Z",
+    };
+    vi.mocked(adminApi.listUserTokens).mockResolvedValue({ items: [token] });
+    vi.mocked(adminApi.listAgents).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    vi.mocked(adminApi.revokeUserToken).mockResolvedValue(null);
+    const c = await mountAs();
+    expect(c.tokens.value).toEqual([token]);
+    expect(adminApi.listAgents).toHaveBeenCalledWith(
+      { search: "", status: null, owner: maya.id },
+      null,
+      expect.any(AbortSignal),
+    );
+    c.askRevoke(token);
+    await c.revokeToken();
+    expect(adminApi.revokeUserToken).toHaveBeenCalledWith(maya.id, "pat_ci");
+    expect(c.tokenToRevoke.value).toBeNull();
+    expect(c.notice.value).toMatch(/Revoked the personal token/);
+  });
+
   it("signs the user out everywhere", async () => {
     vi.mocked(adminApi.revokeUserSessions).mockResolvedValue(null);
     const c = await mountAs();

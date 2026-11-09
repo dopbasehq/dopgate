@@ -88,6 +88,12 @@ const sections: { name: SectionName; title: string; description: string }[] = [
     description: "How long tokens and sessions last.",
   },
   {
+    name: "selfService",
+    title: "Tokens and agents",
+    description:
+      "What your app's users can make for themselves. Admins can always make agents.",
+  },
+  {
     name: "branding",
     title: "Branding",
     description: "The name and logo in emails and on sign-in pages.",
@@ -184,6 +190,35 @@ const card = "rounded-card border border-line bg-panel";
                   :min="1"
                   :error="state.tokens.fieldErrors[field.key]" />
               </div>
+
+              <template v-else-if="section.name === 'selfService'">
+                <DgSwitch
+                  v-model="drafts.selfService.personalTokens"
+                  label="Users can create personal tokens that sign in as themselves" />
+                <DgSwitch
+                  v-model="drafts.selfService.agents"
+                  label="Users can create agents of their own" />
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <DgInput
+                    v-model="drafts.selfService.maxPersonalTokensPerUser"
+                    label="Personal tokens per user"
+                    type="number"
+                    :min="1"
+                    :error="
+                      state.selfService.fieldErrors.maxPersonalTokensPerUser
+                    " />
+                  <DgInput
+                    v-model="drafts.selfService.maxAgentsPerUser"
+                    label="Agents per user"
+                    type="number"
+                    :min="1"
+                    :error="state.selfService.fieldErrors.maxAgentsPerUser" />
+                </div>
+                <p class="text-sm text-ink-muted">
+                  Turning a switch off stops new ones. Tokens and agents that
+                  already exist keep working.
+                </p>
+              </template>
 
               <div
                 v-else-if="section.name === 'branding'"
