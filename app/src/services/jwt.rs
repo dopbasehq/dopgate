@@ -115,6 +115,11 @@ async fn verify_app(
   let mut claims = decode::<AccessClaims>(token, &key, &rules)
     .map_err(|_| invalid())?
     .claims;
+  // Agent tokens are for your backend; every Dopgate endpoint refuses
+  // them, so there is nothing to look up.
+  if claims.kind == crate::models::TokenKind::Agent {
+    return Ok(claims);
+  }
   // A personal token's access token stays valid only while the token is
   // there and unexpired; a sign-in's only while its session is live.
   let live = match (&claims.tid, &claims.sid) {
@@ -128,8 +133,8 @@ async fn verify_app(
   if status != "active" {
     return Err(disabled());
   }
-  claims.email = email;
-  claims.email_verified = verified;
+  claims.email = Some(email);
+  claims.email_verified = Some(verified);
   Ok(claims)
 }
 

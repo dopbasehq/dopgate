@@ -59,6 +59,10 @@ impl FromRequestParts<AppState> for AuthIdentity {
       };
     }
     Ok(match jwt::verify(state, token).await? {
+      Verified::App(claims) if claims.kind == crate::models::TokenKind::Agent => Self::Agent {
+        agent_id: claims.sub,
+        owner_id: claims.owner.unwrap_or_default(),
+      },
       Verified::App(claims) => Self::User {
         via: match (claims.tid, claims.sid) {
           (Some(tid), _) => UserVia::PersonalToken(tid),
@@ -71,7 +75,7 @@ impl FromRequestParts<AppState> for AuthIdentity {
           }
         },
         user_id: claims.sub,
-        email: claims.email,
+        email: claims.email.unwrap_or_default(),
       },
       Verified::Console(claims) => Self::Admin {
         admin_id: claims.sub,
@@ -83,13 +87,23 @@ impl FromRequestParts<AppState> for AuthIdentity {
   }
 }
 
-/// The refusal for an admin or the service key on a user endpoint.
+/// The refusal for an agent anywhere in Dopgate.
+fn agent_refused() -> HttpError {
+  HttpError::forbidden(
+    AUTHORIZATION_DENIED,
+    "Agent tokens are for your app's backend. Dopgate's own endpoints don't take them.",
+  )
+}
+
+/// The refusal for an admin, an agent, or the service key on a user
+/// endpoint.
 fn not_a_user(identity: &AuthIdentity) -> HttpError {
   match identity {
     AuthIdentity::Admin { .. } => HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "Admins have no app account. Use the console endpoints under /console.",
     ),
+    AuthIdentity::Agent { .. } => agent_refused(),
     _ => HttpError::forbidden(
       AUTHORIZATION_DENIED,
       "The service key has no account. Use a user's access token.",
@@ -104,6 +118,16 @@ pub struct UserIdentity {
   pub user_id: String,
   pub email: String,
   pub session_id: String,
+}
+
+impl UserIdentity {
+  pub fn identity(&self) -> AuthIdentity {
+    AuthIdentity::User {
+      user_id: self.user_id.clone(),
+      email: self.email.clone(),
+      via: UserVia::Session(self.session_id.clone()),
+    }
+  }
 }
 
 impl FromRequestParts<AppState> for UserIdentity {
@@ -204,6 +228,7 @@ impl FromRequestParts<AppState> for ConsoleIdentity {
         role,
         session_id,
       }),
+      AuthIdentity::Agent { .. } => Err(agent_refused()),
       _ => Err(HttpError::forbidden(
         AUTHORIZATION_DENIED,
         "Only admins signed in to the console can do this.",

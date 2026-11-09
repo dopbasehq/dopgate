@@ -31,6 +31,10 @@ pub struct Settings {
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SelfServiceSettings {
+  /// Users can create agents of their own.
+  pub agents: bool,
+  /// Agents one user can have, 1 to 1000.
+  pub max_agents_per_user: u32,
   /// Users can create personal tokens that sign in as themselves.
   pub personal_tokens: bool,
   /// Personal tokens one user can have, 1 to 1000.
@@ -40,6 +44,8 @@ pub struct SelfServiceSettings {
 impl Default for SelfServiceSettings {
   fn default() -> Self {
     Self {
+      agents: false,
+      max_agents_per_user: 10,
       personal_tokens: false,
       max_personal_tokens_per_user: 10,
     }

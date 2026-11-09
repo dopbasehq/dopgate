@@ -1,4 +1,7 @@
 pub const ADMIN_ID_PREFIX: &str = "adm_";
+pub const AGENT_ID_PREFIX: &str = "agt_";
+/// What an agent token starts with.
+pub const AGENT_TOKEN_PREFIX: &str = "dga_";
 pub const AUDIT_EVENT_ID_PREFIX: &str = "aud_";
 pub const CONSOLE_KEY_ID_PREFIX: &str = "ckey_";
 pub const PERSONAL_TOKEN_ID_PREFIX: &str = "pat_";

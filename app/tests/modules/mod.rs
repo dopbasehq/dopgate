@@ -1,4 +1,5 @@
 mod admins;
+mod agents;
 mod audit;
 mod auth;
 mod bootstrap;

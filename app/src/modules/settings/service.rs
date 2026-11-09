@@ -291,7 +291,7 @@ pub async fn test_smtp(
     })?,
     None => match actor {
       AuthIdentity::Admin { email, .. } | AuthIdentity::User { email, .. } => email.clone(),
-      AuthIdentity::Service => {
+      AuthIdentity::Agent { .. } | AuthIdentity::Service => {
         return Err(HttpError::new(
           StatusCode::UNPROCESSABLE_ENTITY,
           EMAIL_INVALID,
@@ -383,6 +383,9 @@ fn check_tokens(tokens: &TokenSettings) -> Result<(), HttpError> {
 }
 
 fn check_self_service(self_service: &SelfServiceSettings) -> Result<(), HttpError> {
+  if !(1..=1000).contains(&self_service.max_agents_per_user) {
+    return Err(invalid("Allow between 1 and 1000 agents per user."));
+  }
   if !(1..=1000).contains(&self_service.max_personal_tokens_per_user) {
     return Err(invalid(
       "Allow between 1 and 1000 personal tokens per user.",

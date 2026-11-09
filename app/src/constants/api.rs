@@ -38,6 +38,19 @@ pub mod auth {
   pub const TOKEN: &str = api_path!("/auth/token");
 }
 
+pub mod agents {
+  pub const OWN_COLLECTION: &str = api_path!("/auth/agents");
+  pub const OWN_ITEM: &str = api_path!("/auth/agents/{id}");
+  pub const OWN_REGENERATE: &str = api_path!("/auth/agents/{id}/regenerate");
+  pub const OWN_DISABLE: &str = api_path!("/auth/agents/{id}/disable");
+  pub const OWN_ENABLE: &str = api_path!("/auth/agents/{id}/enable");
+  pub const ADMIN_COLLECTION: &str = api_path!("/admin/agents");
+  pub const ADMIN_ITEM: &str = api_path!("/admin/agents/{id}");
+  pub const ADMIN_REGENERATE: &str = api_path!("/admin/agents/{id}/regenerate");
+  pub const ADMIN_DISABLE: &str = api_path!("/admin/agents/{id}/disable");
+  pub const ADMIN_ENABLE: &str = api_path!("/admin/agents/{id}/enable");
+}
+
 pub mod personal_tokens {
   pub const COLLECTION: &str = api_path!("/auth/personal-tokens");
   pub const ITEM: &str = api_path!("/auth/personal-tokens/{id}");

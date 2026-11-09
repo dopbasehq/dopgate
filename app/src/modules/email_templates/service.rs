@@ -227,7 +227,7 @@ pub async fn preview(
   check(template, &input)?;
   let email = match actor {
     AuthIdentity::Admin { email, .. } | AuthIdentity::User { email, .. } => email.clone(),
-    AuthIdentity::Service => "person@example.com".into(),
+    AuthIdentity::Agent { .. } | AuthIdentity::Service => "person@example.com".into(),
   };
   Ok(render_input(&input, &sample_values(state, &email).await?))
 }
