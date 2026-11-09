@@ -15,10 +15,14 @@ use utoipa::OpenApi;
     controller::logout,
     controller::me,
     controller::update_me,
-    controller::change_password
+    controller::change_password,
+    controller::change_email
   ),
   components(schemas(
     AuthMethods,
+    SignupResult,
+    ChangeEmailRequest,
+    crate::modules::settings::model::BrandingSettings,
     SignupRequest,
     LoginRequest,
     RefreshRequest,
@@ -32,6 +36,7 @@ use utoipa::OpenApi;
     ErrorBody,
     HttpResponseFormat<AuthMethods>,
     HttpResponseFormat<AuthTokens>,
+    HttpResponseFormat<SignupResult>,
     HttpResponseFormat<User>,
     HttpResponseFormat<serde_json::Value>
   )),

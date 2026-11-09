@@ -73,6 +73,21 @@ impl FakeSmtp {
 }
 
 impl FakeSmtp {
+  /// The newest 6-digit code sent to `to`, waiting up to two seconds for the
+  /// message: dopgate sends mail in the background.
+  pub async fn code_for(
+    &self,
+    to: &str,
+  ) -> String {
+    for _ in 0..40 {
+      if let Some(code) = self.last_code_for(to) {
+        return code;
+      }
+      tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    panic!("no code was sent to {to}:\n{}", self.received());
+  }
+
   /// Wait until a message to `to` arrived and return how many did.
   pub async fn wait_for(
     &self,
@@ -115,5 +130,18 @@ impl FakeSmtp {
       }
     }
     messages
+  }
+
+  fn last_code_for(
+    &self,
+    to: &str,
+  ) -> Option<String> {
+    self.messages_to(to).iter().rev().find_map(|message| {
+      message
+        .lines()
+        .map(str::trim)
+        .find(|line| line.len() == 6 && line.bytes().all(|byte| byte.is_ascii_digit()))
+        .map(str::to_owned)
+    })
   }
 }

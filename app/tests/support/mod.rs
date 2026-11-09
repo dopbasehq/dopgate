@@ -24,7 +24,7 @@ use axum::{
   body::{Body, to_bytes},
   http::{HeaderMap, Method, Request, StatusCode, header},
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 pub const DEFAULT_TEST_DATABASE_URL: &str = "postgres://postgres:dopgate@localhost:55432/postgres";
@@ -215,9 +215,60 @@ impl TestApp {
     }
   }
 
-  /// Change runtime settings with the service key.
+  /// Create root through the setup token and return its access token.
+  pub async fn root_token(&self) -> String {
+    let token = self.setup_token().await;
+    let (status, _) = self
+      .request(
+        Method::POST,
+        "/api/v1/bootstrap/root",
+        Some(json!({ "setupToken": token, "email": ROOT_EMAIL, "password": PASSWORD })),
+      )
+      .await;
+    assert_eq!(status, StatusCode::CREATED);
+    self.login(ROOT_EMAIL, PASSWORD).await
+  }
+
+  /// Sign in and return the access token.
+  pub async fn login(
+    &self,
+    email: &str,
+    password: &str,
+  ) -> String {
+    let (status, body) = self
+      .request(
+        Method::POST,
+        "/api/v1/auth/login",
+        Some(json!({ "email": email, "password": password })),
+      )
+      .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body["data"]["accessToken"].as_str().unwrap().to_owned()
+  }
+
+  /// Create a verified account through the admin API and return its ID.
+  pub async fn create_user(
+    &self,
+    admin_token: &str,
+    email: &str,
+    role: &str,
+  ) -> String {
+    let (status, body) = self
+      .request_with(
+        Method::POST,
+        "/api/v1/admin/users",
+        Some(json!({ "email": email, "password": PASSWORD, "role": role, "emailVerified": true })),
+        Some(admin_token),
+      )
+      .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    body["data"]["id"].as_str().unwrap().to_owned()
+  }
+
+  /// Change runtime settings as root.
   pub async fn settings(
     &self,
+    root_token: &str,
     patch: Value,
   ) {
     let (status, body) = self
@@ -225,16 +276,15 @@ impl TestApp {
         Method::PATCH,
         "/api/v1/admin/settings",
         Some(patch),
-        Some(SERVICE_KEY),
+        Some(root_token),
       )
       .await;
     assert_eq!(status, StatusCode::OK, "{body}");
   }
 }
 
-/// Every test instance accepts this service key, so admin routes can be
-/// called before sign-in exists.
-pub const SERVICE_KEY: &str = "test-service-key-0123456789-abcdefghij";
+pub const ROOT_EMAIL: &str = "root@example.com";
+pub const PASSWORD: &str = "correct horse battery";
 
 /// The configuration of an instance in `schema`, ignoring the process
 /// environment.
@@ -246,7 +296,6 @@ pub fn config_for(schema: &str) -> ServerConfig {
   let environment = EnvironmentOverrides {
     database_schema: Some(schema.into()),
     database_max_connections: Some("3".into()),
-    service_key: Some(SERVICE_KEY.into()),
     ..Default::default()
   };
   ServerConfig::load_with_environment(&overrides, environment).unwrap()

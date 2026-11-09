@@ -51,21 +51,14 @@ async fn malformed_headers_are_refused() {
 #[tokio::test]
 async fn the_bearer_scheme_ignores_case() {
   let app = TestApp::new().await;
+  let token = app.root_token().await;
   for scheme in ["Bearer", "bearer", "BEARER"] {
-    let value = format!("{scheme} {}", crate::support::SERVICE_KEY);
-    let reply = app
-      .send(
-        Method::GET,
-        "/api/v1/admin/settings",
-        &[(header::AUTHORIZATION.as_str(), value.as_str())],
-        "",
-      )
-      .await;
-    assert_eq!(reply.status, StatusCode::OK, "{scheme}");
+    let (status, _) = me_with(&app, &format!("{scheme} {token}")).await;
+    assert_eq!(status, StatusCode::OK, "{scheme}");
   }
 }
 
-/// The service key reaches the admin API.
+/// The service key reaches the admin API but has no account of its own.
 #[tokio::test]
 async fn the_service_key_is_an_admin_without_an_account() {
   let key = "k".repeat(40);
@@ -78,12 +71,14 @@ async fn the_service_key_is_an_admin_without_an_account() {
   let reply = app
     .send(
       Method::GET,
-      "/api/v1/admin/settings",
+      "/api/v1/admin/users",
       &[(header::AUTHORIZATION.as_str(), bearer.as_str())],
       "",
     )
     .await;
   assert_eq!(reply.status, StatusCode::OK);
+  let (status, body) = me_with(&app, &bearer).await;
+  assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
   let (status, _) = me_with(&app, &format!("Bearer {}", "x".repeat(40))).await;
   assert_eq!(status, StatusCode::UNAUTHORIZED);
 }

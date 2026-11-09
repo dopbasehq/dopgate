@@ -13,7 +13,11 @@ use utoipa::OpenApi;
     controller::create,
     controller::update,
     controller::delete,
-    controller::revoke_sessions
+    controller::revoke_sessions,
+    controller::sessions,
+    controller::disable,
+    controller::enable,
+    controller::password_reset
   ),
   components(schemas(
     AdminUser,
@@ -26,9 +30,10 @@ use utoipa::OpenApi;
     ErrorBody,
     HttpResponseFormat<UserPage>,
     HttpResponseFormat<AdminUser>,
-    HttpResponseFormat<serde_json::Value>
+    HttpResponseFormat<serde_json::Value>,
+    HttpResponseFormat<Vec<crate::modules::sessions::model::SessionResponse>>
   )),
-  tags((name = "users", description = "Admin: manage accounts"))
+  tags((name = "users", description = "Admin: manage accounts. Root, admins, and the service key."))
 )]
 struct UsersApi;
 

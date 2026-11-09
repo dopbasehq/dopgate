@@ -6,6 +6,7 @@ use crate::state::AppState;
 pub mod audit;
 pub mod auth;
 pub mod bootstrap;
+pub mod email_templates;
 pub mod health;
 pub mod keys;
 pub mod mfa;
@@ -29,6 +30,7 @@ pub fn routes() -> Router<AppState> {
     .merge(users::routes())
     .merge(keys::routes())
     .merge(settings::routes())
+    .merge(email_templates::routes())
     .merge(audit::routes())
 }
 
@@ -44,6 +46,7 @@ pub fn openapi() -> OpenApi {
   doc.merge(users::doc::build());
   doc.merge(keys::doc::build());
   doc.merge(settings::doc::build());
+  doc.merge(email_templates::doc::build());
   doc.merge(audit::doc::build());
   doc
 }

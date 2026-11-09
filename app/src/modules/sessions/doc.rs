@@ -4,7 +4,7 @@ use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(
-  paths(controller::list, controller::revoke),
+  paths(controller::list, controller::revoke, controller::revoke_all),
   components(schemas(
     SessionResponse,
     ErrorBody,

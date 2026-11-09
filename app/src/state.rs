@@ -4,7 +4,9 @@ use tokio::sync::RwLock;
 
 use crate::{
   config::ServerConfig,
-  services::{db::DbClient, oidc::OidcCache, rate_limit::RateLimiter},
+  services::{
+    db::DbClient, keys::KeyStore, limits::Limits, oidc::OidcCache, rate_limit::RateLimiter,
+  },
 };
 
 #[derive(Clone)]
@@ -14,6 +16,11 @@ pub struct AppState {
   pub setup: Arc<RwLock<SetupState>>,
   /// Locks out an address after repeated wrong setup tokens.
   pub rate_limiter: RateLimiter,
+  /// Per-address and per-email request limits for sign-in, sign-up, and
+  /// emailed codes.
+  pub limits: Limits,
+  /// The keys that sign and verify access tokens.
+  pub keys: KeyStore,
   pub oidc: OidcCache,
   pub started_at: std::time::Instant,
 }

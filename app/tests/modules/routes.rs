@@ -10,8 +10,6 @@ use serde_json::{Value, json};
 use crate::support::TestApp;
 
 /// Public routes, a request for each, and the status a fresh instance gives.
-/// Sign-up, sign-in, tokens, and codes answer 501 until their pull
-/// requests land.
 fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
   vec![
     ("GET", "/api/v1/health", None, 200),
@@ -24,50 +22,52 @@ fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
       ),
       401,
     ),
-    ("GET", "/.well-known/jwks.json", None, 501),
-    ("GET", "/api/v1/auth/methods", None, 501),
+    ("GET", "/.well-known/jwks.json", None, 200),
+    ("GET", "/api/v1/auth/methods", None, 200),
     (
       "POST",
       "/api/v1/auth/signup",
       Some(json!({"email": "user@example.com", "password": "correct-horse"})),
-      501,
+      201,
     ),
     (
       "POST",
       "/api/v1/auth/login",
-      Some(json!({"email": "user@example.com", "password": "correct-horse"})),
-      501,
+      Some(json!({"email": "nobody@example.com", "password": "correct-horse"})),
+      401,
     ),
     (
       "POST",
       "/api/v1/auth/refresh",
       Some(json!({"refreshToken": "dgr_x"})),
-      501,
+      401,
     ),
+    ("POST", "/api/v1/auth/logout", Some(json!({})), 401),
     (
       "POST",
       "/api/v1/auth/password/forgot",
-      Some(json!({"email": "user@example.com", "method": "otp"})),
-      501,
+      Some(json!({"email": "user@example.com"})),
+      200,
     ),
     (
       "POST",
       "/api/v1/auth/password/reset",
-      Some(json!({"token": "dgl_x", "newPassword": "correct-horse"})),
-      501,
+      Some(json!({"email": "user@example.com", "code": "123456", "newPassword": "correct-horse"})),
+      400,
     ),
     (
       "POST",
       "/api/v1/auth/verification/send",
-      Some(json!({"email": "user@example.com", "purpose": "email_verify", "method": "link"})),
-      501,
+      Some(json!({"email": "user@example.com", "purpose": "email_verify"})),
+      200,
     ),
     (
       "POST",
       "/api/v1/auth/verification/confirm",
       Some(json!({"purpose": "login", "email": "user@example.com", "code": "123456"})),
-      501,
+      400,
     ),
+    // Planned features.
     (
       "POST",
       "/api/v1/auth/mfa/challenge",
@@ -135,7 +135,7 @@ async fn protected_routes_refuse_missing_and_bad_tokens() {
   let app = TestApp::new().await;
   let (protected, _) = documented_routes(&app).await;
   assert!(
-    protected.len() >= 25,
+    protected.len() >= 30,
     "only {} protected routes",
     protected.len()
   );
@@ -152,9 +152,7 @@ async fn protected_routes_refuse_missing_and_bad_tokens() {
     assert!(reply.json["error"]["AUTHENTICATION_REQUIRED"].is_string());
 
     // The token is checked before the body is read, so no body is needed.
-    // Access tokens arrive with sign-in, so only a wrong service key is
-    // checked here.
-    for token in ["not-a-real-token"] {
+    for token in ["not-a-real-token", "a.b.c"] {
       let bearer = format!("Bearer {token}");
       let reply = app
         .send(
@@ -190,17 +188,15 @@ async fn public_routes_answer() {
 }
 
 #[tokio::test]
-async fn planned_routes_answer_not_implemented_to_the_service_key() {
+async fn planned_admin_routes_answer_not_implemented_for_root() {
   let app = TestApp::new().await;
-  let root = crate::support::SERVICE_KEY;
+  let root = app.root_token().await;
   for (method, path) in [
     (Method::GET, "/api/v1/admin/sso/providers"),
     (Method::POST, "/api/v1/auth/mfa/totp/enroll"),
-    (Method::GET, "/api/v1/admin/users"),
-    (Method::GET, "/api/v1/admin/keys"),
   ] {
     let (status, body) = app
-      .request_with(method.clone(), path, Some(json!({})), Some(root))
+      .request_with(method.clone(), path, Some(json!({})), Some(&root))
       .await;
     assert_eq!(
       status,

@@ -118,13 +118,17 @@ fn commands_need_a_database_url() {
 }
 
 #[test]
-fn keys_rotate_is_planned() {
-  let output = dopgate("unused")
+fn keys_rotate_makes_a_new_active_key() {
+  let schema = unique_schema();
+  let _guard = SchemaGuard(schema.clone());
+  let output = dopgate(&schema)
     .args(["--json", "keys", "rotate"])
     .output()
     .unwrap();
-  assert_eq!(output.status.code(), Some(2));
-  assert!(json(&output.stderr)["error"]["NOT_IMPLEMENTED"].is_string());
+  assert!(output.status.success(), "{output:?}");
+  let body = json(&output.stdout);
+  assert_eq!(body["data"]["status"], "active");
+  assert!(body["data"]["id"].as_str().unwrap().starts_with("key_"));
 }
 
 #[test]

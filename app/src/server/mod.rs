@@ -33,7 +33,7 @@ use crate::{
   },
   http::HttpError,
   middlewares, modules,
-  services::{db::DbClient, rate_limit::RateLimiter, token},
+  services::{db::DbClient, keys::KeyStore, limits::Limits, rate_limit::RateLimiter, token},
   state::{AppState, SetupState},
 };
 
@@ -81,6 +81,11 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
   // The presets are compiled in; a broken file fails here, not at the first
   // sign-in.
   modules::sso::presets::all();
+  let keys = KeyStore::default();
+  keys
+    .initialize(db.pool())
+    .await
+    .context("failed to load the signing keys")?;
   let root = if is_initialized(db.pool()).await? {
     RootSetup::Exists
   } else if let Some(email) = &config.root_email {
@@ -114,6 +119,8 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
     db,
     setup: Arc::new(tokio::sync::RwLock::new(SetupState { token: setup_token })),
     rate_limiter: RateLimiter::default(),
+    limits: Limits::default(),
+    keys,
     oidc: Default::default(),
     started_at: std::time::Instant::now(),
   };
@@ -245,6 +252,7 @@ pub fn startup_banner(
     format!("Public URL: {public_url}"),
     format!("Bind:       {bind_address}"),
     format!("API:        {public_url}/api/v1"),
+    format!("JWKS:       {public_url}{}", api::keys::JWKS),
     format!("Database:   {database} (schema {schema})"),
   ];
   if web_ui_enabled {
@@ -342,6 +350,21 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
       AUDIT_RETENTION_INTERVAL,
     )
   });
+  // Keys rotated by another process (`dopgate keys rotate`, another
+  // replica) are picked up within a minute.
+  let key_reload_task = {
+    let state = state.clone();
+    tokio::spawn(async move {
+      let mut ticker = tokio::time::interval(Duration::from_secs(60));
+      ticker.tick().await;
+      loop {
+        ticker.tick().await;
+        if let Err(error) = state.keys.reload(state.db.pool()).await {
+          tracing::warn!(%error, "failed to reload signing keys");
+        }
+      }
+    })
+  };
   let grace = state.config.shutdown_grace_seconds;
   // Connection info carries the peer address rate limits and audit records use.
   let serve_result = axum::serve(
@@ -353,6 +376,7 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
   if let Some(task) = retention_task {
     task.abort();
   }
+  key_reload_task.abort();
   serve_result?;
   crate::services::audit_chain::log_checkpoint(state.db.pool()).await;
   let _ = tokio::time::timeout(Duration::from_secs(grace), state.db.close()).await;
