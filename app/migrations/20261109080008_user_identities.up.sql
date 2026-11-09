@@ -9,8 +9,8 @@ CREATE TABLE user_identities (
   subject TEXT NOT NULL,
   email_at_link TEXT,
   linked_via TEXT NOT NULL CHECK (linked_via IN ('signup', 'auto', 'manual')),
-  created_at TEXT NOT NULL,
-  last_login_at TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_login_at TIMESTAMPTZ,
   UNIQUE (issuer, subject),
   UNIQUE (user_id, provider_id)
 );

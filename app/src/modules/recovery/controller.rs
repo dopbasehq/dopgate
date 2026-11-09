@@ -1,6 +1,5 @@
 use super::{error::RecoveryError, model::*, service};
 use crate::{
-  extractors::ClientKey,
   http::{HttpResponse, HttpResponseFormat},
   state::AppState,
 };
@@ -24,10 +23,9 @@ use axum::{Json, extract::State};
 )]
 pub async fn forgot(
   State(state): State<AppState>,
-  ClientKey(client_key): ClientKey,
   Json(request): Json<ForgotPasswordRequest>,
 ) -> Result<HttpResponse<serde_json::Value>, RecoveryError> {
-  service::forgot(&state, client_key, request).await?;
+  service::forgot(&state, None, request).await?;
   Ok(HttpResponse::done("RESET_REQUESTED"))
 }
 

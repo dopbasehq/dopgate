@@ -1,7 +1,6 @@
 pub mod audit_chain;
 pub mod authz;
 pub mod client_ip;
-pub mod crypto;
 pub mod db;
 pub mod jwt;
 pub mod mailer;

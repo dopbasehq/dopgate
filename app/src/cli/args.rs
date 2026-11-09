@@ -7,7 +7,7 @@ use clap::{Args, Parser, Subcommand};
   name = "dopgate",
   version,
   about = "Authentication you host yourself",
-  long_about = "dopgate signs users up and in, verifies email addresses, resets passwords, and issues JWTs.\nOne binary, one SQLite file."
+  long_about = "Dopgate signs users up and in, verifies email addresses, resets passwords, and issues JWTs.\nOne binary next to your app, with its tables in a PostgreSQL schema."
 )]
 pub struct Cli {
   /// Print results and errors as JSON.
@@ -23,29 +23,23 @@ pub enum Command {
   Serve(ServeArgs),
   /// Create the root account on a new instance.
   Init(InitArgs),
-  /// Back up and restore the instance (planned).
-  #[command(subcommand)]
-  Backup(BackupCommand),
-  /// Export and import users (planned).
-  #[command(subcommand)]
-  Users(UsersCommand),
-  /// Manage the keys that sign access tokens (planned).
+  /// Manage the keys that sign access tokens.
   #[command(subcommand)]
   Keys(KeysCommand),
+  /// Check that a server on this machine answers. For container health
+  /// checks: exits 0 when healthy, 1 otherwise.
+  Healthcheck(HealthcheckArgs),
 }
 
-/// Where the instance keeps its files.
+/// Which database the instance uses.
 #[derive(Debug, Args)]
 pub struct InstanceArgs {
-  /// Data directory. Default: ~/.dopgate, or DOPGATE_DATA_DIR.
-  #[arg(long, value_name = "PATH")]
-  pub data_dir: Option<PathBuf>,
-  /// Server configuration file. Default: server.toml in the data directory.
+  /// PostgreSQL URL. Default: DOPGATE_DATABASE_URL.
+  #[arg(long, value_name = "URL")]
+  pub database_url: Option<String>,
+  /// Optional TOML configuration file. Default: DOPGATE_CONFIG.
   #[arg(long, value_name = "PATH")]
   pub config: Option<PathBuf>,
-  /// Master key file. Default: master.key in the data directory.
-  #[arg(long, value_name = "PATH")]
-  pub master_key: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -64,7 +58,7 @@ pub struct ServeArgs {
   /// Serve Swagger UI at /api/docs.
   #[arg(long, value_name = "BOOL")]
   pub docs: Option<bool>,
-  /// Serve the Admin UI.
+  /// Serve the admin console at /.
   #[arg(long, value_name = "BOOL")]
   pub web_ui: Option<bool>,
 }
@@ -83,33 +77,15 @@ pub struct InitArgs {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum BackupCommand {
-  /// Write an encrypted backup to the data directory.
-  Create,
-  /// Restore a backup file.
-  Restore {
-    /// Backup file to restore.
-    file: PathBuf,
-  },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum UsersCommand {
-  /// Write every user to a JSON or CSV file.
-  Export {
-    /// Output file.
-    file: PathBuf,
-  },
-  /// Create users from a JSON or CSV file.
-  Import {
-    /// Input file.
-    file: PathBuf,
-  },
-}
-
-#[derive(Debug, Subcommand)]
 pub enum KeysCommand {
   /// Start signing with a new key. The old one stays in the JWKS until its
   /// tokens expire.
-  Rotate,
+  Rotate(InstanceArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct HealthcheckArgs {
+  /// Port the server listens on. Default: DOPGATE_PORT, or 8850.
+  #[arg(long)]
+  pub port: Option<u16>,
 }

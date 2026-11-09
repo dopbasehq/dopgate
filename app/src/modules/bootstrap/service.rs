@@ -32,11 +32,13 @@ pub async fn bootstrap_root(
     client_ip::current().map_or_else(|| "unknown".to_owned(), |ip| ip.to_string())
   );
   if !state.rate_limiter.check(&limiter_key).await {
-    return Err(HttpError::new(
+    let mut error = HttpError::new(
       StatusCode::TOO_MANY_REQUESTS,
       RATE_LIMITED,
       "Too many wrong setup tokens. Try again in 15 minutes.",
-    ));
+    );
+    error.retry_after = Some(15 * 60);
+    return Err(error);
   }
   let mut setup = state.setup.write().await;
   let Some(expected) = setup.token.as_deref() else {
@@ -64,18 +66,29 @@ pub async fn create_root(
   email_address: &str,
   new_password: &str,
 ) -> Result<String, HttpError> {
-  let email = email::normalize(email_address)
-    .ok_or_else(|| HttpError::bad_request(EMAIL_INVALID, EMAIL_INVALID_MESSAGE))?;
-  password::check_policy(new_password)
-    .map_err(|violation| HttpError::bad_request(PASSWORD_INVALID, &violation.0))?;
-  let password_hash = password::hash(new_password).map_err(|error| {
-    tracing::error!(%error, "failed to hash the root password");
-    HttpError::internal()
+  let email = email::normalize(email_address).ok_or_else(|| {
+    HttpError::new(
+      StatusCode::UNPROCESSABLE_ENTITY,
+      EMAIL_INVALID,
+      EMAIL_INVALID_MESSAGE,
+    )
   })?;
+  password::check_policy(new_password).map_err(|violation| {
+    HttpError::new(
+      StatusCode::UNPROCESSABLE_ENTITY,
+      PASSWORD_INVALID,
+      violation.0,
+    )
+  })?;
+  let password_hash = password::hash_async(new_password.to_owned())
+    .await
+    .map_err(|error| {
+      tracing::error!(%error, "failed to hash the root password");
+      HttpError::internal()
+    })?;
   let id = token::public_id(USER_ID_PREFIX);
-  let now = chrono::Utc::now().to_rfc3339();
   let mut tx = db.pool().begin().await?;
-  if let Err(error) = repository::insert_root(&mut tx, &id, &email, &password_hash, &now).await {
+  if let Err(error) = repository::insert_root(&mut tx, &id, &email, &password_hash).await {
     if error
       .as_database_error()
       .is_some_and(|database| database.is_unique_violation())

@@ -38,7 +38,7 @@ pub async fn status(
   request_body = CreateRootRequest,
   responses(
     (status = 201, description = "Root account created", body = inline(HttpResponseFormat<RootCreated>)),
-    (status = 400, description = "The email or password was refused", body = crate::http::ErrorBody),
+    (status = 422, description = "The email or password was refused", body = crate::http::ErrorBody),
     (status = 401, description = "The setup token is wrong", body = crate::http::ErrorBody),
     (status = 409, description = "The root account already exists", body = crate::http::ErrorBody),
     (status = 429, description = "Too many wrong setup tokens", body = crate::http::ErrorBody),

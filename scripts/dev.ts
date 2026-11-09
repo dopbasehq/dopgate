@@ -1,3 +1,7 @@
+// Local development defaults. `bun run dev:db` starts this database.
+process.env.DOPGATE_DATABASE_URL ??= "postgres://postgres:dopgate@localhost:55433/postgres";
+process.env.DOPGATE_ROOT_EMAIL ??= "admin@example.com";
+
 type ChildName = "dopgate API" | "Docs";
 
 type Child = {
@@ -28,7 +32,7 @@ console.log("dopgate development servers starting:");
 console.log("  API:      http://localhost:8850/api/v1");
 console.log("  API docs: http://localhost:8850/api/docs");
 console.log("  Docs:     http://localhost:5173");
-console.log("  Data:     ./.dev-data");
+console.log("  Database: " + process.env.DOPGATE_DATABASE_URL + " (start it with `bun run dev:db`)");
 
 let stopping = false;
 

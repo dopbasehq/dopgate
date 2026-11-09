@@ -1,6 +1,5 @@
 use super::{error::VerificationError, model::*, service};
 use crate::{
-  extractors::ClientKey,
   http::{HttpResponse, HttpResponseFormat},
   state::AppState,
 };
@@ -26,10 +25,9 @@ use axum::{Json, extract::State};
 )]
 pub async fn send(
   State(state): State<AppState>,
-  ClientKey(client_key): ClientKey,
   Json(request): Json<SendVerificationRequest>,
 ) -> Result<HttpResponse<serde_json::Value>, VerificationError> {
-  service::send(&state, client_key, request).await?;
+  service::send(&state, None, request).await?;
   Ok(HttpResponse::done("VERIFICATION_SENT"))
 }
 
@@ -52,11 +50,10 @@ pub async fn send(
 )]
 pub async fn confirm(
   State(state): State<AppState>,
-  ClientKey(client_key): ClientKey,
   Json(request): Json<ConfirmVerificationRequest>,
 ) -> Result<HttpResponse<VerificationResult>, VerificationError> {
   Ok(HttpResponse::ok(
-    service::confirm(&state, client_key, request).await?,
+    service::confirm(&state, None, request).await?,
     "VERIFIED",
   ))
 }

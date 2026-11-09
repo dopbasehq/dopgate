@@ -3,12 +3,13 @@ use anyhow::Result;
 use super::planned;
 use crate::cli::KeysCommand;
 
-pub fn run(
+/// Key rotation arrives with access tokens.
+pub async fn run(
   command: KeysCommand,
   json: bool,
 ) -> Result<i32> {
   let name = match command {
-    KeysCommand::Rotate => "keys rotate",
+    KeysCommand::Rotate(_) => "keys rotate",
   };
   Ok(planned(name, json))
 }
