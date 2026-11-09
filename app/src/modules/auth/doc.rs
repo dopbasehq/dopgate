@@ -19,6 +19,8 @@ use utoipa::OpenApi;
   ),
   components(schemas(
     AuthMethods,
+    SignupResult,
+    crate::modules::settings::model::BrandingSettings,
     SignupRequest,
     LoginRequest,
     RefreshRequest,
@@ -32,6 +34,7 @@ use utoipa::OpenApi;
     ErrorBody,
     HttpResponseFormat<AuthMethods>,
     HttpResponseFormat<AuthTokens>,
+    HttpResponseFormat<SignupResult>,
     HttpResponseFormat<User>,
     HttpResponseFormat<serde_json::Value>
   )),

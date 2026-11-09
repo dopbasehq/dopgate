@@ -150,40 +150,43 @@ async fn verify_checks_an_anchor_and_refuses_half_of_one() {
 }
 
 #[tokio::test]
-async fn the_service_key_reads_and_verifies_the_log_over_http() {
+async fn admins_read_the_log_over_http_and_members_do_not() {
   let app = TestApp::new().await;
-  app
-    .settings(serde_json::json!({ "branding": { "appName": "MyApp" } }))
-    .await;
-  let key = Some(crate::support::SERVICE_KEY);
+  let root = app.root_token().await;
   let (status, body) = app
     .request_with(
       axum::http::Method::GET,
-      "/api/v1/admin/audit-events?action=settings.updated",
+      "/api/v1/admin/audit-events?action=user.signed_in",
       None,
-      key,
+      Some(&root),
     )
     .await;
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(body["data"]["items"][0]["actorType"], "service");
-  assert_eq!(
-    body["data"]["items"][0]["metadata"]["sections"][0],
-    "branding"
-  );
+  assert_eq!(body["data"]["items"][0]["action"], "user.signed_in");
+  assert_eq!(body["data"]["items"][0]["metadata"]["method"], "password");
 
   let (status, body) = app
     .request_with(
       axum::http::Method::GET,
       "/api/v1/admin/audit-events/verify",
       None,
-      key,
+      Some(&root),
     )
     .await;
   assert_eq!(status, StatusCode::OK);
   assert_eq!(body["data"]["ok"], true, "{body}");
 
-  let (status, _) = app
-    .request(axum::http::Method::GET, "/api/v1/admin/audit-events", None)
+  app.create_user(&root, "member@example.com", "member").await;
+  let member = app
+    .login("member@example.com", crate::support::PASSWORD)
     .await;
-  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  let (status, _) = app
+    .request_with(
+      axum::http::Method::GET,
+      "/api/v1/admin/audit-events",
+      None,
+      Some(&member),
+    )
+    .await;
+  assert_eq!(status, StatusCode::FORBIDDEN);
 }

@@ -7,7 +7,7 @@ pub mod controller;
 pub mod doc;
 pub mod error;
 pub mod model;
-mod repository;
+pub(crate) mod repository;
 pub mod service;
 pub fn routes() -> Router<AppState> {
   use crate::constants::api::users;
