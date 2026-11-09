@@ -156,13 +156,14 @@ async fn admins_read_the_log_over_http_and_members_do_not() {
   let (status, body) = app
     .request_with(
       axum::http::Method::GET,
-      "/api/v1/admin/audit-events?action=user.signed_in",
+      "/api/v1/admin/audit-events?action=admin.signed_in",
       None,
       Some(&root),
     )
     .await;
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(body["data"]["items"][0]["action"], "user.signed_in");
+  assert_eq!(body["data"]["items"][0]["action"], "admin.signed_in");
+  assert_eq!(body["data"]["items"][0]["actorType"], "root");
   assert_eq!(body["data"]["items"][0]["metadata"]["method"], "password");
 
   let (status, body) = app
@@ -176,7 +177,7 @@ async fn admins_read_the_log_over_http_and_members_do_not() {
   assert_eq!(status, StatusCode::OK);
   assert_eq!(body["data"]["ok"], true, "{body}");
 
-  app.create_user(&root, "member@example.com", "member").await;
+  app.create_user(&root, "member@example.com").await;
   let member = app
     .login("member@example.com", crate::support::PASSWORD)
     .await;

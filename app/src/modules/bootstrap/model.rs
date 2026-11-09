@@ -21,6 +21,7 @@ pub struct CreateRootRequest {
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RootCreated {
-  pub user_id: String,
+  /// The root account's ID, with the `adm_` prefix.
+  pub admin_id: String,
   pub email: String,
 }

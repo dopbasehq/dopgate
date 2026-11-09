@@ -215,7 +215,7 @@ impl TestApp {
     }
   }
 
-  /// Create root through the setup token and return its access token.
+  /// Create root through the setup token and return its console token.
   pub async fn root_token(&self) -> String {
     let token = self.setup_token().await;
     let (status, _) = self
@@ -226,10 +226,46 @@ impl TestApp {
       )
       .await;
     assert_eq!(status, StatusCode::CREATED);
-    self.login(ROOT_EMAIL, PASSWORD).await
+    self.console_login(ROOT_EMAIL, PASSWORD).await
   }
 
-  /// Sign in and return the access token.
+  /// Sign an admin in to the console and return the console token.
+  pub async fn console_login(
+    &self,
+    email: &str,
+    password: &str,
+  ) -> String {
+    let (status, body) = self
+      .request(
+        Method::POST,
+        "/api/v1/console/login",
+        Some(json!({ "email": email, "password": password })),
+      )
+      .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body["data"]["accessToken"].as_str().unwrap().to_owned()
+  }
+
+  /// Add an admin as root and return its ID. The admin signs in with
+  /// `PASSWORD`.
+  pub async fn create_admin(
+    &self,
+    root_token: &str,
+    email: &str,
+  ) -> String {
+    let (status, body) = self
+      .request_with(
+        Method::POST,
+        "/api/v1/admin/admins",
+        Some(json!({ "email": email, "password": PASSWORD })),
+        Some(root_token),
+      )
+      .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    body["data"]["id"].as_str().unwrap().to_owned()
+  }
+
+  /// Sign a user in to your app and return the access token.
   pub async fn login(
     &self,
     email: &str,
@@ -246,18 +282,17 @@ impl TestApp {
     body["data"]["accessToken"].as_str().unwrap().to_owned()
   }
 
-  /// Create a verified account through the admin API and return its ID.
+  /// Create a verified user through the admin API and return its ID.
   pub async fn create_user(
     &self,
     admin_token: &str,
     email: &str,
-    role: &str,
   ) -> String {
     let (status, body) = self
       .request_with(
         Method::POST,
         "/api/v1/admin/users",
-        Some(json!({ "email": email, "password": PASSWORD, "role": role, "emailVerified": true })),
+        Some(json!({ "email": email, "password": PASSWORD, "emailVerified": true })),
         Some(admin_token),
       )
       .await;

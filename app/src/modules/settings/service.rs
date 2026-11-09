@@ -277,7 +277,7 @@ pub async fn test_smtp(
       )
     })?,
     None => match actor {
-      AuthIdentity::User { email, .. } => email.clone(),
+      AuthIdentity::Admin { email, .. } | AuthIdentity::User { email, .. } => email.clone(),
       AuthIdentity::Service => {
         return Err(HttpError::new(
           StatusCode::UNPROCESSABLE_ENTITY,

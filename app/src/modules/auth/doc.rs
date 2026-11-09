@@ -1,7 +1,7 @@
 use super::{controller, model::*};
 use crate::{
   http::{ErrorBody, HttpResponseFormat},
-  models::{Role, User, UserStatus},
+  models::{TokenKind, User, UserStatus},
 };
 use utoipa::OpenApi;
 
@@ -31,7 +31,7 @@ use utoipa::OpenApi;
     UpdateProfileRequest,
     ChangePasswordRequest,
     User,
-    Role,
+    TokenKind,
     UserStatus,
     ErrorBody,
     HttpResponseFormat<AuthMethods>,

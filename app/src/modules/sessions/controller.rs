@@ -2,6 +2,7 @@ use super::{error::SessionsError, model::*, service};
 use crate::{
   extractors::UserIdentity,
   http::{HttpResponse, HttpResponseFormat},
+  models::Realm,
   modules::audit,
   state::AppState,
 };
@@ -26,7 +27,7 @@ pub async fn list(
   user: UserIdentity,
 ) -> Result<HttpResponse<Vec<SessionResponse>>, SessionsError> {
   Ok(HttpResponse::ok(
-    service::list(&state, &user.user_id, Some(&user.session_id)).await?,
+    service::list(&state, Realm::App, &user.user_id, Some(&user.session_id)).await?,
     "SESSIONS_FETCHED",
   ))
 }
@@ -53,7 +54,7 @@ pub async fn revoke(
   user: UserIdentity,
   Path(id): Path<String>,
 ) -> Result<HttpResponse<serde_json::Value>, SessionsError> {
-  service::revoke_own(&state, &user.user_id, &user.email, user.role.as_str(), &id).await?;
+  service::revoke_own(&state, Realm::App, &user.user_id, &user.email, "user", &id).await?;
   Ok(HttpResponse::done("SESSION_REVOKED"))
 }
 
@@ -79,16 +80,18 @@ pub async fn revoke_all(
 ) -> Result<HttpResponse<serde_json::Value>, SessionsError> {
   let keep = query.keep_current.then_some(user.session_id.as_str());
   let mut tx = state.db.pool().begin().await?;
-  let ended = service::revoke_all(&mut tx, &user.user_id, keep, "signed_out_everywhere").await?;
+  let ended = service::revoke_all(
+    &mut tx,
+    Realm::App,
+    &user.user_id,
+    keep,
+    "signed_out_everywhere",
+  )
+  .await?;
   audit::service::record(
     &mut tx,
-    audit::service::Event::user(
-      &user.user_id,
-      &user.email,
-      user.role.as_str(),
-      "session.revoked_all",
-    )
-    .metadata(serde_json::json!({ "sessions": ended, "keptCurrent": query.keep_current })),
+    audit::service::Event::user(&user.user_id, &user.email, "session.revoked_all")
+      .metadata(serde_json::json!({ "sessions": ended, "keptCurrent": query.keep_current })),
   )
   .await?;
   tx.commit().await?;

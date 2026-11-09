@@ -6,8 +6,12 @@ use axum::{
 use crate::{
   constants::errors::{AUTHENTICATION_INVALID, AUTHENTICATION_REQUIRED, AUTHORIZATION_DENIED},
   http::HttpError,
-  models::AuthIdentity,
-  services::{authz, jwt, token},
+  models::{AuthIdentity, Role},
+  services::{
+    authz,
+    jwt::{self, Verified},
+    token,
+  },
   state::AppState,
 };
 
@@ -33,8 +37,8 @@ fn bearer(parts: &Parts) -> Result<&str, HttpError> {
     })
 }
 
-/// Any authenticated caller: a user with an access token, or the main app's
-/// backend with the service key.
+/// Any authenticated caller: an admin with a console token, a user with an
+/// app token, or the main app's backend with the service key.
 impl FromRequestParts<AppState> for AuthIdentity {
   type Rejection = HttpError;
 
@@ -54,33 +58,28 @@ impl FromRequestParts<AppState> for AuthIdentity {
         )),
       };
     }
-    let claims = jwt::verify(state, token).await?;
-    Ok(Self::User {
-      user_id: claims.sub,
-      email: claims.email,
-      role: claims.role,
-      session_id: claims.sid,
+    Ok(match jwt::verify(state, token).await? {
+      Verified::App(claims) => Self::User {
+        user_id: claims.sub,
+        email: claims.email,
+        session_id: claims.sid,
+      },
+      Verified::Console(claims) => Self::Admin {
+        admin_id: claims.sub,
+        email: claims.email,
+        role: claims.role,
+        session_id: claims.sid,
+      },
     })
   }
 }
 
-/// A signed-in user. The service key is refused: it has no account.
+/// A user of your app, signed in with a session. Admins and the service key
+/// are refused: they have no app account.
 pub struct UserIdentity {
   pub user_id: String,
   pub email: String,
-  pub role: crate::models::Role,
   pub session_id: String,
-}
-
-impl UserIdentity {
-  pub fn identity(&self) -> AuthIdentity {
-    AuthIdentity::User {
-      user_id: self.user_id.clone(),
-      email: self.email.clone(),
-      role: self.role,
-      session_id: self.session_id.clone(),
-    }
-  }
 }
 
 impl FromRequestParts<AppState> for UserIdentity {
@@ -94,14 +93,16 @@ impl FromRequestParts<AppState> for UserIdentity {
       AuthIdentity::User {
         user_id,
         email,
-        role,
         session_id,
       } => Ok(Self {
         user_id,
         email,
-        role,
         session_id,
       }),
+      AuthIdentity::Admin { .. } => Err(HttpError::forbidden(
+        AUTHORIZATION_DENIED,
+        "Admins have no app account. Use the console endpoints under /console.",
+      )),
       AuthIdentity::Service => Err(HttpError::forbidden(
         AUTHORIZATION_DENIED,
         "The service key has no account. Use a user's access token.",
@@ -110,7 +111,54 @@ impl FromRequestParts<AppState> for UserIdentity {
   }
 }
 
-/// A caller allowed to use the admin API.
+/// An admin signed in to the console. Users and the service key are
+/// refused.
+pub struct ConsoleIdentity {
+  pub admin_id: String,
+  pub email: String,
+  pub role: Role,
+  pub session_id: String,
+}
+
+impl ConsoleIdentity {
+  pub fn identity(&self) -> AuthIdentity {
+    AuthIdentity::Admin {
+      admin_id: self.admin_id.clone(),
+      email: self.email.clone(),
+      role: self.role,
+      session_id: self.session_id.clone(),
+    }
+  }
+}
+
+impl FromRequestParts<AppState> for ConsoleIdentity {
+  type Rejection = HttpError;
+
+  async fn from_request_parts(
+    parts: &mut Parts,
+    state: &AppState,
+  ) -> Result<Self, Self::Rejection> {
+    match AuthIdentity::from_request_parts(parts, state).await? {
+      AuthIdentity::Admin {
+        admin_id,
+        email,
+        role,
+        session_id,
+      } => Ok(Self {
+        admin_id,
+        email,
+        role,
+        session_id,
+      }),
+      _ => Err(HttpError::forbidden(
+        AUTHORIZATION_DENIED,
+        "Only admins signed in to the console can do this.",
+      )),
+    }
+  }
+}
+
+/// A caller allowed to use the admin API: an admin, or the service key.
 pub struct AdminIdentity(pub AuthIdentity);
 
 impl FromRequestParts<AppState> for AdminIdentity {

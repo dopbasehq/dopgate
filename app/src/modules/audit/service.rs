@@ -39,23 +39,34 @@ impl<'a> Event<'a> {
     }
   }
 
-  /// An event caused by a user acting on their own account, such as a
-  /// sign-in, before an identity exists for the request.
-  pub fn user(
-    user_id: &'a str,
+  /// An event caused by an admin or a user acting on their own account,
+  /// such as a sign-in, before an identity exists for the request.
+  /// `actor_type` is `user`, or the admin's role.
+  pub fn account(
+    realm: crate::models::Realm,
+    account_id: &'a str,
     email: &'a str,
-    role: &'a str,
+    actor_type: &'a str,
     action: &'a str,
   ) -> Self {
     Self {
-      actor_type: role,
-      actor_id: Some(user_id),
+      actor_type,
+      actor_id: Some(account_id),
       actor_label: Some(email),
       action,
-      resource_type: Some("user"),
-      resource_id: Some(user_id),
+      resource_type: Some(realm.resource()),
+      resource_id: Some(account_id),
       metadata: serde_json::json!({}),
     }
+  }
+
+  /// An event caused by a user of your app acting on their own account.
+  pub fn user(
+    user_id: &'a str,
+    email: &'a str,
+    action: &'a str,
+  ) -> Self {
+    Self::account(crate::models::Realm::App, user_id, email, "user", action)
   }
 
   /// An event with no signed-in actor, such as a failed sign-in.

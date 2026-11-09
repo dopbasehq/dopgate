@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::models::{Role, User, UserStatus};
+use crate::models::{User, UserStatus};
 
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -10,7 +10,6 @@ use crate::models::{Role, User, UserStatus};
 pub struct UserQuery {
   /// Match on email or display name.
   pub search: Option<String>,
-  pub role: Option<Role>,
   pub status: Option<UserStatus>,
   /// The `nextCursor` of the previous page.
   pub cursor: Option<String>,
@@ -43,8 +42,6 @@ pub struct CreateUserRequest {
   pub email: String,
   /// Leave out to create an account that signs in with an emailed code.
   pub password: Option<String>,
-  /// `admin` or `member`. Default: `member`. Only root creates admins.
-  pub role: Option<Role>,
   pub display_name: Option<String>,
   /// Mark the email as verified without sending a message.
   #[serde(default)]
@@ -61,8 +58,6 @@ pub struct UpdateUserRequest {
   pub display_name: Option<String>,
   pub avatar_url: Option<String>,
   pub email_verified: Option<bool>,
-  /// `admin` or `member`. Only root changes roles.
-  pub role: Option<Role>,
   /// Replaces the whole object.
   pub public_metadata: Option<serde_json::Value>,
   /// Replaces the whole object.

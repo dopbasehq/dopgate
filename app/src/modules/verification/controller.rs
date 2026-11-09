@@ -62,9 +62,16 @@ pub async fn confirm(
 ) -> Result<Response, VerificationError> {
   match service::confirm(&state, request, context.user_agent.as_deref()).await? {
     service::Confirmed::SignedIn(tokens) => Ok(
-      sessions::service::deliver(&state, &context, tokens, "SIGNED_IN", StatusCode::OK)
-        .await?
-        .into_response(),
+      sessions::service::deliver(
+        &state,
+        &context,
+        crate::models::Realm::App,
+        tokens,
+        "SIGNED_IN",
+        StatusCode::OK,
+      )
+      .await?
+      .into_response(),
     ),
     service::Confirmed::EmailChanged(user) => {
       Ok(HttpResponse::ok(user, "EMAIL_CHANGED").into_response())

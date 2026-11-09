@@ -289,7 +289,7 @@ async fn members_cannot_read_settings_but_the_service_key_can() {
   })
   .await;
   let root = app.root_token().await;
-  app.create_user(&root, "member@example.com", "member").await;
+  app.create_user(&root, "member@example.com").await;
   let member = app
     .login("member@example.com", crate::support::PASSWORD)
     .await;

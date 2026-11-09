@@ -127,7 +127,7 @@ async fn signup_refuses_taken_emails_weak_passwords_and_closed_signup() {
 async fn wrong_passwords_lock_the_account_with_the_same_answer() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   let attempt = |password: &'static str| {
     let app = &app;
     async move {
@@ -175,12 +175,13 @@ async fn wrong_passwords_lock_the_account_with_the_same_answer() {
 #[tokio::test]
 async fn refresh_tokens_rotate_and_a_reused_one_ends_the_session() {
   let app = TestApp::new().await;
-  app.root_token().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
   let (_, body) = app
     .request(
       Method::POST,
       "/api/v1/auth/login",
-      Some(json!({ "email": crate::support::ROOT_EMAIL, "password": PASSWORD })),
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
     )
     .await;
   let first = body["data"]["refreshToken"].as_str().unwrap().to_owned();
@@ -216,12 +217,13 @@ async fn refresh_tokens_rotate_and_a_reused_one_ends_the_session() {
 #[tokio::test]
 async fn cookie_mode_keeps_the_refresh_token_out_of_the_body() {
   let app = TestApp::new().await;
-  app.root_token().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
   let reply = app
     .call(
       Method::POST,
       "/api/v1/auth/login",
-      Some(json!({ "email": crate::support::ROOT_EMAIL, "password": PASSWORD })),
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
       None,
       &[("x-dopgate-session", "cookie")],
     )
@@ -286,7 +288,7 @@ async fn cookie_mode_keeps_the_refresh_token_out_of_the_body() {
 async fn the_profile_reads_and_changes_its_own_fields_only() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  let id = app.create_user(&root, "ada@example.com", "member").await;
+  let id = app.create_user(&root, "ada@example.com").await;
   app
     .request_with(
       Method::PATCH,
@@ -347,7 +349,7 @@ async fn the_profile_reads_and_changes_its_own_fields_only() {
 async fn changing_the_password_ends_other_sessions_and_sends_a_notice() {
   let (app, smtp) = app_with_mail().await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   let laptop = app.login("ada@example.com", PASSWORD).await;
   let phone = app.login("ada@example.com", PASSWORD).await;
 
@@ -380,8 +382,8 @@ async fn changing_the_password_ends_other_sessions_and_sends_a_notice() {
 async fn changing_the_email_needs_the_password_and_a_code_from_the_new_address() {
   let (app, smtp) = app_with_mail().await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
-  app.create_user(&root, "taken@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
+  app.create_user(&root, "taken@example.com").await;
   let token = app.login("ada@example.com", PASSWORD).await;
   let change = |body: Value| {
     app.request_with(

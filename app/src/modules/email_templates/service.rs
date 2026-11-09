@@ -226,7 +226,7 @@ pub async fn preview(
   let template = builtin(name)?;
   check(template, &input)?;
   let email = match actor {
-    AuthIdentity::User { email, .. } => email.clone(),
+    AuthIdentity::Admin { email, .. } | AuthIdentity::User { email, .. } => email.clone(),
     AuthIdentity::Service => "person@example.com".into(),
   };
   Ok(render_input(&input, &sample_values(state, &email).await?))
@@ -241,7 +241,7 @@ pub async fn test(
 ) -> Result<(), HttpError> {
   let template = builtin(name)?;
   check(template, &input)?;
-  let AuthIdentity::User { email, .. } = actor else {
+  let AuthIdentity::Admin { email, .. } = actor else {
     return Err(HttpError::bad_request(
       EMAIL_INVALID,
       "The service key has no email to send a test to. Use an admin's access token.",
