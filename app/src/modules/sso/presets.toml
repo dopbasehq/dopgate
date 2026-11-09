@@ -64,7 +64,7 @@ id = "auth0"
 label = "Auth0"
 button_label = "Auth0"
 issuer = "https://<tenant>.<region>.auth0.com/"
-hint = "Create a Regular Web Application. Auth0's issuer ends with a slash; dopgate adds it if you leave it out."
+hint = "Create a Regular Web Application. Auth0's issuer ends with a slash; Dopgate adds it if you leave it out."
 
 [[preset]]
 id = "cognito"
@@ -85,7 +85,7 @@ id = "supabase"
 label = "Supabase"
 button_label = "Supabase"
 issuer = "https://<project-ref>.supabase.co/auth/v1"
-hint = "Turn on the OAuth 2.1 server and switch to asymmetric JWT signing keys (RS256 or ES256). dopgate refuses HS256."
+hint = "Turn on the OAuth 2.1 server and switch to asymmetric JWT signing keys (RS256 or ES256). Dopgate refuses HS256."
 
 [[preset]]
 id = "keycloak"

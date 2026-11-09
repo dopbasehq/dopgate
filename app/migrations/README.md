@@ -1,7 +1,10 @@
 # Migrations
 
 Migrations are embedded into the `dopgate` binary with `sqlx::migrate!()` and
-run transactionally before the HTTP listener starts. Startup applies up
+run before the HTTP listener starts. They run with `search_path` set to
+dopgate's schema (`dopgate` unless `DOPGATE_DATABASE_SCHEMA` says otherwise),
+so every table, sqlx's own `_sqlx_migrations` included, lands there. Write
+table names without a schema prefix. Startup applies up
 migrations only. Rolling back is for maintenance and tests, and the CLI has no
 command for it.
 
@@ -33,28 +36,28 @@ To change the schema, add a new pair.
 
 ## Current schema
 
-The baseline, in the order it is applied:
+The PostgreSQL baseline, in the order it is applied:
 
 ```text
-20261026232635_instance_metadata   master-key check value
-20261026232636_users               accounts: root, admins, members
-20261026232637_clients             apps with publishable and secret keys
-20261026232638_sessions            one row per signed-in device
-20261026232639_refresh_tokens      hashed, single-use refresh tokens
-20261026232640_verification_tokens emailed codes and links
-20261026232641_signing_keys        JWT signing keys, private half encrypted
-20261026232642_settings            runtime settings, secrets encrypted
-20261026232643_sso_providers       OpenID Connect providers
-20261026232644_user_identities     provider identities linked to accounts
-20261026232645_sso_flows           provider sign-ins in progress
-20261026232646_audit_events        audit log with its hash chain
+20261109080000_users               accounts: root, admins, members
+20261109080001_sessions            one row per signed-in device
+20261109080002_refresh_tokens      hashed, single-use refresh tokens
+20261109080003_verification_tokens emailed 6-digit codes
+20261109080004_signing_keys        ES256 keys that sign access tokens
+20261109080005_settings            runtime settings, one JSON object per section
+20261109080006_email_templates     admin overrides of the built-in emails
+20261109080007_sso_providers       OpenID Connect providers (planned feature)
+20261109080008_user_identities     provider identities linked to accounts
+20261109080009_sso_flows           provider sign-ins in progress
+20261109080010_audit_events        audit log with its hash chain
 ```
 
-Tables for later features, such as MFA factors and OIDC provider
-authorization codes, arrive with those features in their own pairs.
+Tables for later features, such as MFA factors, arrive with those features in
+their own pairs.
 
 The test suite applies every migration, rolls back to version zero, checks
-that no table is left, and applies them again.
+that no table is left, applies them again, and checks that nothing landed in
+`public`.
 
 ## Adding a migration
 
@@ -62,7 +65,7 @@ Create migrations with the sqlx CLI from `app/`, so the version comes from the
 clock:
 
 ```bash
-cargo install sqlx-cli --no-default-features --features sqlite
+cargo install sqlx-cli --no-default-features --features postgres
 cd app
 sqlx migrate add -r <name>
 ```

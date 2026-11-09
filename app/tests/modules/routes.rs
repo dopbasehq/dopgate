@@ -1,6 +1,6 @@
-//! Every route in the OpenAPI document answers, and answers the way its
-//! phase says it should. The list comes from the document itself, so a new
-//! route without an entry here fails `public_routes_are_all_listed`.
+//! Every route in the OpenAPI document answers. The public list comes from
+//! the document itself, so a new public route without an entry here fails
+//! `public_routes_are_all_listed`.
 
 use std::collections::BTreeSet;
 
@@ -9,77 +9,85 @@ use serde_json::{Value, json};
 
 use crate::support::TestApp;
 
-/// Routes that work today, with the status a bare request gets.
-const WORKING: [(&str, &str, u16); 3] = [
-  ("GET", "/api/v1/health", 200),
-  ("GET", "/api/v1/bootstrap/status", 200),
-  ("POST", "/api/v1/bootstrap/root", 401),
-];
-
-/// Public placeholders, with a request that passes body and query parsing.
-fn public_placeholders() -> Vec<(&'static str, &'static str, Option<Value>)> {
+/// Public routes, a request for each, and the status a fresh instance gives.
+/// Sign-up, sign-in, tokens, and codes answer 501 until their pull
+/// requests land.
+fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
   vec![
-    ("GET", "/api/v1/auth/methods", None),
+    ("GET", "/api/v1/health", None, 200),
+    ("GET", "/api/v1/bootstrap/status", None, 200),
+    (
+      "POST",
+      "/api/v1/bootstrap/root",
+      Some(
+        json!({"setupToken": "setup_wrong", "email": "root@example.com", "password": "correct-horse"}),
+      ),
+      401,
+    ),
+    ("GET", "/.well-known/jwks.json", None, 501),
+    ("GET", "/api/v1/auth/methods", None, 501),
     (
       "POST",
       "/api/v1/auth/signup",
       Some(json!({"email": "user@example.com", "password": "correct-horse"})),
+      501,
     ),
     (
       "POST",
       "/api/v1/auth/login",
       Some(json!({"email": "user@example.com", "password": "correct-horse"})),
+      501,
     ),
     (
       "POST",
       "/api/v1/auth/refresh",
       Some(json!({"refreshToken": "dgr_x"})),
+      501,
     ),
     (
       "POST",
       "/api/v1/auth/password/forgot",
       Some(json!({"email": "user@example.com", "method": "otp"})),
+      501,
     ),
     (
       "POST",
       "/api/v1/auth/password/reset",
       Some(json!({"token": "dgl_x", "newPassword": "correct-horse"})),
+      501,
     ),
     (
       "POST",
       "/api/v1/auth/verification/send",
       Some(json!({"email": "user@example.com", "purpose": "email_verify", "method": "link"})),
+      501,
     ),
     (
       "POST",
       "/api/v1/auth/verification/confirm",
       Some(json!({"purpose": "login", "email": "user@example.com", "code": "123456"})),
+      501,
     ),
     (
       "POST",
       "/api/v1/auth/mfa/challenge",
       Some(json!({"mfaToken": "m", "code": "123456"})),
+      501,
     ),
-    ("GET", "/api/v1/auth/sso/providers", None),
+    ("GET", "/api/v1/auth/sso/providers", None, 501),
     (
       "GET",
       "/api/v1/auth/sso/{provider_id}/start?redirectUrl=https%3A%2F%2Fapp.example.com",
       None,
+      501,
     ),
-    ("GET", "/api/v1/auth/sso/callback?code=c&state=s", None),
+    ("GET", "/api/v1/auth/sso/callback?code=c&state=s", None, 501),
     (
       "POST",
       "/api/v1/auth/sso/exchange",
       Some(json!({"handoffCode": "ssoh_x"})),
+      501,
     ),
-    ("GET", "/.well-known/jwks.json", None),
-    ("GET", "/.well-known/openid-configuration", None),
-    (
-      "GET",
-      "/oauth/authorize?response_type=code&client_id=c&redirect_uri=https%3A%2F%2Fa.example&scope=openid",
-      None,
-    ),
-    // The token endpoint takes a form, sent separately below.
   ]
 }
 
@@ -123,11 +131,11 @@ fn concrete(path: &str) -> String {
 }
 
 #[tokio::test]
-async fn protected_routes_need_a_token_then_answer_not_implemented() {
+async fn protected_routes_refuse_missing_and_bad_tokens() {
   let app = TestApp::new().await;
   let (protected, _) = documented_routes(&app).await;
   assert!(
-    protected.len() >= 40,
+    protected.len() >= 25,
     "only {} protected routes",
     protected.len()
   );
@@ -144,81 +152,90 @@ async fn protected_routes_need_a_token_then_answer_not_implemented() {
     assert!(reply.json["error"]["AUTHENTICATION_REQUIRED"].is_string());
 
     // The token is checked before the body is read, so no body is needed.
-    let reply = app
-      .send(
-        method.clone(),
-        &uri,
-        &[(header::AUTHORIZATION.as_str(), "Bearer not-a-real-token")],
-        "",
-      )
-      .await;
-    assert_eq!(
-      reply.status,
-      StatusCode::NOT_IMPLEMENTED,
-      "{method} {path} with a token"
-    );
-    assert!(reply.json["error"]["NOT_IMPLEMENTED"].is_string());
+    // Access tokens arrive with sign-in, so only a wrong service key is
+    // checked here.
+    for token in ["not-a-real-token"] {
+      let bearer = format!("Bearer {token}");
+      let reply = app
+        .send(
+          method.clone(),
+          &uri,
+          &[(header::AUTHORIZATION.as_str(), bearer.as_str())],
+          "",
+        )
+        .await;
+      assert_eq!(
+        reply.status,
+        StatusCode::UNAUTHORIZED,
+        "{method} {path} with {token}"
+      );
+    }
   }
 }
 
 #[tokio::test]
-async fn public_placeholders_answer_not_implemented() {
+async fn public_routes_answer() {
   let app = TestApp::new().await;
-  for (method, path, body) in public_placeholders() {
+  for (method, path, body, expected) in public_routes() {
     let uri = concrete(path);
     let (status, json) = app.request(method.parse().unwrap(), &uri, body).await;
+    assert_eq!(status.as_u16(), expected, "{method} {path}: {json}");
+    if expected == 501 {
+      assert!(
+        json["error"]["NOT_IMPLEMENTED"].is_string(),
+        "{method} {path}"
+      );
+    }
+  }
+}
+
+#[tokio::test]
+async fn planned_routes_answer_not_implemented_to_the_service_key() {
+  let app = TestApp::new().await;
+  let root = crate::support::SERVICE_KEY;
+  for (method, path) in [
+    (Method::GET, "/api/v1/admin/sso/providers"),
+    (Method::POST, "/api/v1/auth/mfa/totp/enroll"),
+    (Method::GET, "/api/v1/admin/users"),
+    (Method::GET, "/api/v1/admin/keys"),
+  ] {
+    let (status, body) = app
+      .request_with(method.clone(), path, Some(json!({})), Some(root))
+      .await;
     assert_eq!(
       status,
       StatusCode::NOT_IMPLEMENTED,
-      "{method} {path}: {json}"
-    );
-    assert!(
-      json["error"]["NOT_IMPLEMENTED"].is_string(),
-      "{method} {path}"
+      "{method} {path}: {body}"
     );
   }
-  let reply = app
-    .send(
-      Method::POST,
-      "/oauth/token",
-      &[(
-        header::CONTENT_TYPE.as_str(),
-        "application/x-www-form-urlencoded",
-      )],
-      "grant_type=authorization_code&code=c",
-    )
-    .await;
-  assert_eq!(reply.status, StatusCode::NOT_IMPLEMENTED);
 }
 
 #[tokio::test]
-async fn working_routes_answer() {
+async fn removed_routes_are_gone() {
   let app = TestApp::new().await;
-  for (method, path, expected) in WORKING {
-    let body = (method == "POST").then(|| {
-      json!({"setupToken": "setup_wrong", "email": "root@example.com", "password": "correct-horse"})
-    });
-    let (status, _) = app.request(method.parse().unwrap(), path, body).await;
-    assert_eq!(status.as_u16(), expected, "{method} {path}");
+  for path in [
+    "/api/v1/admin/clients",
+    "/api/v1/admin/backups",
+    "/api/v1/admin/export",
+    "/.well-known/openid-configuration",
+  ] {
+    let reply = app.send(Method::GET, path, &[], "").await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND, "{path}");
   }
 }
 
-/// A public route added to the API must be added to one of the lists above.
+/// A public route added to the API must be added to the list above.
 #[tokio::test]
 async fn public_routes_are_all_listed() {
   let app = TestApp::new().await;
   let (_, public) = documented_routes(&app).await;
   let documented: BTreeSet<(String, String)> = public.into_iter().collect();
-  let mut listed: BTreeSet<(String, String)> = public_placeholders()
+  let listed: BTreeSet<(String, String)> = public_routes()
     .into_iter()
-    .map(|(method, path, _)| {
+    .map(|(method, path, _, _)| {
       let path = path.split('?').next().unwrap();
       (method.to_owned(), path.to_owned())
     })
     .collect();
-  listed.insert(("POST".into(), "/oauth/token".into()));
-  for (method, path, _) in WORKING {
-    listed.insert((method.into(), path.into()));
-  }
   assert_eq!(documented, listed);
 }

@@ -1,14 +1,14 @@
-//! Outgoing email: verification codes, sign-in links, and password resets.
+//! Outgoing email: verification codes, sign-in codes, and password resets.
 //!
-//! Messages go out through the SMTP server stored in settings. Until one is
-//! configured, the mailer writes each message to the server log, so local
+//! Messages go out through the SMTP server from `DOPGATE_SMTP_*`. Without
+//! one, the mailer writes each message to the server log, so local
 //! development works without a mail server.
 
 use std::time::Duration;
 
 use lettre::{
   AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
-  message::{Mailbox, header::ContentType},
+  message::{Mailbox, MultiPart, SinglePart, header::ContentType},
   transport::smtp::authentication::Credentials,
 };
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,8 @@ pub struct Message {
   pub to: String,
   pub subject: String,
   pub text: String,
+  /// Sent as an HTML alternative to the text when present.
+  pub html: Option<String>,
 }
 
 /// How the connection to the SMTP server is protected.
@@ -146,13 +148,22 @@ fn build(
     .to
     .parse()
     .map_err(|error| MailError(format!("the recipient address is invalid: {error}")))?;
-  lettre::Message::builder()
+  let builder = lettre::Message::builder()
     .from(Mailbox::new(config.from_name.clone(), from_address))
     .to(to)
-    .subject(&message.subject)
-    .header(ContentType::TEXT_PLAIN)
-    .body(message.text.clone())
-    .map_err(|error| MailError(error.to_string()))
+    .subject(&message.subject);
+  match &message.html {
+    Some(html) => builder.multipart(MultiPart::alternative_plain_html(
+      message.text.clone(),
+      html.clone(),
+    )),
+    None => builder.singlepart(
+      SinglePart::builder()
+        .header(ContentType::TEXT_PLAIN)
+        .body(message.text.clone()),
+    ),
+  }
+  .map_err(|error| MailError(error.to_string()))
 }
 
 fn transport(config: &SmtpConfig) -> Result<AsyncSmtpTransport<Tokio1Executor>, MailError> {

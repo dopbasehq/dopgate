@@ -13,9 +13,9 @@ pub enum AuthIdentity {
     role: Role,
     session_id: String,
   },
-  /// A backend service holding a client secret key. It acts like an admin
-  /// and never like a particular user.
-  Client { client_id: String },
+  /// The main app's backend holding `DOPGATE_SERVICE_KEY`. It acts like an
+  /// admin, never like root or a particular user.
+  Service,
 }
 
 impl AuthIdentity {
@@ -23,31 +23,50 @@ impl AuthIdentity {
   pub fn audit_actor_type(&self) -> &'static str {
     match self {
       Self::User { role, .. } => role.as_str(),
-      Self::Client { .. } => "client",
+      Self::Service => "service",
     }
   }
 
   /// The ID audit records store for this identity.
-  pub fn actor_id(&self) -> &str {
+  pub fn actor_id(&self) -> Option<&str> {
     match self {
-      Self::User { user_id, .. } => user_id,
-      Self::Client { client_id } => client_id,
+      Self::User { user_id, .. } => Some(user_id),
+      Self::Service => None,
     }
+  }
+
+  /// A readable name for audit records: the email, or `service`.
+  pub fn actor_label(&self) -> &str {
+    match self {
+      Self::User { email, .. } => email,
+      Self::Service => "service",
+    }
+  }
+
+  /// The role this identity acts with.
+  pub fn role(&self) -> Role {
+    match self {
+      Self::User { role, .. } => *role,
+      Self::Service => Role::Admin,
+    }
+  }
+
+  /// The signed-in user's ID, if this is a user.
+  pub fn user_id(&self) -> Option<&str> {
+    self.actor_id()
   }
 }
 
 /// The claims inside an access token.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct AccessClaims {
-  /// The public URL of this dopgate instance.
+  /// The public URL of this Dopgate instance.
   pub iss: String,
-  /// The user ID.
+  /// The user ID. Use it as the foreign key in your own tables.
   pub sub: String,
-  /// The client ID the token was issued to, when the app sent one.
-  pub aud: Option<String>,
   pub exp: i64,
   pub iat: i64,
-  /// The session ID. Revoking the session stops it refreshing.
+  /// The session ID. Ending the session stops it refreshing.
   pub sid: String,
   pub email: String,
   pub email_verified: bool,

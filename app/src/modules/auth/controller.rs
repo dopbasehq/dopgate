@@ -1,6 +1,5 @@
 use super::{error::AuthError, model::*, service};
 use crate::{
-  extractors::ClientKey,
   http::{HttpResponse, HttpResponseFormat},
   models::{AuthIdentity, User},
   state::AppState,
@@ -51,11 +50,10 @@ pub async fn methods(
 )]
 pub async fn signup(
   State(state): State<AppState>,
-  ClientKey(client_key): ClientKey,
   Json(request): Json<SignupRequest>,
 ) -> Result<HttpResponse<AuthTokens>, AuthError> {
   Ok(HttpResponse::created(
-    service::signup(&state, client_key, request).await?,
+    service::signup(&state, None, request).await?,
     "SIGNED_UP",
   ))
 }
@@ -80,11 +78,10 @@ pub async fn signup(
 )]
 pub async fn login(
   State(state): State<AppState>,
-  ClientKey(client_key): ClientKey,
   Json(request): Json<LoginRequest>,
 ) -> Result<HttpResponse<AuthTokens>, AuthError> {
   Ok(HttpResponse::ok(
-    service::login(&state, client_key, request).await?,
+    service::login(&state, None, request).await?,
     "SIGNED_IN",
   ))
 }

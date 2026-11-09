@@ -17,7 +17,6 @@ pub struct AuditEvent {
   /// records written outside a request and for records from before it was
   /// captured.
   pub ip_address: Option<String>,
-  #[sqlx(json)]
   pub metadata: Value,
   pub created_at: String,
   /// Position in the audit hash chain, and the hashes of the record before
@@ -65,7 +64,7 @@ pub struct ChainVerifyReport {
   /// chain cannot vouch for them, but they do not fail verification.
   pub legacy: u64,
   /// Records with no chain position written after the chain existed. Any
-  /// such record was inserted outside dopgate; it should stay at zero.
+  /// such record was inserted outside Dopgate; it should stay at zero.
   pub unsequenced: u64,
   /// Sequence number retention removed up to, when records were pruned. The
   /// surviving records continue the chain after it.

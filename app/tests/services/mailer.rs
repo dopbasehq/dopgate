@@ -1,4 +1,5 @@
-//! Delivery through a real SMTP exchange is covered by the settings tests.
+//! Delivery through a real SMTP exchange is covered by the settings and
+//! verification tests.
 
 use app::services::mailer::{self, Message, SmtpConfig, SmtpSecurity};
 
@@ -7,6 +8,7 @@ fn message(to: &str) -> Message {
     to: to.into(),
     subject: "Your code".into(),
     text: "123456".into(),
+    html: Some("<p>123456</p>".into()),
   }
 }
 

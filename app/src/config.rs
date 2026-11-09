@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
 use crate::constants::config::{
-  AUDIT_ARCHIVE_DIRECTORY_NAME, DATA_DIRECTORY_NAME, DATABASE_FILENAME, DEFAULT_PORT,
-  ENV_AUDIT_RETENTION_DAYS, ENV_DATA_DIR, ENV_DOCS, ENV_HOST, ENV_MASTER_KEY_PATH, ENV_PORT,
-  ENV_PUBLIC_URL, ENV_SHUTDOWN_GRACE_SECONDS, ENV_SMTP_FROM_EMAIL, ENV_SMTP_FROM_NAME,
-  ENV_SMTP_HOST, ENV_SMTP_PASSWORD, ENV_SMTP_PORT, ENV_SMTP_SECURITY, ENV_SMTP_USERNAME,
-  ENV_TRUSTED_PROXIES, ENV_WEB_UI, MASTER_KEY_FILENAME, SERVER_CONFIG_FILENAME,
-  SERVER_HOST_PLACEHOLDER,
+  DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_DATABASE_SCHEMA, DEFAULT_PORT, ENV_ALLOWED_ORIGINS,
+  ENV_AUDIT_RETENTION_DAYS, ENV_CONFIG, ENV_DATABASE_MAX_CONNECTIONS, ENV_DATABASE_SCHEMA,
+  ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_PORT, ENV_PUBLIC_URL, ENV_ROOT_EMAIL, ENV_SERVICE_KEY,
+  ENV_SHUTDOWN_GRACE_SECONDS, ENV_SMTP_FROM_EMAIL, ENV_SMTP_FROM_NAME, ENV_SMTP_HOST,
+  ENV_SMTP_PASSWORD, ENV_SMTP_PORT, ENV_SMTP_SECURITY, ENV_SMTP_USERNAME, ENV_TRUSTED_PROXIES,
+  ENV_WEB_UI, SERVER_HOST_PLACEHOLDER, SERVICE_KEY_MIN_LENGTH,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
 use crate::services::mailer::{self, SmtpSecurity};
@@ -27,40 +27,49 @@ pub fn validate_endpoint_transport(url: &Url) -> Result<()> {
   Ok(())
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub struct MasterKeyConfig {
-  pub provider: String,
-  pub path: PathBuf,
-}
-
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct ServerConfig {
+  /// The configuration file that was read, if any.
   #[serde(skip)]
-  pub data_dir: PathBuf,
-  #[serde(skip)]
-  pub config_path: PathBuf,
+  pub config_path: Option<PathBuf>,
   pub version: u32,
   pub bind_address: String,
   pub public_url: String,
+  /// PostgreSQL connection URL. Required.
+  #[serde(skip)]
   pub database_url: String,
+  /// The schema every Dopgate table lives in.
+  pub database_schema: String,
+  /// Most connections the pool opens.
+  #[serde(skip)]
+  pub database_max_connections: u32,
   pub shutdown_grace_seconds: u64,
-  /// Days audit records are kept before they are archived and deleted.
-  /// Unset keeps them forever. New instances get a year through the
-  /// generated `server.toml`.
+  /// Days audit records are kept before they are deleted. Unset keeps them
+  /// forever.
   #[serde(skip)]
   pub audit_retention_days: Option<u64>,
   /// Reverse proxies allowed to report the client address through
-  /// `X-Forwarded-For`. Empty trusts no one, so audit records store the
-  /// connection's peer address.
+  /// `X-Forwarded-For`. Empty trusts no one, so rate limits and audit
+  /// records use the connection's peer address.
   #[serde(skip)]
   pub trusted_proxies: Vec<crate::services::client_ip::ProxyNetwork>,
+  /// Browser origins allowed to call the API across origins (CORS).
+  #[serde(skip)]
+  pub allowed_origins: Vec<String>,
+  /// The main app's backend sends this as a bearer token to use the admin
+  /// API. Unset disables service access.
+  #[serde(skip)]
+  pub service_key: Option<zeroize::Zeroizing<String>>,
+  /// On a database without a root account, startup creates root with this
+  /// email and prints a generated password once.
+  #[serde(skip)]
+  pub root_email: Option<String>,
   #[serde(skip)]
   pub docs_enabled: bool,
   #[serde(skip)]
   pub web_ui_enabled: bool,
-  pub master_key: MasterKeyConfig,
-  /// SMTP from server.toml or `DOPGATE_SMTP_*`. The mailer uses it while
-  /// the runtime settings have no SMTP host.
+  /// SMTP from the config file or `DOPGATE_SMTP_*`. Without a host, mail is
+  /// written to the server log.
   #[serde(skip)]
   pub smtp: SmtpServerConfig,
   /// Records whether the public URL was configured or derived at startup.
@@ -68,7 +77,44 @@ pub struct ServerConfig {
   pub public_url_source: PublicUrlSource,
 }
 
-/// The `[smtp]` table. No host means no SMTP server here.
+impl std::fmt::Debug for ServerConfig {
+  fn fmt(
+    &self,
+    formatter: &mut std::fmt::Formatter<'_>,
+  ) -> std::fmt::Result {
+    formatter
+      .debug_struct("ServerConfig")
+      .field("config_path", &self.config_path)
+      .field("bind_address", &self.bind_address)
+      .field("public_url", &self.public_url)
+      .field("database_url", &redact_database_url(&self.database_url))
+      .field("database_schema", &self.database_schema)
+      .field("allowed_origins", &self.allowed_origins)
+      .field(
+        "service_key",
+        &self.service_key.as_ref().map(|_| "<redacted>"),
+      )
+      .field("root_email", &self.root_email)
+      .field("docs_enabled", &self.docs_enabled)
+      .field("web_ui_enabled", &self.web_ui_enabled)
+      .field("smtp", &self.smtp)
+      .finish_non_exhaustive()
+  }
+}
+
+/// The database URL without its password, for logs and errors.
+pub fn redact_database_url(url: &str) -> String {
+  match Url::parse(url) {
+    Ok(mut parsed) if parsed.password().is_some() => {
+      let _ = parsed.set_password(Some("***"));
+      parsed.to_string()
+    }
+    Ok(parsed) => parsed.to_string(),
+    Err(_) => "<invalid URL>".into(),
+  }
+}
+
+/// The SMTP settings. No host means no SMTP server: mail goes to the log.
 #[derive(Clone, Default)]
 pub struct SmtpServerConfig {
   pub host: Option<String>,
@@ -106,35 +152,41 @@ pub enum PublicUrlSource {
   NetworkPlaceholder,
 }
 
+/// Values from the command line. They win over everything else.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ServerOverrides {
-  pub data_dir: Option<PathBuf>,
   pub config_path: Option<PathBuf>,
+  pub database_url: Option<String>,
   pub public_url: Option<String>,
   pub port: Option<u16>,
   pub host: Option<String>,
   pub shutdown_grace_seconds: Option<u64>,
   pub docs: Option<bool>,
   pub web_ui: Option<bool>,
-  pub master_key_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ServerConfigFile {
   version: Option<u32>,
+  database_url: Option<String>,
+  database_schema: Option<String>,
   public_url: Option<String>,
   port: Option<u16>,
   host: Option<String>,
   shutdown_grace_seconds: Option<u64>,
   audit_retention_days: Option<u64>,
   trusted_proxies: Option<Vec<String>>,
+  allowed_origins: Option<Vec<String>>,
+  service_key: Option<String>,
+  root_email: Option<String>,
   docs: Option<bool>,
   web_ui: Option<bool>,
-  master_key: Option<MasterKeyConfigFile>,
   smtp: Option<SmtpConfigFile>,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SmtpConfigFile {
   host: Option<String>,
   port: Option<u16>,
@@ -145,26 +197,25 @@ struct SmtpConfigFile {
   from_name: Option<String>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-struct MasterKeyConfigFile {
-  provider: Option<String>,
-  path: Option<PathBuf>,
-}
-
 /// `DOPGATE_*` environment overrides, structured so tests (and any embedder)
 /// can resolve configuration from injected values instead of process state.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EnvironmentOverrides {
-  pub data_dir: Option<PathBuf>,
+  pub config_path: Option<PathBuf>,
+  pub database_url: Option<String>,
+  pub database_schema: Option<String>,
+  pub database_max_connections: Option<String>,
   pub public_url: Option<String>,
   pub port: Option<String>,
   pub host: Option<String>,
   pub shutdown_grace_seconds: Option<String>,
   pub audit_retention_days: Option<String>,
   pub trusted_proxies: Option<String>,
+  pub allowed_origins: Option<String>,
+  pub service_key: Option<String>,
+  pub root_email: Option<String>,
   pub docs: Option<String>,
   pub web_ui: Option<String>,
-  pub master_key_path: Option<PathBuf>,
   pub smtp_host: Option<String>,
   pub smtp_port: Option<String>,
   pub smtp_security: Option<String>,
@@ -177,16 +228,21 @@ pub struct EnvironmentOverrides {
 impl EnvironmentOverrides {
   pub(crate) fn read() -> Self {
     Self {
-      data_dir: env::var_os(ENV_DATA_DIR).map(PathBuf::from),
+      config_path: env::var_os(ENV_CONFIG).map(PathBuf::from),
+      database_url: env::var(ENV_DATABASE_URL).ok(),
+      database_schema: env::var(ENV_DATABASE_SCHEMA).ok(),
+      database_max_connections: env::var(ENV_DATABASE_MAX_CONNECTIONS).ok(),
       public_url: env::var(ENV_PUBLIC_URL).ok(),
       port: env::var(ENV_PORT).ok(),
       host: env::var(ENV_HOST).ok(),
       shutdown_grace_seconds: env::var(ENV_SHUTDOWN_GRACE_SECONDS).ok(),
       audit_retention_days: env::var(ENV_AUDIT_RETENTION_DAYS).ok(),
       trusted_proxies: env::var(ENV_TRUSTED_PROXIES).ok(),
+      allowed_origins: env::var(ENV_ALLOWED_ORIGINS).ok(),
+      service_key: env::var(ENV_SERVICE_KEY).ok(),
+      root_email: env::var(ENV_ROOT_EMAIL).ok(),
       docs: env::var(ENV_DOCS).ok(),
       web_ui: env::var(ENV_WEB_UI).ok(),
-      master_key_path: env::var_os(ENV_MASTER_KEY_PATH).map(PathBuf::from),
       smtp_host: env::var(ENV_SMTP_HOST).ok(),
       smtp_port: env::var(ENV_SMTP_PORT).ok(),
       smtp_security: env::var(ENV_SMTP_SECURITY).ok(),
@@ -198,44 +254,31 @@ impl EnvironmentOverrides {
   }
 }
 
-impl Default for MasterKeyConfig {
-  fn default() -> Self {
-    Self {
-      provider: "file".into(),
-      path: dopgate_home().join(MASTER_KEY_FILENAME),
-    }
-  }
-}
-
 impl Default for ServerConfig {
   fn default() -> Self {
-    Self::for_data_dir(dopgate_home())
-  }
-}
-
-impl ServerConfig {
-  fn for_data_dir(data_dir: PathBuf) -> Self {
     Self {
-      config_path: data_dir.join(SERVER_CONFIG_FILENAME),
-      database_url: sqlite_url(&data_dir.join(DATABASE_FILENAME)),
-      master_key: MasterKeyConfig {
-        provider: "file".into(),
-        path: data_dir.join(MASTER_KEY_FILENAME),
-      },
-      data_dir,
+      config_path: None,
       version: 1,
       bind_address: DEFAULT_BIND_ADDRESS.into(),
       public_url: DEFAULT_PUBLIC_URL.into(),
+      database_url: String::new(),
+      database_schema: DEFAULT_DATABASE_SCHEMA.into(),
+      database_max_connections: 10,
       shutdown_grace_seconds: 10,
-      audit_retention_days: None,
+      audit_retention_days: Some(DEFAULT_AUDIT_RETENTION_DAYS),
       trusted_proxies: Vec::new(),
+      allowed_origins: Vec::new(),
+      service_key: None,
+      root_email: None,
       docs_enabled: true,
-      web_ui_enabled: false,
+      web_ui_enabled: true,
       public_url_source: PublicUrlSource::LoopbackDefault,
       smtp: SmtpServerConfig::default(),
     }
   }
+}
 
+impl ServerConfig {
   pub fn load(overrides: &ServerOverrides) -> Result<Self> {
     Self::load_with_environment(overrides, EnvironmentOverrides::read())
   }
@@ -252,29 +295,24 @@ impl ServerConfig {
     environment: EnvironmentOverrides,
     working_directory: &Path,
   ) -> Result<Self> {
-    let fallback = dopgate_home();
-    let selected_data_dir = overrides
-      .data_dir
-      .as_deref()
-      .or(environment.data_dir.as_deref())
-      .unwrap_or(&fallback);
-    let data_dir = resolve_path_from(selected_data_dir, working_directory)?;
     let config_path = overrides
       .config_path
       .as_deref()
+      .or(environment.config_path.as_deref())
       .map(|path| resolve_path_from(path, working_directory))
-      .transpose()?
-      .unwrap_or_else(|| data_dir.join(SERVER_CONFIG_FILENAME));
-    let mut config = Self::for_data_dir(data_dir);
-    config.config_path.clone_from(&config_path);
+      .transpose()?;
+    let mut config = Self {
+      config_path: config_path.clone(),
+      ..Self::default()
+    };
 
     let file_port;
     let file_host;
-    if config_path.exists() {
-      let contents = fs::read_to_string(&config_path)
-        .with_context(|| format!("failed to read {}", config_path.display()))?;
-      let file: ServerConfigFile = toml::from_str(&contents)
-        .with_context(|| format!("failed to parse {}", config_path.display()))?;
+    if let Some(path) = &config_path {
+      let contents =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+      let file: ServerConfigFile =
+        toml::from_str(&contents).with_context(|| format!("failed to parse {}", path.display()))?;
       file_port = file.port;
       file_host = file.host.clone();
       config.apply_file(file)?;
@@ -300,7 +338,7 @@ impl ServerConfig {
     )?;
     config.derive_public_url()?;
     config.smtp.check()?;
-    config.master_key.path = resolve_path_from(&config.master_key.path, working_directory)?;
+    config.clean_root_email()?;
     config.validate()?;
     Ok(config)
   }
@@ -312,6 +350,12 @@ impl ServerConfig {
     if let Some(value) = file.version {
       self.version = value;
     }
+    if let Some(value) = file.database_url {
+      self.database_url = value;
+    }
+    if let Some(value) = file.database_schema {
+      self.database_schema = value;
+    }
     if let Some(value) = file.public_url {
       self.public_url = value;
       self.public_url_source = PublicUrlSource::Explicit;
@@ -320,7 +364,7 @@ impl ServerConfig {
       self.shutdown_grace_seconds = value;
     }
     if let Some(value) = file.audit_retention_days {
-      self.audit_retention_days = Some(value);
+      self.audit_retention_days = (value > 0).then_some(value);
     }
     if let Some(values) = file.trusted_proxies {
       self.trusted_proxies = values
@@ -329,19 +373,20 @@ impl ServerConfig {
         .collect::<Result<_>>()
         .context("invalid trusted_proxies")?;
     }
+    if let Some(values) = file.allowed_origins {
+      self.allowed_origins = parse_origins(values.iter().map(String::as_str))?;
+    }
+    if let Some(value) = file.service_key {
+      self.service_key = Some(zeroize::Zeroizing::new(value));
+    }
+    if let Some(value) = file.root_email {
+      self.root_email = Some(value);
+    }
     if let Some(value) = file.web_ui {
       self.web_ui_enabled = value;
     }
     if let Some(value) = file.docs {
       self.docs_enabled = value;
-    }
-    if let Some(master_key) = file.master_key {
-      if let Some(value) = master_key.provider {
-        self.master_key.provider = value;
-      }
-      if let Some(value) = master_key.path {
-        self.master_key.path = value;
-      }
     }
     if let Some(smtp) = file.smtp {
       self.smtp = SmtpServerConfig {
@@ -361,6 +406,17 @@ impl ServerConfig {
     &mut self,
     environment: EnvironmentOverrides,
   ) -> Result<()> {
+    if let Some(value) = environment.database_url {
+      self.database_url = value;
+    }
+    if let Some(value) = environment.database_schema {
+      self.database_schema = value;
+    }
+    if let Some(value) = environment.database_max_connections {
+      self.database_max_connections = value
+        .parse()
+        .context("invalid DOPGATE_DATABASE_MAX_CONNECTIONS")?;
+    }
     if let Some(value) = environment.public_url {
       self.public_url = value;
       self.public_url_source = PublicUrlSource::Explicit;
@@ -371,24 +427,31 @@ impl ServerConfig {
         .context("invalid DOPGATE_SHUTDOWN_GRACE_SECONDS")?;
     }
     if let Some(value) = environment.audit_retention_days {
-      self.audit_retention_days = Some(
-        value
-          .parse()
-          .context("invalid DOPGATE_AUDIT_RETENTION_DAYS")?,
-      );
+      let days: u64 = value
+        .parse()
+        .context("invalid DOPGATE_AUDIT_RETENTION_DAYS")?;
+      // 0 keeps records forever.
+      self.audit_retention_days = (days > 0).then_some(days);
     }
     if let Some(value) = environment.trusted_proxies {
       self.trusted_proxies = crate::services::client_ip::parse_list(&value)
         .context("invalid DOPGATE_TRUSTED_PROXIES")?;
+    }
+    if let Some(value) = environment.allowed_origins {
+      self.allowed_origins =
+        parse_origins(value.split(',')).context("invalid DOPGATE_ALLOWED_ORIGINS")?;
+    }
+    if let Some(value) = environment.service_key {
+      self.service_key = (!value.trim().is_empty()).then(|| zeroize::Zeroizing::new(value));
+    }
+    if let Some(value) = environment.root_email {
+      self.root_email = Some(value);
     }
     if let Some(value) = environment.web_ui {
       self.web_ui_enabled = value.parse().context("invalid DOPGATE_WEB_UI")?;
     }
     if let Some(value) = environment.docs {
       self.docs_enabled = value.parse().context("invalid DOPGATE_DOCS")?;
-    }
-    if let Some(value) = environment.master_key_path {
-      self.master_key.path = value;
     }
     let smtp = &mut self.smtp;
     if let Some(value) = environment.smtp_host {
@@ -422,6 +485,9 @@ impl ServerConfig {
     &mut self,
     overrides: &ServerOverrides,
   ) {
+    if let Some(value) = &overrides.database_url {
+      self.database_url.clone_from(value);
+    }
     if let Some(value) = &overrides.public_url {
       self.public_url.clone_from(value);
       self.public_url_source = PublicUrlSource::Explicit;
@@ -435,25 +501,19 @@ impl ServerConfig {
     if let Some(value) = overrides.docs {
       self.docs_enabled = value;
     }
-    if let Some(value) = &overrides.master_key_path {
-      self.master_key.path.clone_from(value);
-    }
   }
 
-  /// Create missing configuration references without changing saved settings.
-  pub fn ensure_reference_files(&self) -> Result<()> {
-    ensure_data_dir(&self.data_dir)?;
-    let mut reference = include_str!("config/server.toml")
-      .replace("{{PORT}}", &DEFAULT_PORT.to_string())
-      .replace("{{PUBLIC_URL}}", DEFAULT_PUBLIC_URL);
-    let key_path =
-      std::collections::BTreeMap::from([("path", self.data_dir.join(MASTER_KEY_FILENAME))]);
-    for line in toml::to_string(&key_path)?.lines() {
-      reference.push_str("# ");
-      reference.push_str(line);
-      reference.push('\n');
+  fn clean_root_email(&mut self) -> Result<()> {
+    let Some(value) = self.root_email.take() else {
+      return Ok(());
+    };
+    if value.trim().is_empty() {
+      return Ok(());
     }
-    crate::utils::private_file::write_if_missing(&self.config_path, reference.as_bytes())?;
+    self.root_email = Some(
+      crate::utils::email::normalize(&value)
+        .with_context(|| format!("DOPGATE_ROOT_EMAIL \"{value}\" is not a valid email address"))?,
+    );
     Ok(())
   }
 
@@ -496,9 +556,9 @@ impl ServerConfig {
   pub fn public_url_warning(&self) -> Option<String> {
     if self.public_url_source == PublicUrlSource::NetworkPlaceholder {
       return Some(
-        "Replace SERVER_HOST with this server's public IP address or domain.\n\
-         Set --public-url, DOPGATE_PUBLIC_URL, or public_url in server.toml to save the address.\n\
-         HTTP does not encrypt passwords or tokens."
+        "Replace SERVER_HOST with this server's public address.\n\
+         Set DOPGATE_PUBLIC_URL (or --public-url) to the URL your app and users reach dopgate on.\n\
+         It is also the issuer of every access token."
           .into(),
       );
     }
@@ -512,22 +572,40 @@ impl ServerConfig {
     })
   }
 
+  /// The issuer every access token carries: the public URL without a
+  /// trailing slash.
+  pub fn issuer(&self) -> &str {
+    self.public_url.trim_end_matches('/')
+  }
+
+  /// Whether the public URL is HTTPS, so cookies can be marked Secure.
+  pub fn public_url_is_https(&self) -> bool {
+    self.public_url.starts_with("https://")
+  }
+
   /// The audit retention policy, or `None` when records are kept forever.
   pub fn audit_retention(&self) -> Option<crate::services::audit_chain::Retention> {
-    self.audit_retention_days.map(|keep_days| {
-      crate::services::audit_chain::Retention::new(
-        self.data_dir.join(AUDIT_ARCHIVE_DIRECTORY_NAME),
-        keep_days,
-      )
-    })
+    self
+      .audit_retention_days
+      .map(crate::services::audit_chain::Retention::new)
   }
 
   pub fn validate(&self) -> Result<()> {
     if self.version != 1 {
       bail!("unsupported server configuration version {}", self.version);
     }
-    if self.audit_retention_days == Some(0) {
-      bail!("audit_retention_days must be at least 1 day");
+    if self.database_url.trim().is_empty() {
+      bail!(
+        "set DOPGATE_DATABASE_URL to a PostgreSQL URL, such as postgres://dopgate:secret@localhost:5432/app"
+      );
+    }
+    let database = Url::parse(&self.database_url).context("invalid DOPGATE_DATABASE_URL")?;
+    if !matches!(database.scheme(), "postgres" | "postgresql") {
+      bail!("DOPGATE_DATABASE_URL must start with postgres:// or postgresql://");
+    }
+    crate::services::db::validate_schema(&self.database_schema)?;
+    if !(1..=1000).contains(&self.database_max_connections) {
+      bail!("DOPGATE_DATABASE_MAX_CONNECTIONS must be between 1 and 1000");
     }
     let bind = SocketAddr::from_str(&self.bind_address).context("invalid bind_address")?;
     if self.public_url_source == PublicUrlSource::Explicit {
@@ -556,20 +634,36 @@ impl ServerConfig {
         _ => {}
       }
     }
-    if !self.database_url.starts_with("sqlite:") {
-      bail!("database_url must use SQLite");
-    }
     if !(1..=300).contains(&self.shutdown_grace_seconds) {
       bail!("shutdown_grace_seconds must be between 1 and 300");
     }
-    if self.master_key.provider != "file" {
-      bail!("only the file master-key provider is supported");
-    }
-    if self.master_key.path.as_os_str().is_empty() {
-      bail!("master_key.path is required");
+    if let Some(key) = &self.service_key
+      && key.chars().count() < SERVICE_KEY_MIN_LENGTH
+    {
+      bail!(
+        "DOPGATE_SERVICE_KEY must be at least {SERVICE_KEY_MIN_LENGTH} characters. Generate one with `openssl rand -base64 32`."
+      );
     }
     Ok(())
   }
+}
+
+/// Browser origins such as `https://app.example.com`: a scheme, a host, an
+/// optional port, nothing else. Empty entries are skipped.
+fn parse_origins<'a>(values: impl Iterator<Item = &'a str>) -> Result<Vec<String>> {
+  let mut origins = Vec::new();
+  for value in values.map(str::trim).filter(|value| !value.is_empty()) {
+    let url = Url::parse(value).with_context(|| format!("\"{value}\" is not an origin"))?;
+    if !matches!(url.scheme(), "http" | "https")
+      || url.host_str().is_none()
+      || !matches!(url.path(), "" | "/")
+      || url.query().is_some()
+    {
+      bail!("\"{value}\" must be an origin like https://app.example.com");
+    }
+    origins.push(url.origin().ascii_serialization());
+  }
+  Ok(origins)
 }
 
 impl SmtpServerConfig {
@@ -657,50 +751,6 @@ pub fn resolve_implicit_public_url(bind: SocketAddr) -> (String, PublicUrlSource
   (
     format!("http://{SERVER_HOST_PLACEHOLDER}:{}", bind.port()),
     PublicUrlSource::NetworkPlaceholder,
-  )
-}
-
-pub fn resolve_data_dir(argument: Option<&Path>) -> Result<PathBuf> {
-  let environment = env::var_os(ENV_DATA_DIR).map(PathBuf::from);
-  let fallback = dopgate_home();
-  resolve_path(argument.or(environment.as_deref()).unwrap_or(&fallback))
-}
-
-pub fn dopgate_home() -> PathBuf {
-  env::home_dir()
-    .map(|home| home.join(DATA_DIRECTORY_NAME))
-    .unwrap_or_else(|| PathBuf::from(DATA_DIRECTORY_NAME))
-}
-
-pub fn ensure_data_dir(path: &Path) -> Result<()> {
-  let existed = path.exists();
-  fs::create_dir_all(path)
-    .with_context(|| format!("failed to create data directory {}", path.display()))?;
-  #[cfg(unix)]
-  if !existed {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o700))
-      .with_context(|| format!("failed to secure data directory {}", path.display()))?;
-  }
-  Ok(())
-}
-
-pub fn sqlite_url(path: &Path) -> String {
-  format!("sqlite://{}", path.to_string_lossy().replace('\\', "/"))
-}
-
-pub fn database_path(url: &str) -> Result<PathBuf> {
-  let path = url
-    .strip_prefix("sqlite://")
-    .or_else(|| url.strip_prefix("sqlite:"))
-    .context("database URL is not SQLite")?;
-  Ok(PathBuf::from(path.split('?').next().unwrap_or(path)))
-}
-
-fn resolve_path(path: &Path) -> Result<PathBuf> {
-  resolve_path_from(
-    path,
-    &env::current_dir().context("failed to resolve current directory")?,
   )
 }
 

@@ -11,7 +11,7 @@ async fn openapi_lists_every_module() {
   let app = TestApp::new().await;
   let (status, body) = app.request(Method::GET, "/api/v1/openapi.json", None).await;
   assert_eq!(status, StatusCode::OK);
-  assert_eq!(body["info"]["title"], "dopgate API");
+  assert_eq!(body["info"]["title"], "Dopgate API");
   assert_eq!(body["info"]["version"], env!("CARGO_PKG_VERSION"));
   let tags: BTreeSet<&str> = body["tags"]
     .as_array()
@@ -29,18 +29,17 @@ async fn openapi_lists_every_module() {
     "mfa",
     "sso",
     "users",
-    "clients",
     "keys",
-    "oidc",
     "settings",
     "audit",
-    "backups",
   ] {
     assert!(tags.contains(tag), "missing tag {tag}");
   }
   let schemes = body["components"]["securitySchemes"].as_object().unwrap();
   assert!(schemes.contains_key("bearerAuth"));
-  assert!(schemes.contains_key("clientKey"));
+  for removed in ["clients", "oidc", "backups"] {
+    assert!(!tags.contains(removed), "{removed} should be gone");
+  }
 }
 
 /// Handlers share names such as `list` across modules; the document still

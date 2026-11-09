@@ -71,3 +71,49 @@ impl FakeSmtp {
     self.received.lock().unwrap().join("\n")
   }
 }
+
+impl FakeSmtp {
+  /// Wait until a message to `to` arrived and return how many did.
+  pub async fn wait_for(
+    &self,
+    to: &str,
+    count: usize,
+  ) -> usize {
+    for _ in 0..40 {
+      let found = self.messages_to(to).len();
+      if found >= count {
+        return found;
+      }
+      tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    self.messages_to(to).len()
+  }
+
+  /// Each message's lines, split on the end-of-data marker.
+  pub fn messages_to(
+    &self,
+    to: &str,
+  ) -> Vec<String> {
+    let log = self.received.lock().unwrap().clone();
+    let mut messages = Vec::new();
+    let mut current: Option<(String, Vec<String>)> = None;
+    let mut recipient = String::new();
+    for line in log {
+      let upper = line.to_ascii_uppercase();
+      if upper.starts_with("RCPT TO:") {
+        recipient = line[8..].trim().trim_matches(['<', '>']).to_owned();
+      } else if upper == "DATA" {
+        current = Some((recipient.clone(), Vec::new()));
+      } else if line == "." {
+        if let Some((rcpt, lines)) = current.take()
+          && rcpt.eq_ignore_ascii_case(to)
+        {
+          messages.push(lines.join("\n"));
+        }
+      } else if let Some((_, lines)) = current.as_mut() {
+        lines.push(line);
+      }
+    }
+    messages
+  }
+}

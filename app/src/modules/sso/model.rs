@@ -15,12 +15,9 @@ pub struct PublicProvider {
 #[into_params(parameter_in = Query)]
 #[serde(rename_all = "camelCase")]
 pub struct StartQuery {
-  /// Where to send the user afterwards, with a handoff code. Must be one of
-  /// the client's redirect URLs.
+  /// Where to send the user afterwards, with a handoff code. Must be on an
+  /// allowed origin.
   pub redirect_url: String,
-  /// The app's publishable key. Browsers cannot send headers on a
-  /// redirect, so it travels in the query here.
-  pub client: Option<String>,
 }
 
 #[derive(Deserialize, IntoParams)]

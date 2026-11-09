@@ -1,22 +1,20 @@
-use sqlx::SqliteConnection;
+use sqlx::PgConnection;
 
 /// Insert the root account. The partial unique index on `users(role)`
-/// refuses a second root.
+/// refuses a second root. The email counts as verified: whoever runs the
+/// server chose it.
 pub async fn insert_root(
-  connection: &mut SqliteConnection,
+  connection: &mut PgConnection,
   id: &str,
   email: &str,
   password_hash: &str,
-  now: &str,
 ) -> Result<(), sqlx::Error> {
   sqlx::query(
-    "INSERT INTO users(id,email,email_verified_at,password_hash,role,status,created_at,updated_at) VALUES(?,?,NULL,?,'root','active',?,?)",
+    "INSERT INTO users(id,email,email_verified_at,password_hash,role,status,created_at,updated_at) VALUES($1,$2,now(),$3,'root','active',now(),now())",
   )
   .bind(id)
   .bind(email)
   .bind(password_hash)
-  .bind(now)
-  .bind(now)
   .execute(connection)
   .await
   .map(|_| ())

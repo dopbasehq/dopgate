@@ -47,27 +47,60 @@ async fn malformed_headers_are_refused() {
   }
 }
 
-/// The scheme name is case-insensitive. A well-formed token reaches token
-/// verification, which answers 501 until phase 2.
+/// The scheme name is case-insensitive.
 #[tokio::test]
 async fn the_bearer_scheme_ignores_case() {
   let app = TestApp::new().await;
-  for value in ["Bearer abc", "bearer abc", "BEARER abc"] {
-    let (status, _) = me_with(&app, value).await;
-    assert_eq!(status, StatusCode::NOT_IMPLEMENTED, "{value:?}");
+  for scheme in ["Bearer", "bearer", "BEARER"] {
+    let value = format!("{scheme} {}", crate::support::SERVICE_KEY);
+    let reply = app
+      .send(
+        Method::GET,
+        "/api/v1/admin/settings",
+        &[(header::AUTHORIZATION.as_str(), value.as_str())],
+        "",
+      )
+      .await;
+    assert_eq!(reply.status, StatusCode::OK, "{scheme}");
   }
 }
 
+/// The service key reaches the admin API.
 #[tokio::test]
-async fn client_secret_keys_are_recognised() {
+async fn the_service_key_is_an_admin_without_an_account() {
+  let key = "k".repeat(40);
+  let configured = key.clone();
+  let app = TestApp::with(move |config| {
+    config.service_key = Some(zeroize::Zeroizing::new(configured));
+  })
+  .await;
+  let bearer = format!("Bearer {key}");
+  let reply = app
+    .send(
+      Method::GET,
+      "/api/v1/admin/settings",
+      &[(header::AUTHORIZATION.as_str(), bearer.as_str())],
+      "",
+    )
+    .await;
+  assert_eq!(reply.status, StatusCode::OK);
+  let (status, _) = me_with(&app, &format!("Bearer {}", "x".repeat(40))).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn no_service_key_means_no_service_access() {
   let app = TestApp::new().await;
   let reply = app
     .send(
       Method::GET,
       "/api/v1/admin/users",
-      &[(header::AUTHORIZATION.as_str(), "Bearer sk_test")],
+      &[(
+        header::AUTHORIZATION.as_str(),
+        "Bearer some-long-value-without-dots-at-all",
+      )],
       "",
     )
     .await;
-  assert_eq!(reply.status, StatusCode::NOT_IMPLEMENTED);
+  assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
 }

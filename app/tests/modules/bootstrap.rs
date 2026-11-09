@@ -98,7 +98,7 @@ async fn invalid_email_and_short_password_are_refused() {
       Some(json!({"setupToken": token, "email": "not-an-email", "password": "correct-horse"})),
     )
     .await;
-  assert_eq!(status, StatusCode::BAD_REQUEST);
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
   assert!(body["error"]["EMAIL_INVALID"].is_string());
 
   let (status, body) = app
@@ -108,7 +108,7 @@ async fn invalid_email_and_short_password_are_refused() {
       Some(json!({"setupToken": token, "email": "root@example.com", "password": "short"})),
     )
     .await;
-  assert_eq!(status, StatusCode::BAD_REQUEST);
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
   assert!(body["error"]["PASSWORD_INVALID"].is_string());
 }
 
@@ -166,13 +166,46 @@ async fn refused_request_keeps_the_setup_token() {
 /// An instance that already has root starts without a setup token.
 #[tokio::test]
 async fn initialized_instance_has_no_setup_token() {
-  let directory = tempfile::TempDir::new().unwrap();
-  let config = crate::support::config_in(&directory);
-  let (db, _) = app::server::prepare_instance(&config).await.unwrap();
+  let schema = crate::support::unique_schema();
+  let _guard = crate::support::SchemaGuard(schema.clone());
+  let config = crate::support::config_for(&schema);
+  let db = app::server::prepare_instance(&config).await.unwrap();
   app::modules::bootstrap::service::create_root(&db, "root@example.com", "correct-horse")
     .await
     .unwrap();
   db.close().await;
   let state = app::server::build_state(config).await.unwrap();
   assert!(state.setup.read().await.token.is_none());
+}
+
+/// `DOPGATE_ROOT_EMAIL` on a fresh database creates root with a generated
+/// password that works, once. A second start leaves root alone.
+#[tokio::test]
+async fn root_email_creates_root_with_a_generated_password_once() {
+  let schema = crate::support::unique_schema();
+  let _guard = crate::support::SchemaGuard(schema.clone());
+  let mut config = crate::support::config_for(&schema);
+  config.root_email = Some("owner@example.com".into());
+  let (state, setup) = app::server::build_state_with_setup(config.clone())
+    .await
+    .unwrap();
+  let app::server::RootSetup::Created { email, password } = setup else {
+    panic!("root was not created");
+  };
+  assert_eq!(email, "owner@example.com");
+  assert!(password.len() >= 24);
+  assert!(state.setup.read().await.token.is_none());
+
+  let (role, verified, hash): (String, bool, String) = sqlx::query_as(
+    "SELECT role, email_verified_at IS NOT NULL, password_hash FROM users WHERE email = 'owner@example.com'",
+  )
+  .fetch_one(state.db.pool())
+  .await
+  .unwrap();
+  assert_eq!(role, "root");
+  assert!(verified);
+  assert!(app::services::password::verify(&password, &hash));
+
+  let (_, again) = app::server::build_state_with_setup(config).await.unwrap();
+  assert!(matches!(again, app::server::RootSetup::Exists));
 }
