@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DopgateIcon } from "~/assets/icons";
+import DopgateLockup from "~/components/app/DopgateLockup.vue";
 
 /**
  * FocusLayout — one centred column and nothing else, for pages outside
@@ -11,10 +11,7 @@ import { DopgateIcon } from "~/assets/icons";
   <div class="flex min-h-svh flex-col bg-canvas">
     <header
       class="flex items-center gap-2.5 border-b border-line-soft px-5 py-4 sm:px-8">
-      <DopgateIcon class="h-7 w-7 shrink-0" />
-      <span class="font-mono text-sm font-semibold text-ink-strong">
-        dopgate
-      </span>
+      <DopgateLockup :size="24" />
     </header>
     <main
       class="flex flex-1 items-start justify-center px-5 py-12 sm:items-center sm:py-16">

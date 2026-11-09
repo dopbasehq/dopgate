@@ -1,18 +1,25 @@
 @import "@fontsource-variable/fira-code/wght.css";
+@import "@fontsource-variable/geist/wght.css";
 @import "tailwindcss";
 
 /**
- * dopgate admin console dark theme tokens, shared with Dopbase.
+ * Dopgate admin console dark theme tokens, shared with Dopbase. These are
+ * the values on the "Dopgate · Brand reference" page in Figma.
  *
  * The neutral palette starts with a #1c1c1c canvas. Sidebar, panel,
  * hover, and keyline colors mix in increasing amounts of white. Text
- * uses a #ebebeb ramp, while interactive elements use dopgate red.
+ * uses a #ebebeb ramp, while the logo and primary actions use Gate Red.
  */
 @theme {
   --font-sans:
     system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono:
     "Fira Code Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  /* The wordmark and brand headlines only. The console UI stays on
+     system-ui. */
+  --font-brand:
+    "Geist Variable", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
 
   /* Main content area. */
   --color-canvas: #1c1c1c;
@@ -36,7 +43,7 @@
   --color-ink-muted: color-mix(in srgb, #ebebeb, transparent 45%);
   --color-ink-faint: color-mix(in srgb, #ebebeb, transparent 65%);
 
-  /* dopgate brand red. */
+  /* Dopgate brand red. */
   --color-accent: #ff4053;
   --color-accent-strong: #ff8593;
   --color-accent-soft: color-mix(in srgb, #ff4053, transparent 86%);

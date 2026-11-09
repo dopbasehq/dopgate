@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * DopgateIcon — the dopgate mark, Hash D: a solid D with a # knocked out
+ * DopgateIcon — the Dopgate mark, Hash D: a solid D with a # knocked out
  * of it. The # is a hole, so it shows whatever surface sits behind the
  * mark; the square in its middle stays solid. Drawn on a 48×52 box, the
  * same paths as the "Dopgate / Logo" component in Figma and

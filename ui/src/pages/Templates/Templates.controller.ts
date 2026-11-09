@@ -18,7 +18,7 @@ export function templateTitle(name: string): string {
   return TEMPLATE_TITLES[name] ?? name;
 }
 
-/** Templates page controller: the emails dopgate sends. */
+/** Templates page controller: the emails Dopgate sends. */
 export function useTemplatesController() {
   const read = useQuery(templatesQuery);
   const templates = computed<TemplateSummary[] | null>(

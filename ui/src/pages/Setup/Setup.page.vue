@@ -19,7 +19,7 @@ const {
 <template>
   <AuthLayout>
     <h1 class="text-[28px] font-semibold leading-tight text-ink-strong">
-      Set up dopgate
+      Set up Dopgate
     </h1>
     <p class="mt-2 text-sm text-ink-muted">
       Create the root account. It can do everything, including adding admins.
@@ -50,7 +50,7 @@ const {
         name="setupToken"
         autocomplete="off"
         mono
-        hint="Printed in the server log the first time dopgate starts."
+        hint="Printed in the server log the first time Dopgate starts."
         :error="fieldErrors.setupToken" />
       <DgInput
         v-model="email"

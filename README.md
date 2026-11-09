@@ -1,4 +1,10 @@
-# Dopgate
+<p align="center">
+  <img src="public/logo.svg" width="72" height="78" alt="Dopgate logo: a red D with a # knocked out of it">
+</p>
+
+<h1 align="center">Dopgate</h1>
+
+<p align="center">Authentication you host yourself. Part of the Dopbase family.</p>
 
 Dopgate is an authentication server for one app, and you host it yourself. It signs users up and in, confirms their email with 6-digit codes, resets passwords, and gives your app ES256 JWTs that your backend verifies offline against a public key set. It runs as its own container next to your app, usually in the same Docker Compose stack, and keeps every table in a PostgreSQL schema (`dopgate` by default), so it can share your app's database. The binary has an admin console built in for root and admins.
 

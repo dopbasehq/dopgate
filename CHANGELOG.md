@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to dopgate are documented in this file. The format follows
+All notable changes to Dopgate are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
@@ -38,6 +38,8 @@ with an admin console and Docker images. Nothing below has shipped before.
   365 days by default) and a verify endpoint.
 - The admin console at `/`: users, email templates, settings, signing keys,
   audit log, and your account.
+- The Dopgate brand: the Hash D logo, Gate Red, and the Geist wordmark across
+  the console, docs, README, and favicons.
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
 - A `Dockerfile` and a `docker-compose.yml` with PostgreSQL and Dopgate.
 - Documentation site and README for the setup above.

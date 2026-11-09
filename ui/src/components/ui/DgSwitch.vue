@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * DgSwitch is a 41×24 toggle with a rounded track, floating white knob,
- * and dopgate red active state. A visually hidden
+ * and Dopgate red active state. A visually hidden
  * native checkbox keeps keyboard, focus, and a11y behavior. The track
  * and knob are presentation bound to the model value.
  * Presentation-only.

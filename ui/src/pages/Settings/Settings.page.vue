@@ -213,7 +213,7 @@ const card = "rounded-card border border-line bg-panel";
                   the server and restart dopgate.
                 </template>
                 <template v-else>
-                  No SMTP server is set, so dopgate writes emails to the server
+                  No SMTP server is set, so Dopgate writes emails to the server
                   log. Set the DOPGATE_SMTP_* environment variables to send real
                   email.
                 </template>

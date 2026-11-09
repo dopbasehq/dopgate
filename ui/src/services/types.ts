@@ -1,4 +1,4 @@
-/** Shapes from the dopgate v1 API. Timestamps are RFC 3339 strings. */
+/** Shapes from the Dopgate v1 API. Timestamps are RFC 3339 strings. */
 
 export type Role = "root" | "admin" | "member";
 export type UserStatus = "active" | "disabled";
