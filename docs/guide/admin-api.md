@@ -57,17 +57,18 @@ export async function setPlan(userId, plan) {
 
 The service key acts as an admin. It can:
 
-- list, read, create, update, disable, enable, and delete members,
-- end a member's sessions and send them a password reset code,
+- list, read, create, update, disable, enable, and delete users,
+- end a user's sessions and send them a password reset code,
+- list and read admins,
 - read and change settings, and send an SMTP test to an address you give in `to`,
 - read, change, preview, and reset email templates,
 - list signing keys and read and verify the audit log.
 
 It can't:
 
-- create admins, change roles, or manage admins or root (`403 AUTHORIZATION_DENIED` or `403 ROOT_PROTECTED`),
+- add, change, disable, or remove admins, which only root can do (`403 AUTHORIZATION_DENIED` or `403 ROOT_PROTECTED`),
 - rotate signing keys, which only root can do,
-- call endpoints for a signed-in user, such as `/api/v1/auth/me` (`403 AUTHORIZATION_DENIED`),
+- call endpoints for a signed-in user or admin, such as `/api/v1/auth/me` or `/api/v1/console/me` (`403 AUTHORIZATION_DENIED`),
 - send a template test email, because it has no inbox. Preview the template instead.
 
 Audit records written by the service key have the actor type `service` and the label `service`, so you can tell them apart from changes made in the console.

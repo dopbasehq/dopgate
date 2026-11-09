@@ -5,7 +5,7 @@ description: "How sign-up works, how the 6-digit verification code is sent and c
 
 # Sign-up and email verification
 
-A user signs up with an email and a password. Dopgate creates a member account and emails a 6-digit code that proves they own the address. Three settings decide what happens next. Admins change them on the console's **Settings** page or with `PATCH /api/v1/admin/settings`.
+A user signs up with an email and a password. Dopgate creates the account and emails a 6-digit code that proves they own the address. Three settings decide what happens next. Admins change them on the console's **Settings** page or with `PATCH /api/v1/admin/settings`.
 
 | Setting (`signup.*`) | Default | Effect |
 | --- | --- | --- |

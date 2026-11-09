@@ -28,7 +28,7 @@ Commands:
 `--json` works before or after the command. `init` and `keys rotate` then print one JSON object to standard output on success:
 
 ```json
-{"success":true,"data":{"userId":"usr_01JC8...","email":"admin@example.com","schema":"dopgate"}}
+{"success":true,"data":{"adminId":"adm_01JC8...","email":"admin@example.com","schema":"dopgate"}}
 ```
 
 Errors from any command go to standard error, as JSON with `--json`:

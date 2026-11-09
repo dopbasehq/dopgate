@@ -45,7 +45,7 @@ When your backend needs to do something to an account, such as set a plan in the
 - Email verification, password reset, and email change, all by 6-digit code
 - Profiles with a display name, an avatar URL, and three kinds of JSON metadata
 - Access and refresh tokens, with refresh token rotation and reuse detection, and a list of signed-in devices each user can end
-- Three roles: root, admin, and member
+- Admins who run Dopgate from the console, kept apart from the users who sign in to your app
 - An admin API for users, settings, email templates, signing keys, and the audit log
 - Rate limits per address and per email, and account lockout after wrong passwords
 - Six email templates you can rewrite from the console or the API

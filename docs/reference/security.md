@@ -51,9 +51,11 @@ Every response carries:
 
 API responses also carry `Cache-Control: no-store`. Request bodies are limited to 3 MB and requests to 30 seconds. CORS allows only the origins in `DOPGATE_ALLOWED_ORIGINS` and never allows credentials. The console's refresh cookie is `HttpOnly`, `SameSite=Strict`, limited to `/api/v1/auth`, and `Secure` on an HTTPS public URL.
 
-## Roles
+## Admins and users
 
-Root, admins, members, and the service key have the permissions listed in [Users and roles](/guide/users-and-roles). Root can't be changed through the admin API by anyone, root included, and only root rotates keys or manages admins.
+Admins and your app's users are separate accounts in separate tables, with separate sessions and codes. Root, admins, users, and the service key have the permissions listed in [Admins and users](/guide/admins-and-users). Root can't be changed through the admin API by anyone, root included, and only root rotates keys or manages admins.
+
+Console tokens are signed with HS256 and a 32-byte secret in `console_keys`. The secret never leaves Dopgate and isn't in the JWKS, so a backend that trusts the key set can't accept an admin's token. Rotating the signing keys replaces it too.
 
 ## Audit log
 

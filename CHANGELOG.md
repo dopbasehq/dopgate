@@ -24,11 +24,19 @@ with an admin console and Docker images. Nothing below has shipped before.
 - Email verification and password reset by code. Sign-in requires a verified
   email by default (`signup.requireEmailVerification`).
 - ES256 access tokens with `/.well-known/jwks.json`, key rotation, and
-  single-use refresh tokens that end the session when reused.
+  single-use refresh tokens that end the session when reused. Tokens carry
+  `kind` (`human`) and no role.
 - Sessions: list devices and sign out one or all at `/api/v1/auth/sessions`.
+- Admins are separate from your app's users. Root and admins have `adm_` IDs
+  and their own sessions and codes, and sign in to the console only, at
+  `/api/v1/console`. Their tokens are signed with an internal key that isn't
+  in the JWKS, so no backend can accept them. The same email can belong to an
+  admin and a user. Instances from before the split move root and admins
+  across on upgrade, passwords included.
 - Admin API for users: search, create, update metadata, disable, delete, send
-  reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it;
-  only root manages admins.
+  reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it.
+- Root manages admins at `/api/v1/admin/admins`; admins and the service key
+  can read the list.
 - Six email templates with built-in defaults that admins can edit, preview,
   test, and reset at `/api/v1/admin/email-templates`.
 - Limits: per-address and per-email request limits, code resend waits, and

@@ -5,7 +5,7 @@ description: "The header and claims of a Dopgate access token, and the checks yo
 
 # Token claims
 
-A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
+A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256). Only your app's users get these tokens. Admins sign in to the console and get tokens that only Dopgate can verify; see [Admins and users](/guide/admins-and-users).
 
 ## Header
 
@@ -24,9 +24,9 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
   "exp": 1762700900,
   "iat": 1762700000,
   "sid": "ses_01JC8Z3V7QK2N4R6T8W0Y2A4C7",
+  "kind": "human",
   "email": "ana@example.com",
-  "email_verified": true,
-  "role": "member"
+  "email_verified": true
 }
 ```
 
@@ -37,9 +37,9 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | `exp` | number | Expiry, in Unix seconds. `iat` plus `accessTokenMinutes` (15 by default). |
 | `iat` | number | When the token was issued, in Unix seconds |
 | `sid` | string | The session ID, `ses_` followed by a ULID. It matches the `id` in the session list. |
+| `kind` | string | `human` for a person who signed in |
 | `email` | string | The account's email, lowercased, when the token was issued |
 | `email_verified` | boolean | Whether the email was confirmed when the token was issued |
-| `role` | string | `root`, `admin`, or `member`, when the token was issued |
 
 There is no `aud`, `nbf`, or `jti` claim. Profile fields and metadata are not in the token; read them from `GET /api/v1/auth/me` or the admin API.
 
@@ -52,7 +52,7 @@ There is no `aud`, `nbf`, or `jti` claim. Profile fields and metadata are not in
 | Expiry | `exp` is in the future. A few seconds of leeway for clock skew is fine. |
 | Subject | `sub` is present. Use it as the user ID. |
 
-Inside Dopgate, a token also has to belong to a session that hasn't ended and an account that isn't disabled, and the email, verified flag, and role are read fresh from the database. Your backend can't make those checks offline. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
+Inside Dopgate, a token also has to belong to a session that hasn't ended and an account that isn't disabled, and the email and verified flag are read fresh from the database. Your backend can't make those checks offline. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
 
 ## The key set
 

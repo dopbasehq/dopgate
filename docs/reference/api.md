@@ -14,9 +14,10 @@ Every endpoint lives under `/api/v1`, except the key set at `/.well-known/jwks.j
 | Label | Send |
 | --- | --- |
 | Public | Nothing |
-| User | `Authorization: Bearer <access token>` of a signed-in user. The service key is refused with `403 AUTHORIZATION_DENIED`. |
-| Admin | An access token of root or an admin, or `Authorization: Bearer <DOPGATE_SERVICE_KEY>`. Members get `403 AUTHORIZATION_DENIED`. |
-| Root | An access token of the root account. |
+| User | `Authorization: Bearer <access token>` of a signed-in user of your app. Console tokens and the service key are refused with `403 AUTHORIZATION_DENIED`. |
+| Console | `Authorization: Bearer <console token>` of a signed-in admin, from `/api/v1/console`. User tokens and the service key are refused with `403 AUTHORIZATION_DENIED`. |
+| Admin | A console token of root or an admin, or `Authorization: Bearer <DOPGATE_SERVICE_KEY>`. User tokens get `403 AUTHORIZATION_DENIED`. |
+| Root | A console token of the root account. |
 
 A missing header answers `401 AUTHENTICATION_REQUIRED`. A bad header or an unknown token answers `401 AUTHENTICATION_INVALID` or `401 TOKEN_INVALID`. An access token of a disabled account answers `403 ACCOUNT_DISABLED`. These apply to every authenticated endpoint and aren't repeated below.
 
@@ -45,7 +46,6 @@ A user, as `/auth/*` endpoints return it:
 | `emailVerified` | boolean | |
 | `displayName` | string or null | |
 | `avatarUrl` | string or null | |
-| `role` | string | `root`, `admin`, or `member` |
 | `status` | string | `active` or `disabled` |
 | `userMetadata` | object | Written by the user |
 | `publicMetadata` | object | Written by admins and the service key |
@@ -53,7 +53,21 @@ A user, as `/auth/*` endpoints return it:
 | `lastSignInAt` | string or null | RFC 3339 time |
 | `createdAt`, `updatedAt` | string | RFC 3339 time |
 
-An admin user is the same object plus `privateMetadata` (object) and `lockedUntil` (time, set while the account is locked).
+The admin API returns the same object plus `privateMetadata` (object) and `lockedUntil` (time, set while the account is locked).
+
+An admin, as `/console/*` and `/admin/admins` return it:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | `adm_` prefix |
+| `email` | string | Lowercased |
+| `displayName`, `avatarUrl` | string or null | |
+| `role` | string | `root` or `admin` |
+| `status` | string | `active` or `disabled` |
+| `hasPassword` | boolean | False for admins who sign in with codes only |
+| `lockedUntil` | string or null | Set while the account is locked |
+| `lastSignInAt` | string or null | RFC 3339 time |
+| `createdAt`, `updatedAt` | string | RFC 3339 time |
 
 Tokens, as every sign-in returns them:
 
@@ -62,8 +76,10 @@ Tokens, as every sign-in returns them:
 | `accessToken` | string | ES256 JWT |
 | `tokenType` | string | Always `Bearer` |
 | `expiresIn` | number | Seconds until the access token expires |
-| `refreshToken` | string or null | `dgr_` prefix. `null` in [cookie mode](/guide/sign-in#cookie-sessions-for-the-console). |
+| `refreshToken` | string or null | `dgr_` prefix. `null` in [cookie mode](/guide/sign-in#cookie-sessions). |
 | `user` | user | The signed-in user |
+
+Console sign-ins return the same fields with `admin` in place of `user`. Their `accessToken` is signed with HS256 and a secret that isn't in the JWKS.
 
 A session:
 
@@ -105,7 +121,7 @@ Public. Creates root with the setup token printed at startup. Works once.
 | `email` | yes | |
 | `password` | yes | At least 8 characters |
 
-Answers `201 ROOT_CREATED` with `userId` and `email`. Errors: `401 SETUP_TOKEN_INVALID`, `409 ALREADY_INITIALIZED`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, and `429 RATE_LIMITED` after 5 wrong tokens from one address in 15 minutes.
+Answers `201 ROOT_CREATED` with `adminId` and `email`. Errors: `401 SETUP_TOKEN_INVALID`, `409 ALREADY_INITIALIZED`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, and `429 RATE_LIMITED` after 5 wrong tokens from one address in 15 minutes.
 
 ## Auth
 
@@ -123,7 +139,7 @@ Public. What your sign-in screen should offer.
 
 ### `POST /api/v1/auth/signup`
 
-Public. Creates a member account and emails a `verify_email` code.
+Public. Creates a user and emails a `verify_email` code.
 
 | Request field | Required | Notes |
 | --- | --- | --- |
@@ -135,9 +151,9 @@ Answers `201 SIGNED_UP` with `user`, `verificationRequired`, `verificationSent`,
 
 ### `POST /api/v1/auth/login`
 
-Public. Signs in with `email` and `password`. Answers `200 SIGNED_IN` with tokens. Errors: `401 AUTHENTICATION_INVALID` (wrong email or password, or a locked account), `403 ACCOUNT_DISABLED`, `403 EMAIL_NOT_VERIFIED`, `429 RATE_LIMITED`.
+Public. Signs a user in with `email` and `password`. Answers `200 SIGNED_IN` with tokens. Errors: `401 AUTHENTICATION_INVALID` (wrong email or password, a locked account, or an admin's credentials), `403 ACCOUNT_DISABLED`, `403 EMAIL_NOT_VERIFIED`, `429 RATE_LIMITED`.
 
-Send `X-Dopgate-Session: cookie` to get the refresh token in the `dopgate_refresh` cookie instead of the body. The console does this; apps shouldn't need to.
+Send `X-Dopgate-Session: cookie` to get the refresh token in the `dopgate_refresh` cookie instead of the body. Apps on another origin shouldn't need to.
 
 ### `POST /api/v1/auth/refresh`
 
@@ -259,6 +275,39 @@ User. Ends one session of the signed-in user. Answers `200 SESSION_REVOKED`, or 
 
 User. Ends every session of the signed-in user. With `?keepCurrent=true`, the session making the request stays. Answers `200 SESSIONS_REVOKED`.
 
+## Console
+
+The console's own sign-in and the signed-in admin's account. These mirror the account endpoints under `/auth`, but only find admins, keep their own sessions and codes, and set the `dopgate_console` cookie (path `/api/v1/console`) in cookie mode. A user's credentials get the same answers as a wrong password.
+
+| Endpoint | Auth | What it does |
+| --- | --- | --- |
+| `POST /api/v1/console/login` | Public | `email` and `password`. Answers `200 SIGNED_IN` with console tokens. Same errors as `/auth/login`, without `EMAIL_NOT_VERIFIED`. |
+| `POST /api/v1/console/refresh` | Public | `refreshToken`, or the `dopgate_console` cookie. Answers `200 TOKENS_REFRESHED`. |
+| `POST /api/v1/console/logout` | Public, or Console | `refreshToken` and `allSessions`, as on `/auth/logout`. |
+| `POST /api/v1/console/codes/send` | Public | `email`. Emails a `login_code` to the admin. The answer is the same for unknown emails. |
+| `POST /api/v1/console/codes/confirm` | Public | `email`, `purpose` (`login` or `email_change`), and `code`. Tokens for `login`, the admin for `email_change`. |
+| `POST /api/v1/console/password/forgot` | Public | `email`. Emails a reset code to the admin. |
+| `POST /api/v1/console/password/reset` | Public | `email`, `code`, `newPassword`. Ends every console session of the admin. |
+| `POST /api/v1/console/password/change` | Console | `currentPassword` and `newPassword`. Ends the admin's other sessions. |
+| `GET`, `PATCH /api/v1/console/me` | Console | The signed-in admin. `PATCH` takes `displayName` and `avatarUrl`. |
+| `POST /api/v1/console/email/change` | Console | `newEmail` and `password`. Confirm with `/console/codes/confirm`. |
+| `GET`, `DELETE /api/v1/console/sessions` | Console | List the admin's sessions, or end them all (`keepCurrent=true` keeps this one). |
+| `DELETE /api/v1/console/sessions/{id}` | Console | End one session. |
+
+## Admins
+
+`GET` endpoints need Admin; the rest need Root. `{id}` is an admin ID with the `adm_` prefix. Root itself answers `403 ROOT_PROTECTED` to every change.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /api/v1/admin/admins` | Every admin, root first, as `{ "items": [...] }`. Answers `200 ADMINS_FETCHED`. |
+| `POST /api/v1/admin/admins` | `email`, `password` (optional), `displayName`. Answers `201 ADMIN_CREATED`. Errors: `409 EMAIL_TAKEN` when another admin uses the email, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`. |
+| `GET /api/v1/admin/admins/{id}` | One admin, with `200 ADMIN_FETCHED`. |
+| `PATCH /api/v1/admin/admins/{id}` | `displayName` and `avatarUrl`. Answers `200 ADMIN_UPDATED`. |
+| `POST /api/v1/admin/admins/{id}/disable` | Refuses sign-in and ends every console session. Answers `200 ADMIN_DISABLED`. |
+| `POST /api/v1/admin/admins/{id}/enable` | Answers `200 ADMIN_ENABLED`. |
+| `DELETE /api/v1/admin/admins/{id}` | Removes the admin. Answers `204` with no body. |
+
 ## Keys
 
 ### `GET /.well-known/jwks.json`
@@ -271,42 +320,40 @@ Admin. Every signing key, with `id`, `algorithm` (`ES256`), `status` (`active`, 
 
 ### `POST /api/v1/admin/keys/rotate`
 
-Root. Makes a new active key and moves the old one to `retiring`. Answers `200 SIGNING_KEY_ROTATED` with the new key.
+Root. Makes a new active key and moves the old one to `retiring`. The console secret is replaced at the same time, so the console refreshes its token. Answers `200 SIGNING_KEY_ROTATED` with the new key.
 
 ## Users
 
-All user endpoints need Admin. `{id}` is a user ID with the `usr_` prefix; an unknown ID answers `404 NOT_FOUND`. Endpoints that change an account follow the rules in [Users and roles](/guide/users-and-roles#who-can-manage-whom): `403 ROOT_PROTECTED` for root, `403 AUTHORIZATION_DENIED` when an admin or the service key acts on an admin.
+All user endpoints need Admin. `{id}` is a user ID with the `usr_` prefix; an unknown ID answers `404 NOT_FOUND`. Admins are managed under [Admins](#admins), never here.
 
 ### `GET /api/v1/admin/users`
 
-Lists admin users, newest first, with `200 USERS_FETCHED`.
+Lists users, newest first, with `200 USERS_FETCHED`.
 
 | Query | Notes |
 | --- | --- |
 | `search` | Matches the email or display name |
-| `role` | `root`, `admin`, or `member` |
 | `status` | `active` or `disabled` |
 | `cursor`, `limit` | See [Pagination](#pagination) |
 
 ### `POST /api/v1/admin/users`
 
-Creates an account without sending email. Answers `201 USER_CREATED` with the admin user.
+Creates a user without sending email. Answers `201 USER_CREATED` with the user.
 
 | Request field | Required | Notes |
 | --- | --- | --- |
 | `email` | yes | |
 | `password` | no | Leave out for an account that signs in with codes |
-| `role` | no | `admin` or `member`, default `member`. Only root creates admins. |
 | `displayName` | no | |
 | `emailVerified` | no | Default `false` |
 | `publicMetadata` | no | JSON object up to 16 KB |
 | `privateMetadata` | no | JSON object up to 16 KB |
 
-Errors: `403 AUTHORIZATION_DENIED`, `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
+Errors: `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
 
 ### `GET /api/v1/admin/users/{id}`
 
-Returns one admin user with `200 USER_FETCHED`.
+Returns one user with `200 USER_FETCHED`.
 
 ### `PATCH /api/v1/admin/users/{id}`
 
@@ -316,10 +363,9 @@ Updates an account. Fields you leave out stay as they are. Answers `200 USER_UPD
 | --- | --- |
 | `displayName`, `avatarUrl` | Empty string clears |
 | `emailVerified` | `true` or `false` |
-| `role` | `admin` or `member`. Root only. |
 | `publicMetadata`, `privateMetadata` | Replace the whole object |
 
-Errors: `403 ROOT_PROTECTED`, `403 AUTHORIZATION_DENIED`, `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
+Errors: `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
 
 ### `DELETE /api/v1/admin/users/{id}`
 

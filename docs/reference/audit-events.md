@@ -12,7 +12,7 @@ Dopgate records sign-ins, account changes, and admin actions in the `audit_event
 ```json
 {
   "id": "aud_01JC8Z3V7QK2N4R6T8W0Y2A4C6",
-  "actorType": "member",
+  "actorType": "user",
   "actorId": "usr_01JC8Z3V7QK2N4R6T8W0Y2A4C7",
   "actorLabel": "ana@example.com",
   "action": "user.signed_in",
@@ -29,9 +29,9 @@ Dopgate records sign-ins, account changes, and admin actions in the `audit_event
 
 | Field | Meaning |
 | --- | --- |
-| `actorType` | `root`, `admin`, or `member` for a user; `service` for the service key; `anonymous`; or `system` for setup, retention, and the CLI |
-| `actorId`, `actorLabel` | The user ID and email, `service` for the service key, or a label such as `setup`, `cli`, `retention`, or `refresh` |
-| `resourceType`, `resourceId` | What the action touched: `user`, `session`, `settings`, `email_template`, `signing_key`, or `audit` |
+| `actorType` | `root` or `admin` for an admin; `user` for a user of your app; `service` for the service key; `anonymous`; or `system` for setup, retention, and the CLI |
+| `actorId`, `actorLabel` | The admin or user ID and email, `service` for the service key, or a label such as `setup`, `cli`, `retention`, or `refresh` |
+| `resourceType`, `resourceId` | What the action touched: `admin`, `user`, `session`, `settings`, `email_template`, `signing_key`, or `audit` |
 | `ipAddress` | The client address, through any [trusted proxies](/self-hosting/configuration#behind-a-reverse-proxy). Absent outside a request. |
 | `metadata` | Extra details per action, listed below. Never holds passwords, codes, or tokens. |
 | `seq`, `prevHash`, `recordHash` | The record's place in the hash chain |
@@ -52,27 +52,34 @@ Dopgate records sign-ins, account changes, and admin actions in the `audit_event
 | `user.password_reset` | The user | `sessionsEnded` |
 | `user.email_changed` | The user | `from`, `to` |
 
+Admins signing in to the console leave the same events with an `admin.` prefix, such as `admin.signed_in`, `admin.sign_in_failed`, `admin.signed_out`, `admin.password_changed`, `admin.password_reset`, `admin.email_changed`, and `admin.profile_updated`. The actor type is the admin's role.
+
 A failed sign-in for an email with no account isn't recorded, because there is no account to attach it to.
 
 ### Sessions
 
 | Action | Actor | Metadata |
 | --- | --- | --- |
-| `session.revoked` | The user, ending one of their sessions | none; the session is the resource |
-| `session.revoked_all` | The user, signing out everywhere | `sessions`, `keptCurrent` |
-| `session.refresh_reused` | `anonymous`, label `refresh` | `userId`; the session is the resource. A spent refresh token came back and the session was ended. |
+| `session.revoked` | The user or admin, ending one of their sessions | none; the session is the resource |
+| `session.revoked_all` | The user or admin, signing out everywhere | `sessions`, `keptCurrent` |
+| `session.refresh_reused` | `anonymous`, label `refresh` | `accountId`; the session is the resource. A spent refresh token came back and the session was ended. |
 
 ### Admin actions
 
 | Action | Actor | Metadata |
 | --- | --- | --- |
-| `user.created` | Admin, root, or service | `email`, `role` |
-| `user.updated` | Admin, root, or service | `fields` that changed, `role` |
-| `user.deleted` | Admin, root, or service | `email`, `role` |
+| `user.created` | Admin, root, or service | `email` |
+| `user.updated` | Admin, root, or service | `fields` that changed |
+| `user.deleted` | Admin, root, or service | `email` |
 | `user.disabled` | Admin, root, or service | `sessionsEnded` |
 | `user.enabled` | Admin, root, or service | `sessionsEnded` (always 0) |
 | `user.sessions_revoked` | Admin, root, or service | `sessionsEnded` |
 | `user.password_reset_sent` | Admin, root, or service | none |
+| `admin.created` | Root | `email` |
+| `admin.updated` | Root | `fields` that changed |
+| `admin.disabled` | Root | `sessionsEnded` |
+| `admin.enabled` | Root | `sessionsEnded` (always 0) |
+| `admin.deleted` | Root | `email` |
 | `settings.updated` | Admin, root, or service | `sections` that changed, such as `["signup", "limits"]` |
 | `email_template.updated` | Admin, root, or service | none; the template name is the resource |
 | `email_template.reset` | Admin, root, or service | none; only recorded when an override existed |
@@ -92,7 +99,7 @@ curl "https://auth.example.com/api/v1/admin/audit-events?action=user.signed_in&l
   -H "authorization: Bearer $TOKEN"
 ```
 
-Records come newest first, 50 per page by default and at most 200. Filter with `action` (an exact action name) and `actor` (a user ID or an actor label such as an email or `service`). Pass `nextCursor` back as `cursor` for the next page.
+Records come newest first, 50 per page by default and at most 200. Filter with `action` (an exact action name) and `actor` (an admin or user ID, or an actor label such as an email or `service`). Pass `nextCursor` back as `cursor` for the next page.
 
 ## Retention
 
