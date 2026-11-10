@@ -14,6 +14,7 @@ use utoipa::OpenApi;
     PasswordSettings,
     TokenSettings,
     LimitSettings,
+    SelfServiceSettings,
     SmtpSettings,
     SmtpSecurity,
     SmtpSource,

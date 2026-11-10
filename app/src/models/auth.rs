@@ -13,11 +13,11 @@ pub enum AuthIdentity {
     role: Role,
     session_id: String,
   },
-  /// A user of your app, signed in with a session.
+  /// A user of your app, signed in with a session or a personal token.
   User {
     user_id: String,
     email: String,
-    session_id: String,
+    via: UserVia,
   },
   /// The main app's backend holding `DOPGATE_SERVICE_KEY`. It acts like an
   /// admin, never like root or a particular account.
@@ -75,6 +75,15 @@ impl AuthIdentity {
   }
 }
 
+/// How a user's access token was obtained.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UserVia {
+  /// A password or code sign-in, with this session ID.
+  Session(String),
+  /// A personal token, with this token ID.
+  PersonalToken(String),
+}
+
 /// What kind of account an app access token belongs to.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -93,10 +102,18 @@ pub struct AccessClaims {
   pub sub: String,
   pub exp: i64,
   pub iat: i64,
-  /// The session ID. Ending the session stops it refreshing.
-  pub sid: String,
+  /// The session ID, for a password or code sign-in. Ending the session
+  /// stops it refreshing.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub sid: Option<String>,
   /// `human` for a person.
   pub kind: TokenKind,
+  /// `pat` when the token came from a personal token.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub via: Option<String>,
+  /// The personal token's ID, when `via` is `pat`.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub tid: Option<String>,
   pub email: String,
   pub email_verified: bool,
 }

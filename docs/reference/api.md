@@ -214,6 +214,28 @@ User. Emails an `email_change` code to the new address. Confirm it with `/auth/v
 
 Answers `200 EMAIL_CHANGE_CODE_SENT`. Errors: `401 AUTHENTICATION_INVALID`, `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `429 RATE_LIMITED`.
 
+### `POST /api/v1/auth/token`
+
+Public. Trades a personal token for an access token that signs in as its user. See [Personal tokens](/guide/personal-tokens).
+
+| Request field | Required | Notes |
+| --- | --- | --- |
+| `token` | yes | `dgp_` and 43 characters |
+
+Answers `200 TOKEN_TRADED` with `accessToken`, `tokenType`, and `expiresIn`, and no refresh token. Errors: `401 TOKEN_INVALID`, `401 TOKEN_EXPIRED`, `403 ACCOUNT_DISABLED`, `429 RATE_LIMITED`.
+
+## Personal tokens
+
+Every `/auth/personal-tokens` endpoint needs User from a password or code sign-in; an access token traded from a personal token gets `403 AUTHORIZATION_DENIED`.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /api/v1/auth/personal-tokens` | The user's tokens, newest first, as `{ "items": [...] }`, with `id`, `name`, `lastFour`, `expiresAt`, `expired`, `lastUsedAt`, `createdAt`. Answers `200 PERSONAL_TOKENS_FETCHED`. |
+| `POST /api/v1/auth/personal-tokens` | `name` (1 to 64 characters, unique per user) and `expiresAt` (optional, up to 3 years ahead). Answers `201 PERSONAL_TOKEN_CREATED` with `token`, shown once, and `personalToken`. Errors: `403 FEATURE_DISABLED`, `409 TOKEN_NAME_TAKEN`, `409 LIMIT_REACHED`, `422 REQUEST_INVALID`. |
+| `DELETE /api/v1/auth/personal-tokens/{id}` | Deletes the token. Answers `200 PERSONAL_TOKEN_DELETED`, or `404 NOT_FOUND`. |
+| `GET /api/v1/admin/users/{id}/personal-tokens` | Admin. A user's tokens, without the tokens themselves. |
+| `DELETE /api/v1/admin/users/{id}/personal-tokens/{tokenId}` | Console only, not the service key. Revokes the token. |
+
 ## Codes
 
 ### `POST /api/v1/auth/verification/send`
@@ -403,12 +425,13 @@ Admin. Answers `200 SETTINGS_FETCHED` with every section.
 | `password` | `minLength` (`8`, allowed 8 to 128) |
 | `tokens` | `accessTokenMinutes` (`15`, 1 to 1440), `refreshTokenIdleDays` (`30`, 1 to 3650), `sessionAbsoluteDays` (`90`, 1 to 3650, not less than the idle limit) |
 | `limits` | `codeMinutes` (`10`), `codeMaxAttempts` (`5`), `codeResendSeconds` (`60`), `codesPerHour` (`5`), `lockoutAttempts` (`5`), `lockoutMinutes` (`15`), `ipRequestsPerMinute` (`20`). Ranges in [Rate limits](/guide/rate-limits). |
+| `selfService` | `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [Personal tokens](/guide/personal-tokens). |
 | `branding` | `appName` (`dopgate`, one line up to 255 characters), `logoUrl` (`null`, an `http(s)` URL) |
 | `smtp` | `host` (`null`), `port` (`587`, `465`, or `25` by security), `security` (`starttls`), `username`, `passwordSet`, `fromEmail` (`no-reply@dopgate.com`), `fromName`, `source` (`server_config`, `database`, or `log`), `canStorePassword`. See [Email (SMTP)](/self-hosting/smtp#where-the-settings-come-from). |
 
 ### `PATCH /api/v1/admin/settings`
 
-Admin. Send any of `signup`, `password`, `tokens`, `limits`, `branding`, and `smtp`. Each section you send replaces the stored one whole; fields missing from a section you send take their defaults. Answers `200 SETTINGS_UPDATED` with every section. `smtp` keeps the saved password when `password` is left out, and removes it for `""`. Errors: `422 SETTINGS_INVALID` for a value out of range, for `smtp` while `DOPGATE_SMTP_HOST` is set, or for an SMTP password without `DOPGATE_SERVICE_KEY`.
+Admin. Send any of `signup`, `password`, `tokens`, `limits`, `selfService`, `branding`, and `smtp`. Each section you send replaces the stored one whole; fields missing from a section you send take their defaults. Answers `200 SETTINGS_UPDATED` with every section. `smtp` keeps the saved password when `password` is left out, and removes it for `""`. Errors: `422 SETTINGS_INVALID` for a value out of range, for `smtp` while `DOPGATE_SMTP_HOST` is set, or for an SMTP password without `DOPGATE_SERVICE_KEY`.
 
 ```json
 { "signup": { "enabled": true, "requireEmailVerification": true, "passwordlessSignup": true } }

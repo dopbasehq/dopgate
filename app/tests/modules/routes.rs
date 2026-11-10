@@ -104,6 +104,12 @@ fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
       Some(json!({"email": "admin@example.com", "code": "123456", "newPassword": "correct-horse"})),
       400,
     ),
+    (
+      "POST",
+      "/api/v1/auth/token",
+      Some(json!({"token": "dgp_x"})),
+      401,
+    ),
     // Planned features.
     (
       "POST",

@@ -13,7 +13,6 @@ use crate::{
     },
     tokens::USER_ID_PREFIX,
   },
-  extractors::UserIdentity,
   http::HttpError,
   models::{AccessClaims, Realm, TokenKind, User},
   modules::{
@@ -175,8 +174,10 @@ pub async fn app_tokens(
     sub: user.id.clone(),
     exp: now.timestamp() + expires_in,
     iat: now.timestamp(),
-    sid: grant.session_id,
+    sid: Some(grant.session_id),
     kind: TokenKind::Human,
+    via: None,
+    tid: None,
     email: user.email.clone(),
     email_verified: user.is_verified(),
   };
@@ -339,14 +340,14 @@ async fn current(
 
 pub async fn me(
   state: &AppState,
-  user: &UserIdentity,
+  user_id: &str,
 ) -> Result<User, HttpError> {
-  Ok(current(state, &user.user_id).await?.to_user())
+  Ok(current(state, user_id).await?.to_user())
 }
 
 pub async fn update_me(
   state: &AppState,
-  user: &UserIdentity,
+  user_id: &str,
   request: UpdateProfileRequest,
 ) -> Result<User, HttpError> {
   let changes = ProfileChanges {
@@ -359,7 +360,7 @@ pub async fn update_me(
     ..ProfileChanges::default()
   };
   let mut tx = state.db.pool().begin().await?;
-  let updated = users::update_profile(&mut *tx, &user.user_id, &changes).await?;
+  let updated = users::update_profile(&mut *tx, user_id, &changes).await?;
   audit::service::record(
     &mut tx,
     audit::service::Event::user(&updated.id, &updated.email, "user.profile_updated"),

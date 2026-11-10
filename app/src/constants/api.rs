@@ -34,6 +34,15 @@ pub mod auth {
   pub const ME: &str = api_path!("/auth/me");
   pub const PASSWORD_CHANGE: &str = api_path!("/auth/password/change");
   pub const EMAIL_CHANGE: &str = api_path!("/auth/email/change");
+  /// Trade a personal token for an access token.
+  pub const TOKEN: &str = api_path!("/auth/token");
+}
+
+pub mod personal_tokens {
+  pub const COLLECTION: &str = api_path!("/auth/personal-tokens");
+  pub const ITEM: &str = api_path!("/auth/personal-tokens/{id}");
+  pub const ADMIN_COLLECTION: &str = api_path!("/admin/users/{id}/personal-tokens");
+  pub const ADMIN_ITEM: &str = api_path!("/admin/users/{id}/personal-tokens/{token_id}");
 }
 
 /// Console sign-in and the signed-in admin's account. Only the console

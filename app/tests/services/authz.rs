@@ -1,5 +1,5 @@
 use app::{
-  models::{AuthIdentity, Role},
+  models::{AuthIdentity, Role, UserVia},
   services::authz::{require_admin, require_root},
 };
 
@@ -16,7 +16,7 @@ fn user() -> AuthIdentity {
   AuthIdentity::User {
     user_id: "usr_1".into(),
     email: "person@example.com".into(),
-    session_id: "ses_2".into(),
+    via: UserVia::Session("ses_2".into()),
   }
 }
 

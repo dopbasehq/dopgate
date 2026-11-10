@@ -78,6 +78,10 @@ async fn a_new_instance_has_defaults_and_logs_mail() {
       "lockoutAttempts": 5, "lockoutMinutes": 15, "ipRequestsPerMinute": 20,
     })
   );
+  assert_eq!(
+    settings["selfService"],
+    json!({ "personalTokens": false, "maxPersonalTokensPerUser": 10 })
+  );
   assert_eq!(settings["branding"]["appName"], "Dopgate");
 }
 
@@ -264,6 +268,8 @@ async fn bad_values_are_refused() {
     json!({ "tokens": { "accessTokenMinutes": 0, "refreshTokenIdleDays": 30, "sessionAbsoluteDays": 90 } }),
     json!({ "tokens": { "accessTokenMinutes": 15, "refreshTokenIdleDays": 100, "sessionAbsoluteDays": 90 } }),
     json!({ "limits": { "codeMinutes": 0 } }),
+    json!({ "selfService": { "personalTokens": true, "maxPersonalTokensPerUser": 0 } }),
+    json!({ "selfService": { "maxPersonalTokensPerUser": 1001 } }),
     json!({ "branding": { "appName": "" } }),
     json!({ "branding": { "appName": "x", "logoUrl": "javascript:alert(1)" } }),
     json!({ "smtp": { "host": "https://smtp.example.com" } }),
@@ -281,7 +287,7 @@ async fn bad_values_are_refused() {
 }
 
 #[tokio::test]
-async fn members_cannot_read_settings_but_the_service_key_can() {
+async fn users_cannot_read_settings_but_the_service_key_can() {
   let key = "k".repeat(40);
   let service_key = key.clone();
   let app = TestApp::with(move |config| {

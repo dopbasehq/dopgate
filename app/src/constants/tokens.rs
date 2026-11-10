@@ -1,6 +1,9 @@
 pub const ADMIN_ID_PREFIX: &str = "adm_";
 pub const AUDIT_EVENT_ID_PREFIX: &str = "aud_";
 pub const CONSOLE_KEY_ID_PREFIX: &str = "ckey_";
+pub const PERSONAL_TOKEN_ID_PREFIX: &str = "pat_";
+/// What a personal token starts with.
+pub const PERSONAL_TOKEN_PREFIX: &str = "dgp_";
 pub const REFRESH_TOKEN_ID_PREFIX: &str = "rft_";
 pub const REFRESH_TOKEN_PREFIX: &str = "dgr_";
 pub const SESSION_ID_PREFIX: &str = "ses_";

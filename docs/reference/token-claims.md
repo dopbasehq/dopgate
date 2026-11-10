@@ -36,8 +36,10 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | `sub` | string | The user ID, `usr_` followed by a ULID. It never changes for the life of the account. |
 | `exp` | number | Expiry, in Unix seconds. `iat` plus `accessTokenMinutes` (15 by default). |
 | `iat` | number | When the token was issued, in Unix seconds |
-| `sid` | string | The session ID, `ses_` followed by a ULID. It matches the `id` in the session list. |
+| `sid` | string | The session ID, `ses_` followed by a ULID. It matches the `id` in the session list. Absent on a token from a personal token. |
 | `kind` | string | `human` for a person who signed in |
+| `via` | string | `pat` when the token came from a [personal token](/guide/personal-tokens). Absent after a password or code sign-in. |
+| `tid` | string | The personal token's ID, `pat_` followed by a ULID, when `via` is `pat` |
 | `email` | string | The account's email, lowercased, when the token was issued |
 | `email_verified` | boolean | Whether the email was confirmed when the token was issued |
 
@@ -52,7 +54,7 @@ There is no `aud`, `nbf`, or `jti` claim. Profile fields and metadata are not in
 | Expiry | `exp` is in the future. A few seconds of leeway for clock skew is fine. |
 | Subject | `sub` is present. Use it as the user ID. |
 
-Inside Dopgate, a token also has to belong to a session that hasn't ended and an account that isn't disabled, and the email and verified flag are read fresh from the database. Your backend can't make those checks offline. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
+Inside Dopgate, a token also has to belong to a session that hasn't ended (or a personal token that still exists and hasn't expired) and an account that isn't disabled, and the email and verified flag are read fresh from the database. Your backend can't make those checks offline. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
 
 ## The key set
 

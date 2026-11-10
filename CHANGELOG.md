@@ -39,6 +39,11 @@ with an admin console and Docker images. Nothing below has shipped before.
   reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it.
 - Root manages admins at `/api/v1/admin/admins`; admins and the service key
   can read the list.
+- Personal tokens (`dgp_`) let a user sign in as themselves from a script.
+  Users make them at `/api/v1/auth/personal-tokens` once an admin turns on
+  `selfService.personalTokens`, and trade them at `POST /api/v1/auth/token`
+  for an access token with `via: "pat"`. Tokens can expire, are capped per
+  user, and admins can list and revoke them without seeing them.
 - Six email templates with built-in defaults that admins can edit, preview,
   test, and reset at `/api/v1/admin/email-templates`.
 - Limits: per-address and per-email request limits, code resend waits, and

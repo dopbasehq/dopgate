@@ -13,10 +13,12 @@ pub mod email_templates;
 pub mod health;
 pub mod keys;
 pub mod mfa;
+pub mod personal_tokens;
 pub mod recovery;
 pub mod sessions;
 pub mod settings;
 pub mod sso;
+pub mod tokens;
 pub mod users;
 pub mod verification;
 
@@ -26,6 +28,8 @@ pub fn routes() -> Router<AppState> {
     .merge(bootstrap::routes())
     .merge(auth::routes())
     .merge(console::routes())
+    .merge(tokens::routes())
+    .merge(personal_tokens::routes())
     .merge(recovery::routes())
     .merge(verification::routes())
     .merge(sessions::routes())
@@ -46,6 +50,8 @@ pub fn openapi() -> OpenApi {
   doc.merge(bootstrap::doc::build());
   doc.merge(auth::doc::build());
   doc.merge(console::doc::build());
+  doc.merge(tokens::doc::build());
+  doc.merge(personal_tokens::doc::build());
   doc.merge(recovery::doc::build());
   doc.merge(verification::doc::build());
   doc.merge(sessions::doc::build());
