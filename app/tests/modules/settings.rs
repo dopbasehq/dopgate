@@ -80,7 +80,10 @@ async fn a_new_instance_has_defaults_and_logs_mail() {
   );
   assert_eq!(
     settings["selfService"],
-    json!({ "personalTokens": false, "maxPersonalTokensPerUser": 10 })
+    json!({
+      "agents": false, "maxAgentsPerUser": 10,
+      "personalTokens": false, "maxPersonalTokensPerUser": 10,
+    })
   );
   assert_eq!(settings["branding"]["appName"], "Dopgate");
 }
@@ -270,6 +273,7 @@ async fn bad_values_are_refused() {
     json!({ "limits": { "codeMinutes": 0 } }),
     json!({ "selfService": { "personalTokens": true, "maxPersonalTokensPerUser": 0 } }),
     json!({ "selfService": { "maxPersonalTokensPerUser": 1001 } }),
+    json!({ "selfService": { "agents": true, "maxAgentsPerUser": 0 } }),
     json!({ "branding": { "appName": "" } }),
     json!({ "branding": { "appName": "x", "logoUrl": "javascript:alert(1)" } }),
     json!({ "smtp": { "host": "https://smtp.example.com" } }),

@@ -178,8 +178,10 @@ pub async fn app_tokens(
     kind: TokenKind::Human,
     via: None,
     tid: None,
-    email: user.email.clone(),
-    email_verified: user.is_verified(),
+    email: Some(user.email.clone()),
+    email_verified: Some(user.is_verified()),
+    owner: None,
+    capabilities: None,
   };
   Ok(AuthTokens {
     access_token: jwt::sign(state, &claims).await?,

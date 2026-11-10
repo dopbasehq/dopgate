@@ -25,7 +25,7 @@ with an admin console and Docker images. Nothing below has shipped before.
   email by default (`signup.requireEmailVerification`).
 - ES256 access tokens with `/.well-known/jwks.json`, key rotation, and
   single-use refresh tokens that end the session when reused. Tokens carry
-  `kind` (`human`) and no role.
+  `kind` (`human` or `agent`) and no role.
 - Sessions: list devices and sign out one or all at `/api/v1/auth/sessions`.
 - Admins are separate from your app's users. Root and admins have `adm_` IDs
   and their own sessions and codes, and sign in to the console only, at
@@ -44,6 +44,13 @@ with an admin console and Docker images. Nothing below has shipped before.
   `selfService.personalTokens`, and trade them at `POST /api/v1/auth/token`
   for an access token with `via: "pat"`. Tokens can expire, are capped per
   user, and admins can list and revoke them without seeing them.
+- Agents (`agt_`) are accounts for bots and AI agents. Each belongs to an
+  admin or a user, signs in only by trading its one `dga_` token at
+  `/api/v1/auth/token`, and carries flat key-value capabilities that land in
+  its access token next to `kind: "agent"` and `owner`. Admins make agents in
+  the console; users make their own at `/api/v1/auth/agents` once
+  `selfService.agents` is on. Disabling or deleting an owner stops or
+  removes their agents.
 - Six email templates with built-in defaults that admins can edit, preview,
   test, and reset at `/api/v1/admin/email-templates`.
 - Limits: per-address and per-email request limits, code resend waits, and

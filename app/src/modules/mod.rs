@@ -5,6 +5,7 @@ use crate::state::AppState;
 
 pub mod accounts;
 pub mod admins;
+pub mod agents;
 pub mod audit;
 pub mod auth;
 pub mod bootstrap;
@@ -30,6 +31,7 @@ pub fn routes() -> Router<AppState> {
     .merge(console::routes())
     .merge(tokens::routes())
     .merge(personal_tokens::routes())
+    .merge(agents::routes())
     .merge(recovery::routes())
     .merge(verification::routes())
     .merge(sessions::routes())
@@ -52,6 +54,7 @@ pub fn openapi() -> OpenApi {
   doc.merge(console::doc::build());
   doc.merge(tokens::doc::build());
   doc.merge(personal_tokens::doc::build());
+  doc.merge(agents::doc::build());
   doc.merge(recovery::doc::build());
   doc.merge(verification::doc::build());
   doc.merge(sessions::doc::build());

@@ -5,12 +5,13 @@ description: "The two kinds of account in Dopgate: admins who run it from the co
 
 # Admins and users
 
-Dopgate keeps two kinds of account, and they never mix.
+Dopgate keeps two kinds of person, and they never mix. Each of them can also own [agents](/guide/agents), accounts for bots that sign in with a token.
 
 | Kind | ID | Who it is for | Signs in at |
 | --- | --- | --- | --- |
 | Admin | `adm_` | People who run Dopgate: root and the admins root adds | The console, through `/api/v1/console` |
 | User | `usr_` | The people who sign in to your app | Your app, through `/api/v1/auth` |
+| Agent | `agt_` | Bots and AI agents, each owned by an admin or a user | Your app, by trading its token at `/api/v1/auth/token` |
 
 Each kind lives in its own table, with its own sessions and emailed codes. An admin can't sign in to your app, and a user can't sign in to the console: credentials sent to the wrong side get the same `401` as a wrong password. The same email may belong to an admin and to a user. They are two separate accounts, with separate passwords.
 

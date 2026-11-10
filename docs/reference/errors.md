@@ -25,18 +25,21 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | Code | Status | When |
 | --- | --- | --- |
 | `ACCOUNT_DISABLED` | 403 | The account is disabled: at sign-in after the right password, at refresh, at code confirmation, at password reset, or when its access token is used on Dopgate. |
+| `AGENT_DISABLED` | 403 | An agent token was traded while the agent, or its owner, is turned off. |
+| `AGENT_NAME_TAKEN` | 409 | The owner already has an agent with this name. |
 | `ALREADY_INITIALIZED` | 409 | `POST /bootstrap/root` on an instance that already has root. |
 | `AUTHENTICATION_INVALID` | 401 | Wrong email or password, a locked account, a wrong current password, an `Authorization` header that isn't `Bearer <token>`, or a bearer token that is neither a JWT nor the service key. |
 | `AUTHENTICATION_REQUIRED` | 401 | No `Authorization` header, or `POST /auth/logout` with neither an access token nor a refresh token. |
-| `AUTHORIZATION_DENIED` | 403 | The caller can't do this: a user on the admin API, an admin token on a user endpoint or a user token on a console endpoint, anyone but root managing admins or rotating keys, or the service key on an endpoint for a signed-in account. |
+| `AUTHORIZATION_DENIED` | 403 | The caller can't do this: an agent token on any Dopgate endpoint, an admin editing or regenerating an agent they don't own, a user on the admin API, an admin token on a user endpoint or a user token on a console endpoint, anyone but root managing admins or rotating keys, or the service key on an endpoint for a signed-in account. |
+| `CAPABILITIES_INVALID` | 422 | An agent's capabilities aren't a flat object of strings, numbers, true or false, and lists of strings, or are over 4 KB. |
 | `CODE_EXPIRED` | 400 | The emailed code is past its lifetime. |
 | `CODE_INVALID` | 400 | The code is wrong, used up after too many wrong tries, or there is no code for this email and purpose. |
 | `EMAIL_INVALID` | 422 | The email isn't valid, or an email change names the current address. `400` for the `to` of an SMTP test, and when the service key asks for a test email it has no address for. |
 | `EMAIL_NOT_VERIFIED` | 403 | Sign-in with the right password while the email is unconfirmed and settings require it. |
 | `EMAIL_TAKEN` | 409 | Another account already uses this email. |
-| `FEATURE_DISABLED` | 403 | A user tried to make a personal token while `selfService.personalTokens` is off. |
+| `FEATURE_DISABLED` | 403 | A user tried to make a personal token while `selfService.personalTokens` is off, or to make, edit, or regenerate an agent while `selfService.agents` is off. |
 | `INTERNAL_ERROR` | 500 | Something failed on the server, such as a database error. The log has the details. |
-| `LIMIT_REACHED` | 409 | The user already has `selfService.maxPersonalTokensPerUser` personal tokens. |
+| `LIMIT_REACHED` | 409 | The user already has `selfService.maxPersonalTokensPerUser` personal tokens, or `selfService.maxAgentsPerUser` agents. |
 | `METADATA_INVALID` | 422 | A metadata value isn't a JSON object, or is larger than 16 KB. |
 | `NOT_FOUND` | 404 | No such user, session, or email template, or the signed-in account was deleted. |
 | `NOT_IMPLEMENTED` | 501 | A planned endpoint: single sign-on or multi-factor authentication. |

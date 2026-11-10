@@ -33,15 +33,17 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | Claim | Type | Meaning |
 | --- | --- | --- |
 | `iss` | string | Dopgate's `DOPGATE_PUBLIC_URL` without a trailing slash |
-| `sub` | string | The user ID, `usr_` followed by a ULID. It never changes for the life of the account. |
+| `sub` | string | The user ID, `usr_` followed by a ULID, or an agent's `agt_` ID. It never changes for the life of the account. |
 | `exp` | number | Expiry, in Unix seconds. `iat` plus `accessTokenMinutes` (15 by default). |
 | `iat` | number | When the token was issued, in Unix seconds |
 | `sid` | string | The session ID, `ses_` followed by a ULID. It matches the `id` in the session list. Absent on a token from a personal token. |
-| `kind` | string | `human` for a person who signed in |
+| `kind` | string | `human` for a person who signed in, `agent` for an [agent](/guide/agents). Check it first. |
 | `via` | string | `pat` when the token came from a [personal token](/guide/personal-tokens). Absent after a password or code sign-in. |
 | `tid` | string | The personal token's ID, `pat_` followed by a ULID, when `via` is `pat` |
-| `email` | string | The account's email, lowercased, when the token was issued |
-| `email_verified` | boolean | Whether the email was confirmed when the token was issued |
+| `owner` | string | An agent's owner, an admin (`adm_`) or a user (`usr_`). Agents only. |
+| `capabilities` | object | An agent's flat key-value capabilities. Agents only. |
+| `email` | string | The account's email, lowercased, when the token was issued. People only. |
+| `email_verified` | boolean | Whether the email was confirmed when the token was issued. People only. |
 
 There is no `aud`, `nbf`, or `jti` claim. Profile fields and metadata are not in the token; read them from `GET /api/v1/auth/me` or the admin API.
 

@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TradeTokenRequest {
-  /// A personal token, `dgp_` and 43 characters.
+  /// A personal token (`dgp_…`) or an agent token (`dga_…`).
   pub token: String,
 }
 

@@ -19,6 +19,9 @@ pub enum AuthIdentity {
     email: String,
     via: UserVia,
   },
+  /// An agent. Its token is for your backend: every Dopgate endpoint
+  /// refuses it.
+  Agent { agent_id: String, owner_id: String },
   /// The main app's backend holding `DOPGATE_SERVICE_KEY`. It acts like an
   /// admin, never like root or a particular account.
   Service,
@@ -31,6 +34,7 @@ impl AuthIdentity {
     match self {
       Self::Admin { role, .. } => role.as_str(),
       Self::User { .. } => "user",
+      Self::Agent { .. } => "agent",
       Self::Service => "service",
     }
   }
@@ -40,6 +44,7 @@ impl AuthIdentity {
     match self {
       Self::Admin { admin_id, .. } => Some(admin_id),
       Self::User { user_id, .. } => Some(user_id),
+      Self::Agent { agent_id, .. } => Some(agent_id),
       Self::Service => None,
     }
   }
@@ -48,6 +53,7 @@ impl AuthIdentity {
   pub fn actor_label(&self) -> &str {
     match self {
       Self::Admin { email, .. } | Self::User { email, .. } => email,
+      Self::Agent { agent_id, .. } => agent_id,
       Self::Service => "service",
     }
   }
@@ -90,15 +96,19 @@ pub enum UserVia {
 pub enum TokenKind {
   /// A person who signed in to your app.
   Human,
+  /// An agent, signed in with its token.
+  Agent,
 }
 
 /// The claims inside an app access token, signed with ES256. Your backend
-/// verifies them offline against the JWKS.
+/// verifies them offline against the JWKS. A person's token carries the
+/// email; an agent's carries its owner and capabilities instead.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct AccessClaims {
   /// The public URL of this Dopgate instance.
   pub iss: String,
-  /// The user ID. Use it as the foreign key in your own tables.
+  /// The user ID (`usr_`), or the agent ID (`agt_`). Use it as the foreign
+  /// key in your own tables.
   pub sub: String,
   pub exp: i64,
   pub iat: i64,
@@ -106,7 +116,7 @@ pub struct AccessClaims {
   /// stops it refreshing.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub sid: Option<String>,
-  /// `human` for a person.
+  /// `human` for a person, `agent` for an agent.
   pub kind: TokenKind,
   /// `pat` when the token came from a personal token.
   #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -114,8 +124,18 @@ pub struct AccessClaims {
   /// The personal token's ID, when `via` is `pat`.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub tid: Option<String>,
-  pub email: String,
-  pub email_verified: bool,
+  /// A person's email.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub email: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub email_verified: Option<bool>,
+  /// An agent's owner: an admin (`adm_`) or a user (`usr_`).
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub owner: Option<String>,
+  /// An agent's capabilities: flat key-value pairs your app interprets.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  #[schema(value_type = Option<Object>)]
+  pub capabilities: Option<serde_json::Value>,
 }
 
 /// The claims inside a console access token. These are signed with HS256

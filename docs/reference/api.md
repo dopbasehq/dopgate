@@ -216,13 +216,13 @@ Answers `200 EMAIL_CHANGE_CODE_SENT`. Errors: `401 AUTHENTICATION_INVALID`, `409
 
 ### `POST /api/v1/auth/token`
 
-Public. Trades a personal token for an access token that signs in as its user. See [Personal tokens](/guide/personal-tokens).
+Public. Trades a personal token for an access token that signs in as its user, or an agent token for one that signs in as the agent. See [Personal tokens](/guide/personal-tokens) and [Agents](/guide/agents).
 
 | Request field | Required | Notes |
 | --- | --- | --- |
-| `token` | yes | `dgp_` and 43 characters |
+| `token` | yes | `dgp_` or `dga_`, and 43 characters |
 
-Answers `200 TOKEN_TRADED` with `accessToken`, `tokenType`, and `expiresIn`, and no refresh token. Errors: `401 TOKEN_INVALID`, `401 TOKEN_EXPIRED`, `403 ACCOUNT_DISABLED`, `429 RATE_LIMITED`.
+Answers `200 TOKEN_TRADED` with `accessToken`, `tokenType`, and `expiresIn`, and no refresh token. Errors: `401 TOKEN_INVALID`, `401 TOKEN_EXPIRED`, `403 ACCOUNT_DISABLED`, `403 AGENT_DISABLED`, `429 RATE_LIMITED`.
 
 ## Personal tokens
 
@@ -235,6 +235,30 @@ Every `/auth/personal-tokens` endpoint needs User from a password or code sign-i
 | `DELETE /api/v1/auth/personal-tokens/{id}` | Deletes the token. Answers `200 PERSONAL_TOKEN_DELETED`, or `404 NOT_FOUND`. |
 | `GET /api/v1/admin/users/{id}/personal-tokens` | Admin. A user's tokens, without the tokens themselves. |
 | `DELETE /api/v1/admin/users/{id}/personal-tokens/{tokenId}` | Console only, not the service key. Revokes the token. |
+
+## Agents
+
+An agent, as these endpoints return it: `id` (`agt_`), `name`, `description`, `owner` (`id`, `kind` of `admin` or `user`, and `email`), `capabilities`, `status`, `lastFour`, `lastUsedAt`, `createdAt`, `updatedAt`. Creating or regenerating also returns `token`, shown once. See [Agents](/guide/agents) for the rules on names and capabilities.
+
+Your own agents, for users. Every endpoint needs User from a password or code sign-in. `POST`, `PATCH`, and `regenerate` also need `selfService.agents` on (`403 FEATURE_DISABLED`). Another owner's agent answers `404 NOT_FOUND`.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /api/v1/auth/agents` | The user's agents, newest first, paged like users. |
+| `POST /api/v1/auth/agents` | `name`, `description`, `capabilities`. Answers `201 AGENT_CREATED` with `token` and `agent`. Errors: `409 AGENT_NAME_TAKEN`, `409 LIMIT_REACHED`, `422 CAPABILITIES_INVALID`, `422 REQUEST_INVALID`. |
+| `GET`, `PATCH`, `DELETE /api/v1/auth/agents/{id}` | Read, change (fields left out stay; `capabilities` is replaced whole), or delete (`204`). |
+| `POST /api/v1/auth/agents/{id}/regenerate` | A new token, in `200 AGENT_TOKEN_REGENERATED`. The old one stops working. |
+| `POST /api/v1/auth/agents/{id}/disable`, `/enable` | Turn the agent off or on. |
+
+Every agent, for admins. `GET` needs Admin; the rest need Console, not the service key. `PATCH` and `regenerate` answer `403 AUTHORIZATION_DENIED` unless the signed-in admin owns the agent.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /api/v1/admin/agents` | Every agent, newest first. Filter with `owner` (an `adm_` or `usr_` ID), `status`, and `search` on the name; page with `cursor` and `limit`. |
+| `POST /api/v1/admin/agents` | An agent the signed-in admin owns. Same body and answers as the user endpoint, without the setting or the limit. |
+| `GET`, `PATCH`, `DELETE /api/v1/admin/agents/{id}` | Read, change (owner only), or delete any agent. |
+| `POST /api/v1/admin/agents/{id}/regenerate` | Owner only. |
+| `POST /api/v1/admin/agents/{id}/disable`, `/enable` | Any agent. |
 
 ## Codes
 
@@ -425,7 +449,7 @@ Admin. Answers `200 SETTINGS_FETCHED` with every section.
 | `password` | `minLength` (`8`, allowed 8 to 128) |
 | `tokens` | `accessTokenMinutes` (`15`, 1 to 1440), `refreshTokenIdleDays` (`30`, 1 to 3650), `sessionAbsoluteDays` (`90`, 1 to 3650, not less than the idle limit) |
 | `limits` | `codeMinutes` (`10`), `codeMaxAttempts` (`5`), `codeResendSeconds` (`60`), `codesPerHour` (`5`), `lockoutAttempts` (`5`), `lockoutMinutes` (`15`), `ipRequestsPerMinute` (`20`). Ranges in [Rate limits](/guide/rate-limits). |
-| `selfService` | `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [Personal tokens](/guide/personal-tokens). |
+| `selfService` | `agents` (`false`), `maxAgentsPerUser` (`10`, 1 to 1000), `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [Agents](/guide/agents) and [Personal tokens](/guide/personal-tokens). |
 | `branding` | `appName` (`dopgate`, one line up to 255 characters), `logoUrl` (`null`, an `http(s)` URL) |
 | `smtp` | `host` (`null`), `port` (`587`, `465`, or `25` by security), `security` (`starttls`), `username`, `passwordSet`, `fromEmail` (`no-reply@dopgate.com`), `fromName`, `source` (`server_config`, `database`, or `log`), `canStorePassword`. See [Email (SMTP)](/self-hosting/smtp#where-the-settings-come-from). |
 
