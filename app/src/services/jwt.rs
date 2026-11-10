@@ -46,10 +46,14 @@ pub async fn sign_console(
   state: &AppState,
   claims: &ConsoleClaims,
 ) -> Result<String, HttpError> {
-  let (kid, secret) = state.keys.console_key().await.ok_or_else(|| {
-    tracing::error!("no active console key");
-    HttpError::internal()
-  })?;
+  let (kid, secret) = state
+    .keys
+    .console_key(state.db.pool())
+    .await?
+    .ok_or_else(|| {
+      tracing::error!("no active console key");
+      HttpError::internal()
+    })?;
   let mut header = Header::new(Algorithm::HS256);
   header.kid = Some(kid);
   encode(&header, claims, &EncodingKey::from_secret(&secret)).map_err(|error| {
@@ -141,7 +145,7 @@ async fn verify_console(
   let secret = state
     .keys
     .console_secret(state.db.pool(), kid)
-    .await
+    .await?
     .ok_or_else(invalid)?;
   let mut rules = Validation::new(Algorithm::HS256);
   rules.set_issuer(&[state.config.issuer()]);

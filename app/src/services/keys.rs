@@ -8,7 +8,9 @@
 //!
 //! Console access tokens use a separate HS256 secret in `console_keys`. It
 //! never leaves Dopgate and is not in the JWKS. Rotation replaces it too;
-//! the console then refreshes its token.
+//! the console then refreshes its token. It is read from the database on
+//! every use rather than cached, so every server drops a retired secret at
+//! the moment of rotation.
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -43,8 +45,6 @@ struct Cache {
   signing: Option<(String, EncodingKey)>,
   verifying: HashMap<String, DecodingKey>,
   jwks: Vec<Value>,
-  /// The active console secret and its ID.
-  console: Option<(String, Vec<u8>)>,
 }
 
 /// A freshly generated key, ready to insert.
@@ -183,9 +183,6 @@ impl KeyStore {
       }
       cache.jwks.push(jwk);
     }
-    cache.console = sqlx::query_as("SELECT id, secret FROM console_keys WHERE status='active'")
-      .fetch_optional(pool)
-      .await?;
     *self.cache.write().await = cache;
     Ok(())
   }
@@ -211,32 +208,29 @@ impl KeyStore {
     self.cache.read().await.verifying.get(kid).cloned()
   }
 
-  /// The ID and secret that sign console tokens.
-  pub async fn console_key(&self) -> Option<(String, Vec<u8>)> {
-    self.cache.read().await.console.clone()
+  /// The ID and secret that sign console tokens. Read from the database
+  /// each time, not cached, so a rotation from the CLI or another server
+  /// takes effect at once.
+  pub async fn console_key(
+    &self,
+    pool: &PgPool,
+  ) -> Result<Option<(String, Vec<u8>)>, sqlx::Error> {
+    sqlx::query_as("SELECT id, secret FROM console_keys WHERE status='active'")
+      .fetch_optional(pool)
+      .await
   }
 
-  /// The console secret with this ID, if it is the active one. A miss
-  /// reloads once, since another server may have rotated.
+  /// The console secret with this ID, only while it is the active one, so
+  /// a token signed before a rotation stops verifying everywhere at once.
   pub async fn console_secret(
     &self,
     pool: &PgPool,
     kid: &str,
-  ) -> Option<Vec<u8>> {
-    let matching = |cache: &Cache| {
-      cache
-        .console
-        .as_ref()
-        .filter(|(id, _)| id == kid)
-        .map(|(_, secret)| secret.clone())
-    };
-    if let Some(secret) = matching(&*self.cache.read().await) {
-      return Some(secret);
-    }
-    if let Err(error) = self.reload(pool).await {
-      tracing::warn!(%error, "failed to reload signing keys");
-    }
-    matching(&*self.cache.read().await)
+  ) -> Result<Option<Vec<u8>>, sqlx::Error> {
+    sqlx::query_scalar("SELECT secret FROM console_keys WHERE id = $1 AND status='active'")
+      .bind(kid)
+      .fetch_optional(pool)
+      .await
   }
 
   /// The JSON Web Key Set apps verify tokens with.
