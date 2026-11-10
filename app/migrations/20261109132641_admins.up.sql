@@ -82,15 +82,22 @@ SELECT 'adm_' || substr(id, 5), email, email_verified_at, password_hash, display
        failed_login_count, locked_until, last_sign_in_at, created_at, updated_at
 FROM users WHERE role IN ('root', 'admin');
 
-UPDATE settings SET updated_by = NULL;
-UPDATE email_templates SET updated_by = NULL;
-DELETE FROM users WHERE role IN ('root', 'admin');
-
--- Settings and templates are saved by admins now.
+-- Settings and templates are saved by admins now. Whoever last saved one
+-- keeps the credit under their new admin ID. Only admins could save them,
+-- so a member's ID there can only be stale, and it is cleared.
 ALTER TABLE settings DROP CONSTRAINT settings_updated_by_fkey;
+ALTER TABLE email_templates DROP CONSTRAINT email_templates_updated_by_fkey;
+UPDATE settings SET updated_by = CASE
+  WHEN updated_by IN (SELECT id FROM users WHERE role IN ('root', 'admin'))
+  THEN 'adm_' || substr(updated_by, 5) END
+WHERE updated_by IS NOT NULL;
+UPDATE email_templates SET updated_by = CASE
+  WHEN updated_by IN (SELECT id FROM users WHERE role IN ('root', 'admin'))
+  THEN 'adm_' || substr(updated_by, 5) END
+WHERE updated_by IS NOT NULL;
+DELETE FROM users WHERE role IN ('root', 'admin');
 ALTER TABLE settings ADD CONSTRAINT settings_updated_by_fkey
   FOREIGN KEY (updated_by) REFERENCES admins(id) ON DELETE SET NULL;
-ALTER TABLE email_templates DROP CONSTRAINT email_templates_updated_by_fkey;
 ALTER TABLE email_templates ADD CONSTRAINT email_templates_updated_by_fkey
   FOREIGN KEY (updated_by) REFERENCES admins(id) ON DELETE SET NULL;
 
