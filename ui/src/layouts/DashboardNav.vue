@@ -4,6 +4,7 @@ import {
   HistoryIcon,
   KeyIcon,
   MailIcon,
+  ShieldIcon,
   SlidersHorizontalIcon,
   UsersIcon,
 } from "~/assets/icons";
@@ -28,6 +29,7 @@ const emit = defineEmits<{ "sign-out": [] }>();
 const icons: Record<PageName, Component> = {
   users: UsersIcon,
   templates: MailIcon,
+  admins: ShieldIcon,
   settings: SlidersHorizontalIcon,
   keys: KeyIcon,
   audit: HistoryIcon,

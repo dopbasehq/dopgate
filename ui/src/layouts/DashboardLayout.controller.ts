@@ -18,9 +18,9 @@ export function useDashboardLayoutController() {
   const route = useRoute();
   const auth = useAuthStore();
 
-  const email = computed(() => auth.user?.email ?? "");
+  const email = computed(() => auth.admin?.email ?? "");
   const roleName = computed(() =>
-    auth.user ? formatRole(auth.user.role) : "",
+    auth.admin ? formatRole(auth.admin.role) : "",
   );
   const activePage = computed<PageName | null>(() => {
     const segment = route.path.split("/")[1];

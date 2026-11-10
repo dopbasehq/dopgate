@@ -16,8 +16,8 @@ declare module "vue-router" {
  *    you to `/setup`; after, `/setup` sends you on.
  * 2. Public pages need no session. Signed-in visitors skip the sign-in page.
  * 3. Other pages need a session. The page-load refresh is tried once, then
- *    it's the sign-in page, with the address you wanted kept.
- * 4. Members are signed in but this console is for admins: No access.
+ *    it's the sign-in page, with the address you wanted kept. Only admins
+ *    can sign in here, so a session is all a page needs.
  */
 export async function guard(
   to: RouteLocationNormalized,
@@ -43,14 +43,10 @@ export async function guard(
       query: to.fullPath === "/" ? {} : { redirect: to.fullPath },
     };
   }
-  if (!auth.isAdmin) {
-    return to.name === "no-access" ? true : { name: "no-access" };
-  }
-  if (to.name === "no-access") return { name: "users" };
   return true;
 }
 
-/** Where a signed-in account starts. */
+/** Where a signed-in admin starts. */
 export function home(): RouteLocationRaw {
-  return useAuthStore().isAdmin ? { name: "users" } : { name: "no-access" };
+  return { name: "users" };
 }

@@ -25,6 +25,7 @@ export const keys = {
     one: (id: string): EntryKey => ["users", "one", id],
     sessions: (id: string): EntryKey => ["users", "sessions", id],
   },
+  admins: ["admins"] as EntryKey,
   templates: {
     root: ["templates"] as EntryKey,
     list: ["templates", "list"] as EntryKey,

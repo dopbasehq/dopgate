@@ -9,20 +9,14 @@ import {
   DgInput,
   DgModal,
   DgSearchField,
-  DgSelect,
   DgSkeleton,
   DgSwitch,
 } from "~/components/ui";
 import { PlusIcon } from "~/assets/icons";
-import {
-  ROLE_FILTERS,
-  STATUS_FILTERS,
-  useUsersController,
-} from "./Users.controller";
+import { STATUS_FILTERS, useUsersController } from "./Users.controller";
 
 const {
   search,
-  roleFilter,
   statusFilter,
   filtered,
   rows,
@@ -32,7 +26,6 @@ const {
   loadingMore,
   reload,
   loadMore,
-  canChooseRole,
   createOpen,
   draft,
   createErrors,
@@ -42,11 +35,6 @@ const {
   closeCreate,
   submitCreate,
 } = useUsersController();
-
-const roleOptions = [
-  { value: "member", label: "Member" },
-  { value: "admin", label: "Admin" },
-];
 </script>
 
 <template>
@@ -71,10 +59,6 @@ const roleOptions = [
           v-model="search"
           class="w-full sm:w-72"
           placeholder="Search by email or name" />
-        <DgFilterMenu
-          v-model="roleFilter"
-          label="Role"
-          :options="ROLE_FILTERS" />
         <DgFilterMenu
           v-model="statusFilter"
           label="Status"
@@ -102,7 +86,6 @@ const roleOptions = [
               <tr class="border-b border-line-soft bg-raised/50">
                 <th class="h-11 px-4 font-medium text-ink-muted">Email</th>
                 <th class="h-11 px-4 font-medium text-ink-muted">Name</th>
-                <th class="h-11 px-4 font-medium text-ink-muted">Role</th>
                 <th class="h-11 px-4 font-medium text-ink-muted">Status</th>
                 <th
                   class="h-11 whitespace-nowrap px-4 font-medium text-ink-muted">
@@ -123,9 +106,6 @@ const roleOptions = [
                       class="truncate font-mono text-ink-strong hover:underline">
                       {{ row.user.email }}
                     </RouterLink>
-                    <span v-if="row.isYou" class="text-xs text-ink-faint"
-                      >you</span
-                    >
                     <DgBadge
                       v-if="!row.user.emailVerified"
                       tone="warn"
@@ -137,12 +117,6 @@ const roleOptions = [
                 <td class="px-4 text-ink">
                   <span v-if="row.name">{{ row.name }}</span>
                   <span v-else class="text-ink-faint">None</span>
-                </td>
-                <td class="px-4">
-                  <DgBadge
-                    :tone="row.user.role === 'root' ? 'accent' : 'neutral'">
-                    {{ row.roleLabel }}
-                  </DgBadge>
                 </td>
                 <td class="px-4">
                   <DgBadge :tone="row.user.status === 'active' ? 'ok' : 'crit'">
@@ -201,11 +175,6 @@ const roleOptions = [
           placeholder="Optional"
           hint="Leave empty to have them sign in with an email code or reset it later."
           :error="createErrors.password" />
-        <DgSelect
-          v-if="canChooseRole"
-          v-model="draft.role"
-          label="Role"
-          :options="roleOptions" />
         <DgSwitch
           v-model="draft.emailVerified"
           label="Mark email as verified" />

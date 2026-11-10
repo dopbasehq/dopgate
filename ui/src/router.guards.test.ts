@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RouteLocationNormalized } from "vue-router";
 import * as authApi from "~/services/auth.api";
 import { useAuthStore } from "~/stores/auth.store";
-import { admin, apiError, member, root, tokensFor } from "~/tests/fixtures";
+import { admin, apiError, root, tokensFor } from "~/tests/fixtures";
 import { guard } from "./router.guards";
 
 vi.mock("~/services/auth.api");
@@ -56,7 +56,7 @@ describe("router guard", () => {
   it("restores the session from the refresh cookie once", async () => {
     vi.mocked(authApi.refreshSession).mockResolvedValue(tokensFor(admin));
     expect(await guard(to("audit"))).toBe(true);
-    expect(useAuthStore().user?.id).toBe(admin.id);
+    expect(useAuthStore().admin?.id).toBe(admin.id);
     expect(await guard(to("users"))).toBe(true);
     expect(authApi.refreshSession).toHaveBeenCalledTimes(1);
   });
@@ -75,15 +75,10 @@ describe("router guard", () => {
     expect(await guard(signIn)).toEqual({ name: "users" });
   });
 
-  it("keeps members on No access", async () => {
-    vi.mocked(authApi.refreshSession).mockResolvedValue(tokensFor(member));
-    expect(await guard(to("users"))).toEqual({ name: "no-access" });
-    expect(await guard(to("no-access"))).toBe(true);
-    expect(await guard(signIn)).toEqual({ name: "no-access" });
-  });
-
-  it("sends admins away from No access", async () => {
+  it("lets any signed-in admin reach every page", async () => {
     vi.mocked(authApi.refreshSession).mockResolvedValue(tokensFor(admin));
-    expect(await guard(to("no-access"))).toEqual({ name: "users" });
+    for (const name of ["users", "admins", "settings", "keys", "audit"]) {
+      expect(await guard(to(name))).toBe(true);
+    }
   });
 });

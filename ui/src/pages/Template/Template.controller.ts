@@ -156,7 +156,7 @@ export function useTemplateController({ previewDelay = 400 } = {}) {
       "test",
       async () => {
         await sendTemplateTest(name.value, contentOf(draft.value!));
-        notice.value = `Sent a test email to ${auth.user?.email ?? "your address"}.`;
+        notice.value = `Sent a test email to ${auth.admin?.email ?? "your address"}.`;
       },
       "Couldn't send the test email.",
     );

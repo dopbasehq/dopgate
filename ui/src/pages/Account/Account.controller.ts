@@ -23,19 +23,19 @@ import { isValidEmail } from "~/utils/validation";
 export function useAccountController() {
   const auth = useAuthStore();
   const invalidate = useInvalidate();
-  const user = computed(() => auth.user);
+  const user = computed(() => auth.admin);
 
   // Display name
-  const displayName = ref(auth.user?.displayName ?? "");
+  const displayName = ref(auth.admin?.displayName ?? "");
   watch(
-    () => auth.user?.displayName,
+    () => auth.admin?.displayName,
     (next, previous) => {
       if (displayName.value === (previous ?? ""))
         displayName.value = next ?? "";
     },
   );
   const profileDirty = computed(
-    () => (auth.user?.displayName ?? "") !== displayName.value.trim(),
+    () => (auth.admin?.displayName ?? "") !== displayName.value.trim(),
   );
   const savingProfile = ref(false);
   const profileError = ref<string | null>(null);
@@ -50,7 +50,7 @@ export function useAccountController() {
       const name = displayName.value.trim();
       const next = await updateMe({ displayName: name === "" ? null : name });
       displayName.value = next.displayName ?? "";
-      auth.setUser(next);
+      auth.setAdmin(next);
       profileSaved.value = true;
     } catch (cause) {
       profileError.value = errorMessage(cause, "Couldn't save your name.");
@@ -77,7 +77,7 @@ export function useAccountController() {
     passwordError.value = null;
     passwordChanged.value = false;
     const errors: typeof passwordErrors.value = {};
-    if (auth.user?.hasPassword !== false && currentPassword.value === "")
+    if (auth.admin?.hasPassword !== false && currentPassword.value === "")
       errors.current = "Enter your current password.";
     if (newPassword.value === "") errors.next = "Choose a new password.";
     if (confirmPassword.value !== newPassword.value)
@@ -120,7 +120,7 @@ export function useAccountController() {
   const newEmail = ref("");
   /** The current password; asked for only when the account has one. */
   const emailPassword = ref("");
-  const needsEmailPassword = computed(() => auth.user?.hasPassword !== false);
+  const needsEmailPassword = computed(() => auth.admin?.hasPassword !== false);
   const emailCode = ref("");
   const emailFieldError = ref<string | null>(null);
   const emailPasswordError = ref<string | null>(null);
@@ -140,7 +140,7 @@ export function useAccountController() {
       emailFieldError.value = "Enter a valid email address.";
       return;
     }
-    if (address.toLowerCase() === auth.user?.email.toLowerCase()) {
+    if (address.toLowerCase() === auth.admin?.email.toLowerCase()) {
       emailFieldError.value = "This is already your email address.";
       return;
     }
@@ -192,7 +192,7 @@ export function useAccountController() {
         newEmail.value.trim(),
         emailCode.value,
       );
-      auth.setUser(next);
+      auth.setAdmin(next);
       emailStep.value = "idle";
       newEmail.value = "";
       emailCode.value = "";

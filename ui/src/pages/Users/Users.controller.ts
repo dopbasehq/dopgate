@@ -7,19 +7,12 @@ import {
   type NewUser,
   type UserFilters,
 } from "~/services/admin.api";
-import type { AdminUser, Role, UserStatus } from "~/services/types";
+import type { AdminUser, UserStatus } from "~/services/types";
 import { usersQuery } from "~/queries/admin";
 import { useInvalidate } from "~/queries/invalidate";
-import { useAuthStore } from "~/stores/auth.store";
 import { useDebounced } from "~/utils/debounce";
-import { formatRelativeTime, formatRole } from "~/utils/format";
+import { formatRelativeTime } from "~/utils/format";
 import { isValidEmail } from "~/utils/validation";
-
-export const ROLE_FILTERS: { value: Role; label: string }[] = [
-  { value: "root", label: "Root" },
-  { value: "admin", label: "Admin" },
-  { value: "member", label: "Member" },
-];
 
 export const STATUS_FILTERS: { value: UserStatus; label: string }[] = [
   { value: "active", label: "Active" },
@@ -29,17 +22,13 @@ export const STATUS_FILTERS: { value: UserStatus; label: string }[] = [
 export interface UserRow {
   user: AdminUser;
   name: string | null;
-  roleLabel: string;
   lastSignIn: string;
-  isYou: boolean;
 }
 
 export interface NewUserDraft {
   email: string;
   displayName: string;
   password: string;
-  /** "admin" or "member". */
-  role: string;
   emailVerified: boolean;
 }
 
@@ -47,28 +36,23 @@ const emptyDraft = (): NewUserDraft => ({
   email: "",
   displayName: "",
   password: "",
-  role: "member",
   emailVerified: false,
 });
 
 /**
- * Users page controller: search and filter users on the server, a page at
- * a time, and add new ones. Only root may create admins, so only root
- * sees the role choice.
+ * Users page controller: search and filter your app's users on the server,
+ * a page at a time, and add new ones. Admins live on the Admins page.
  */
 export function useUsersController() {
   const router = useRouter();
-  const auth = useAuthStore();
   const invalidate = useInvalidate();
 
   const search = ref("");
   const searchQuery = useDebounced(search, "");
-  const roleFilter = ref<string | null>(null);
   const statusFilter = ref<string | null>(null);
 
   const filters = computed<UserFilters>(() => ({
     search: searchQuery.value.trim(),
-    role: (roleFilter.value as Role | null) ?? null,
     status: (statusFilter.value as UserStatus | null) ?? null,
   }));
 
@@ -97,19 +81,14 @@ export function useUsersController() {
       (feed.data.value?.pages.at(-1)?.nextCursor ?? null) !== null,
   );
   const filtered = computed(
-    () =>
-      filters.value.search !== "" ||
-      filters.value.role !== null ||
-      filters.value.status !== null,
+    () => filters.value.search !== "" || filters.value.status !== null,
   );
 
   const rows = computed<UserRow[]>(() =>
     users.value.map((user) => ({
       user,
       name: user.displayName,
-      roleLabel: formatRole(user.role),
       lastSignIn: formatRelativeTime(user.lastSignInAt),
-      isYou: user.id === auth.user?.id,
     })),
   );
 
@@ -132,7 +111,6 @@ export function useUsersController() {
   }
 
   // New user
-  const canChooseRole = computed(() => auth.isRoot);
   const createOpen = ref(false);
   const draft = ref<NewUserDraft>(emptyDraft());
   const createErrors = ref<{ email?: string; password?: string }>({});
@@ -168,8 +146,6 @@ export function useUsersController() {
     const displayName = draft.value.displayName.trim();
     if (displayName) body.displayName = displayName;
     if (draft.value.password) body.password = draft.value.password;
-    if (canChooseRole.value)
-      body.role = draft.value.role === "admin" ? "admin" : "member";
 
     creating.value = true;
     try {
@@ -202,7 +178,6 @@ export function useUsersController() {
 
   return {
     search,
-    roleFilter,
     statusFilter,
     filtered,
     rows,
@@ -212,7 +187,6 @@ export function useUsersController() {
     loadingMore,
     reload,
     loadMore,
-    canChooseRole,
     createOpen,
     draft,
     createErrors,

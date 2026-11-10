@@ -24,6 +24,7 @@ export function useInvalidate() {
       return refresh(["users", "list"], keys.users.sessions(user.id));
     },
     usersChanged: () => refresh(keys.users.root),
+    adminsChanged: () => refresh(keys.admins),
     templatesChanged: () => refresh(keys.templates.root),
     settingsChanged: () => refresh(keys.settings),
     signingKeysChanged: () => refresh(keys.signingKeys),

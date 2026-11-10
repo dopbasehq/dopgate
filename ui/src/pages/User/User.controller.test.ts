@@ -5,7 +5,7 @@ import { mountController, settle } from "~/tests/mount-controller";
 import {
   admin,
   apiError,
-  member,
+  maya,
   root,
   sessionFixture,
   signInAs,
@@ -27,8 +27,8 @@ let shown: AdminUser;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  shown = member;
-  route.params = { id: member.id };
+  shown = maya;
+  route.params = { id: maya.id };
   vi.mocked(adminApi.fetchUser).mockImplementation(async () => shown);
   vi.mocked(adminApi.fetchUserSessions).mockResolvedValue([sessionFixture()]);
   vi.mocked(adminApi.listAuditEvents).mockResolvedValue({
@@ -37,7 +37,7 @@ beforeEach(() => {
   });
 });
 
-async function mountAs(viewer = root, target: AdminUser = member) {
+async function mountAs(viewer = root, target: AdminUser = maya) {
   shown = target;
   route.params = { id: target.id };
   signInAs(viewer);
@@ -55,7 +55,7 @@ describe("useUserController", () => {
         userMetadata: { theme: "dark" },
       }),
     );
-    expect(c.user.value?.email).toBe(member.email);
+    expect(c.user.value?.email).toBe(maya.email);
     expect(c.sessions.value).toHaveLength(1);
     expect(c.displayName.value).toBe("Maya");
     expect(JSON.parse(c.publicMetadata.value)).toEqual({ plan: "pro" });
@@ -63,45 +63,23 @@ describe("useUserController", () => {
     expect(c.metadataDirty.value).toBe(false);
   });
 
-  describe("who may do what", () => {
-    it("hides every action on root", async () => {
-      const c = await mountAs(root, root);
-      expect(c.canManage.value).toBe(false);
-      expect(c.protectedNote.value).toMatch(/^Root account/);
-    });
-
-    it("lets an admin manage members but not other admins", async () => {
-      expect((await mountAs(admin, member)).canManage.value).toBe(true);
-      const other = userFixture({ id: "usr_other", role: "admin" });
-      const c = await mountAs(admin, other);
-      expect(c.canManage.value).toBe(false);
-      expect(c.protectedNote.value).toBe(
-        "Only root can change admin accounts.",
-      );
-    });
-
-    it("lets only root change roles", async () => {
-      expect((await mountAs(root, member)).canChangeRole.value).toBe(true);
-      expect((await mountAs(admin, member)).canChangeRole.value).toBe(false);
-    });
-
-    it("never offers to turn off or delete your own account", async () => {
-      const c = await mountAs(admin, admin);
-      expect(c.canManage.value).toBe(true);
-      expect(c.canDisableOrDelete.value).toBe(false);
-    });
+  it("lets every admin manage every user", async () => {
+    expect((await mountAs(root, maya)).canManage.value).toBe(true);
+    const c = await mountAs(admin, maya);
+    expect(c.canManage.value).toBe(true);
+    expect(c.canDisableOrDelete.value).toBe(true);
   });
 
   it("saves the display name", async () => {
     vi.mocked(adminApi.updateUser).mockResolvedValue({
-      ...member,
+      ...maya,
       displayName: "Maya B",
     });
     const c = await mountAs();
     c.displayName.value = " Maya B ";
     expect(c.profileDirty.value).toBe(true);
     await c.saveProfile();
-    expect(adminApi.updateUser).toHaveBeenCalledWith(member.id, {
+    expect(adminApi.updateUser).toHaveBeenCalledWith(maya.id, {
       displayName: "Maya B",
     });
     expect(c.user.value?.displayName).toBe("Maya B");
@@ -121,7 +99,7 @@ describe("useUserController", () => {
 
     it("saves both objects and keeps the server's copy", async () => {
       const saved = {
-        ...member,
+        ...maya,
         publicMetadata: { plan: "pro" },
         privateMetadata: { crm: 7 },
       };
@@ -130,7 +108,7 @@ describe("useUserController", () => {
       c.publicMetadata.value = '{"plan":"pro"}';
       c.privateMetadata.value = '{"crm":7}';
       await c.saveMetadata();
-      expect(adminApi.updateUser).toHaveBeenCalledWith(member.id, {
+      expect(adminApi.updateUser).toHaveBeenCalledWith(maya.id, {
         publicMetadata: { plan: "pro" },
         privateMetadata: { crm: 7 },
       });
@@ -140,20 +118,20 @@ describe("useUserController", () => {
 
   it("turns an account off after confirming", async () => {
     vi.mocked(adminApi.disableUser).mockResolvedValue({
-      ...member,
+      ...maya,
       status: "disabled",
     });
     const c = await mountAs();
     c.ask("disable");
     await c.confirm();
-    expect(adminApi.disableUser).toHaveBeenCalledWith(member.id);
+    expect(adminApi.disableUser).toHaveBeenCalledWith(maya.id);
     expect(c.user.value?.status).toBe("disabled");
     expect(c.confirming.value).toBeNull();
   });
 
   it("turns it back on", async () => {
-    vi.mocked(adminApi.enableUser).mockResolvedValue(member);
-    const c = await mountAs(root, { ...member, status: "disabled" });
+    vi.mocked(adminApi.enableUser).mockResolvedValue(maya);
+    const c = await mountAs(root, { ...maya, status: "disabled" });
     await c.enable();
     expect(c.user.value?.status).toBe("active");
   });
@@ -162,22 +140,7 @@ describe("useUserController", () => {
     vi.mocked(adminApi.sendPasswordReset).mockResolvedValue(null);
     const c = await mountAs();
     await c.sendReset();
-    expect(c.notice.value).toBe(
-      `Sent a password reset code to ${member.email}.`,
-    );
-  });
-
-  it("makes a member an admin", async () => {
-    vi.mocked(adminApi.updateUser).mockResolvedValue({
-      ...member,
-      role: "admin",
-    });
-    const c = await mountAs();
-    await c.setRole("admin");
-    expect(adminApi.updateUser).toHaveBeenCalledWith(member.id, {
-      role: "admin",
-    });
-    expect(c.user.value?.role).toBe("admin");
+    expect(c.notice.value).toBe(`Sent a password reset code to ${maya.email}.`);
   });
 
   it("signs the user out everywhere", async () => {
@@ -186,7 +149,7 @@ describe("useUserController", () => {
     vi.mocked(adminApi.fetchUserSessions).mockResolvedValue([]);
     c.ask("sign-out-all");
     await c.confirm();
-    expect(adminApi.revokeUserSessions).toHaveBeenCalledWith(member.id);
+    expect(adminApi.revokeUserSessions).toHaveBeenCalledWith(maya.id);
     expect(c.sessions.value).toEqual([]);
   });
 
@@ -195,7 +158,7 @@ describe("useUserController", () => {
     const c = await mountAs();
     c.ask("delete");
     await c.confirm();
-    expect(adminApi.deleteUser).toHaveBeenCalledWith(member.id);
+    expect(adminApi.deleteUser).toHaveBeenCalledWith(maya.id);
     expect(push).toHaveBeenCalledWith({ name: "users" });
   });
 

@@ -37,7 +37,7 @@ describe("useAccountController", () => {
     c.displayName.value = "Ada L";
     await c.saveProfile();
     expect(authApi.updateMe).toHaveBeenCalledWith({ displayName: "Ada L" });
-    expect(useAuthStore().user?.displayName).toBe("Ada L");
+    expect(useAuthStore().admin?.displayName).toBe("Ada L");
     expect(c.profileSaved.value).toBe(true);
   });
 
@@ -109,7 +109,7 @@ describe("useAccountController", () => {
         "ada@new.example",
         "123456",
       );
-      expect(useAuthStore().user?.email).toBe("ada@new.example");
+      expect(useAuthStore().admin?.email).toBe("ada@new.example");
       expect(c.emailStep.value).toBe("idle");
       expect(c.emailChanged.value).toBe(true);
     });

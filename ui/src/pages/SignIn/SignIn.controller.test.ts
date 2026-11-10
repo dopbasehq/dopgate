@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authApi from "~/services/auth.api";
 import { useAuthStore } from "~/stores/auth.store";
 import { mountController, settle } from "~/tests/mount-controller";
-import { admin, apiError, member, tokensFor } from "~/tests/fixtures";
+import { admin, apiError, tokensFor } from "~/tests/fixtures";
 import { useSignInController } from "./SignIn.controller";
 
 const { replace, route } = vi.hoisted(() => ({
@@ -55,7 +55,7 @@ describe("useSignInController", () => {
       c.password.value = "secret";
       await c.submitPassword();
       expect(authApi.login).toHaveBeenCalledWith("admin@example.com", "secret");
-      expect(useAuthStore().user?.id).toBe(admin.id);
+      expect(useAuthStore().admin?.id).toBe(admin.id);
       expect(replace).toHaveBeenCalledWith("/audit?action=user.created");
     });
 
@@ -67,14 +67,6 @@ describe("useSignInController", () => {
       expect(replace).toHaveBeenCalledWith({ name: "users" });
     });
 
-    it("sends a member to No access", async () => {
-      vi.mocked(authApi.login).mockResolvedValue(tokensFor(member));
-      const c = await mount();
-      c.password.value = "secret";
-      await c.submitPassword();
-      expect(replace).toHaveBeenCalledWith({ name: "no-access" });
-    });
-
     it.each([
       ["AUTHENTICATION_INVALID", 401, /email or password is wrong/],
       ["ACCOUNT_DISABLED", 403, /another admin/],
@@ -84,7 +76,6 @@ describe("useSignInController", () => {
       c.password.value = "secret";
       await c.submitPassword();
       expect(c.problem.value?.message).toMatch(message);
-      expect(c.problem.value?.offerVerify).toBeFalsy();
     });
 
     it("says how long to wait when rate limited", async () => {
@@ -104,17 +95,13 @@ describe("useSignInController", () => {
     it("sends a login code and confirms it", async () => {
       const c = await mount();
       await c.emailMeACode();
-      expect(authApi.sendCode).toHaveBeenCalledWith(
-        "admin@example.com",
-        "login",
-      );
+      expect(authApi.sendCode).toHaveBeenCalledWith("admin@example.com");
       expect(c.step.value).toBe("code");
 
       c.code.value = "123456";
       await c.submitCode();
       expect(authApi.confirmSignInCode).toHaveBeenCalledWith(
         "admin@example.com",
-        "login",
         "123456",
       );
       expect(replace).toHaveBeenCalledWith({ name: "users" });
@@ -161,43 +148,6 @@ describe("useSignInController", () => {
       });
       const c = await mount();
       expect(c.emailCodeEnabled.value).toBe(false);
-    });
-  });
-
-  describe("unverified email", () => {
-    it("offers a verification code and signs in with it", async () => {
-      vi.mocked(authApi.login).mockRejectedValue(
-        apiError(403, "EMAIL_NOT_VERIFIED"),
-      );
-      const c = await mount();
-      c.password.value = "secret";
-      await c.submitPassword();
-      expect(c.problem.value?.offerVerify).toBe(true);
-
-      await c.sendVerifyCode();
-      expect(authApi.sendCode).toHaveBeenCalledWith(
-        "admin@example.com",
-        "email_verify",
-      );
-      expect(c.step.value).toBe("verify");
-
-      c.code.value = "654321";
-      await c.submitCode();
-      expect(authApi.confirmSignInCode).toHaveBeenCalledWith(
-        "admin@example.com",
-        "email_verify",
-        "654321",
-      );
-      expect(useAuthStore().isSignedIn).toBe(true);
-    });
-
-    it("resends the same kind of code", async () => {
-      const c = await mount();
-      await c.sendVerifyCode();
-      await c.resend();
-      expect(
-        vi.mocked(authApi.sendCode).mock.calls.map((call) => call[1]),
-      ).toEqual(["email_verify", "email_verify"]);
     });
   });
 });

@@ -7,24 +7,18 @@ import { authMethodsQuery } from "~/queries/auth";
 import { useAuthStore } from "~/stores/auth.store";
 import { isSafeRedirect, isValidEmail } from "~/utils/validation";
 
-/**
- * Which form shows: the password form, the code step for signing in by
- * email, or the code step that verifies the address first.
- */
-export type SignInStep = "password" | "code" | "verify";
+/** Which form shows: the password form, or the code step. */
+export type SignInStep = "password" | "code";
 
-/** A form error that may offer a way out. */
+/** A form error. */
 export interface SignInProblem {
   title: string;
   message: string;
-  /** Unverified email: offer to send a verification code. */
-  offerVerify?: boolean;
 }
 
 /**
- * Sign-in page controller: email and password, or a 6-digit code by
- * email. An account whose email isn't verified yet confirms it with a code
- * and is signed in by that.
+ * Sign-in page controller for admins: email and password, or a 6-digit
+ * code by email. Your app's users can't sign in here.
  */
 export function useSignInController() {
   const router = useRouter();
@@ -67,12 +61,8 @@ export function useSignInController() {
 
   async function finish(): Promise<void> {
     const redirect = route.query.redirect;
-    if (auth.isAdmin && isSafeRedirect(redirect)) {
-      await router.replace(redirect);
-      return;
-    }
     await router.replace(
-      auth.isAdmin ? { name: "users" } : { name: "no-access" },
+      isSafeRedirect(redirect) ? redirect : { name: "users" },
     );
   }
 
@@ -85,13 +75,6 @@ export function useSignInController() {
             title: "Couldn't sign you in",
             message:
               "The email or password is wrong. After too many tries the account locks for a while.",
-          };
-        case "EMAIL_NOT_VERIFIED":
-          return {
-            title: "Verify your email first",
-            message:
-              "This account's email address isn't verified yet. We can send a code to confirm it.",
-            offerVerify: true,
           };
         case "ACCOUNT_DISABLED":
           return {
@@ -127,17 +110,17 @@ export function useSignInController() {
     }
   }
 
-  /** Sends a code for `purpose` and moves to the matching code step. */
-  async function send(purpose: "login" | "email_verify"): Promise<void> {
+  /** Sends a sign-in code and moves to the code step. */
+  async function send(): Promise<void> {
     if (sending.value) return;
     reset();
     if (!validateEmail()) return;
     sending.value = true;
     try {
-      await sendCode(email.value.trim(), purpose);
+      await sendCode(email.value.trim());
       code.value = "";
-      step.value = purpose === "login" ? "code" : "verify";
-      notice.value = `If ${email.value.trim()} has an account, a code is on its way.`;
+      step.value = "code";
+      notice.value = `If ${email.value.trim()} belongs to an admin, a code is on its way.`;
     } catch (cause) {
       if (step.value === "password") problem.value = describe(cause);
       else codeError.value = describeCodeError(cause);
@@ -146,9 +129,8 @@ export function useSignInController() {
     }
   }
 
-  const emailMeACode = () => send("login");
-  const sendVerifyCode = () => send("email_verify");
-  const resend = () => send(step.value === "verify" ? "email_verify" : "login");
+  const emailMeACode = () => send();
+  const resend = () => send();
 
   function describeCodeError(cause: unknown): string {
     if (cause instanceof ApiError) {
@@ -171,11 +153,7 @@ export function useSignInController() {
     }
     submitting.value = true;
     try {
-      await auth.confirmCode(
-        email.value.trim(),
-        step.value === "verify" ? "email_verify" : "login",
-        code.value,
-      );
+      await auth.confirmCode(email.value.trim(), code.value);
       await finish();
     } catch (cause) {
       codeError.value = describeCodeError(cause);
@@ -206,7 +184,6 @@ export function useSignInController() {
     sending,
     submitPassword,
     emailMeACode,
-    sendVerifyCode,
     resend,
     submitCode,
     usePassword,

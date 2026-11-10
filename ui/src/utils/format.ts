@@ -38,7 +38,6 @@ export function formatDateTime(iso: string | null): string {
 const ROLE_LABELS: Record<Role, string> = {
   root: "Root",
   admin: "Admin",
-  member: "Member",
 };
 
 export function formatRole(role: Role): string {

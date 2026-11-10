@@ -6,6 +6,7 @@ import {
   fetchTemplates,
   fetchUser,
   fetchUserSessions,
+  listAdmins,
   listAuditEvents,
   listUsers,
   type AuditFilters,
@@ -41,6 +42,12 @@ export const userSessionsQuery = defineQueryOptions((id: string) => ({
   key: keys.users.sessions(id),
   query: ({ signal }) => fetchUserSessions(id, signal),
 }));
+
+/** Root and every admin, root first. */
+export const adminsQuery = defineQueryOptions({
+  key: keys.admins,
+  query: async ({ signal }) => (await listAdmins(signal)).items,
+});
 
 export const templatesQuery = defineQueryOptions({
   key: keys.templates.list,

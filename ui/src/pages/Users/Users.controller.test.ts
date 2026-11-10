@@ -4,11 +4,13 @@ import { mountController, settle } from "~/tests/mount-controller";
 import {
   admin,
   apiError,
-  member,
+  maya,
   root,
   signInAs,
   userFixture,
 } from "~/tests/fixtures";
+
+const ada = userFixture({ id: "usr_ada", email: "ada@example.com" });
 import { useUsersController } from "./Users.controller";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
@@ -24,7 +26,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(adminApi.listUsers).mockResolvedValue({
-    items: [root, admin, member],
+    items: [ada, maya],
     nextCursor: null,
   });
 });
@@ -37,20 +39,15 @@ async function mountAs(user = root) {
 }
 
 describe("useUsersController", () => {
-  it("lists users with their role, status and last sign-in", async () => {
+  it("lists users with their status and last sign-in", async () => {
     const c = await mountAs();
-    expect(c.rows.value.map((row) => row.user.id)).toEqual([
-      root.id,
-      admin.id,
-      member.id,
-    ]);
+    expect(c.rows.value.map((row) => row.user.id)).toEqual([ada.id, maya.id]);
     expect(c.rows.value[0]).toMatchObject({
-      roleLabel: "Root",
-      isYou: true,
+      name: "Maya",
       lastSignIn: "Never",
     });
     expect(adminApi.listUsers).toHaveBeenCalledWith(
-      { search: "", role: null, status: null },
+      { search: "", status: null },
       null,
       expect.any(AbortSignal),
     );
@@ -59,12 +56,11 @@ describe("useUsersController", () => {
   it("searches and filters on the server", async () => {
     const c = await mountAs();
     c.search.value = "  ada ";
-    c.roleFilter.value = "admin";
     c.statusFilter.value = "active";
     await wait(350);
     await settle();
     expect(adminApi.listUsers).toHaveBeenLastCalledWith(
-      { search: "ada", role: "admin", status: "active" },
+      { search: "ada", status: "active" },
       null,
       expect.any(AbortSignal),
     );
@@ -74,14 +70,14 @@ describe("useUsersController", () => {
   it("loads the next page with the cursor", async () => {
     const extra = userFixture({ id: "usr_more", email: "more@example.com" });
     vi.mocked(adminApi.listUsers)
-      .mockResolvedValueOnce({ items: [root], nextCursor: "c2" })
+      .mockResolvedValueOnce({ items: [ada], nextCursor: "c2" })
       .mockResolvedValueOnce({ items: [extra], nextCursor: null });
     const c = await mountAs();
     expect(c.hasMore.value).toBe(true);
     await c.loadMore();
     expect(vi.mocked(adminApi.listUsers).mock.calls[1]?.[1]).toBe("c2");
     expect(c.rows.value.map((row) => row.user.id)).toEqual([
-      root.id,
+      ada.id,
       "usr_more",
     ]);
     expect(c.hasMore.value).toBe(false);
@@ -96,11 +92,6 @@ describe("useUsersController", () => {
   });
 
   describe("new user", () => {
-    it("lets only root choose the role", async () => {
-      expect((await mountAs(root)).canChooseRole.value).toBe(true);
-      expect((await mountAs(admin)).canChooseRole.value).toBe(false);
-    });
-
     it("needs a valid email", async () => {
       const c = await mountAs();
       c.openCreate();
@@ -120,14 +111,12 @@ describe("useUsersController", () => {
         email: " new@example.com ",
         displayName: "",
         password: "",
-        role: "admin",
         emailVerified: true,
       };
       await c.submitCreate();
       expect(adminApi.createUser).toHaveBeenCalledWith({
         email: "new@example.com",
         emailVerified: true,
-        role: "admin",
       });
       expect(c.createOpen.value).toBe(false);
       expect(push).toHaveBeenCalledWith({
@@ -136,12 +125,11 @@ describe("useUsersController", () => {
       });
     });
 
-    it("never sends a role for an admin", async () => {
-      vi.mocked(adminApi.createUser).mockResolvedValue(member);
+    it("lets any admin create a user with a password", async () => {
+      vi.mocked(adminApi.createUser).mockResolvedValue(maya);
       const c = await mountAs(admin);
       c.openCreate();
       c.draft.value.email = "new@example.com";
-      c.draft.value.role = "admin";
       c.draft.value.password = "hunter22";
       await c.submitCreate();
       expect(adminApi.createUser).toHaveBeenCalledWith({
