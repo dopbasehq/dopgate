@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
   constants::{
-    errors::{AUTHORIZATION_DENIED, EMAIL_TAKEN, NOT_FOUND, ROOT_PROTECTED},
+    errors::{EMAIL_TAKEN, NOT_FOUND, ROOT_PROTECTED},
     tokens::ADMIN_ID_PREFIX,
   },
   http::HttpError,
@@ -183,13 +183,9 @@ pub async fn delete(
 ) -> Result<(), HttpError> {
   authz::require_root(actor)?;
   let target = find(state, id).await?;
+  // Only root gets here and root can't be the target, so nobody deletes
+  // their own account.
   require_not_root(&target)?;
-  if actor.admin_id() == Some(id) {
-    return Err(HttpError::forbidden(
-      AUTHORIZATION_DENIED,
-      "You can't delete your own account.",
-    ));
-  }
   let mut tx = state.db.pool().begin().await?;
   if !repository::delete(&mut *tx, id).await? {
     return Err(not_found());

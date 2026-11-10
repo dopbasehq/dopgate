@@ -174,7 +174,7 @@ Public, or User. Ends the session of the access token, or of the refresh token w
 | `refreshToken` | no | Ends this token's session. Works after the access token expired. |
 | `allSessions` | no | `true` ends every session of the account |
 
-Answers `200 SIGNED_OUT` with `data: null`, and clears the console cookie when one was sent. An unknown refresh token still answers `200`. Errors: `401 AUTHENTICATION_REQUIRED` when neither token is sent.
+Answers `200 SIGNED_OUT` with `data: null`, and clears the `dopgate_refresh` cookie when one was sent. It never touches the console's cookie: the console signs out with `POST /api/v1/console/logout`. An unknown refresh token still answers `200`. Errors: `401 AUTHENTICATION_REQUIRED` when neither token is sent.
 
 ### `GET /api/v1/auth/me`
 

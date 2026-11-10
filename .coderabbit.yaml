@@ -49,7 +49,7 @@ reviews:
         Admins (adm_ IDs, root included) are separate from the app's users.
     - path: "app/src/{extractors,middlewares}/**"
       instructions: *auth
-    - path: "app/src/modules/{auth,admins,agents,console,keys,mfa,personal_tokens,recovery,sessions,sso,tokens,users,verification,bootstrap}/**"
+    - path: "app/src/modules/{accounts,auth,admins,agents,console,keys,mfa,personal_tokens,recovery,sessions,sso,tokens,users,verification,bootstrap}/**"
       instructions: *auth
     - path: "app/migrations/**"
       instructions: &migrations |

@@ -83,8 +83,9 @@ fn migration_files_follow_the_naming_rules() {
 }
 
 /// An instance from before the split keeps working: root and admins move
-/// from `users` to `admins` with their passwords, members stay, and rolling
-/// back puts everyone where they were.
+/// from `users` to `admins` with their passwords, members stay, the setting
+/// an admin saved still names them, and rolling back puts everyone where
+/// they were.
 #[tokio::test]
 async fn the_admin_split_moves_existing_accounts() {
   let (db, _guard) = support::database().await;
@@ -105,6 +106,12 @@ async fn the_admin_split_moves_existing_accounts() {
     .await
     .unwrap();
   }
+  sqlx::query(
+    "INSERT INTO settings(key,value,updated_at,updated_by) VALUES('test','{}',now(),'usr_ana')",
+  )
+  .execute(pool)
+  .await
+  .unwrap();
   db.migrate().await.unwrap();
 
   let admins: Vec<(String, String, Option<String>)> =
@@ -132,6 +139,7 @@ async fn the_admin_split_moves_existing_accounts() {
     .await
     .unwrap();
   assert_eq!(users, ["usr_ada"]);
+  assert_eq!(saved_by(pool).await.as_deref(), Some("adm_ana"));
 
   MIGRATOR.undo(pool, 20261109080010).await.unwrap();
   let restored: Vec<(String, String)> = sqlx::query_as("SELECT id, role FROM users ORDER BY id")
@@ -146,4 +154,33 @@ async fn the_admin_split_moves_existing_accounts() {
       ("usr_root".to_owned(), "root".to_owned()),
     ]
   );
+  assert_eq!(saved_by(pool).await.as_deref(), Some("usr_ana"));
+}
+
+async fn saved_by(pool: &sqlx::PgPool) -> Option<String> {
+  sqlx::query_scalar("SELECT updated_by FROM settings WHERE key = 'test'")
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// After the split an admin and a user can share an email, which `users`
+/// can't hold. Rolling back stops with an error instead of dropping one.
+#[tokio::test]
+async fn rolling_back_the_admin_split_refuses_to_drop_a_shared_email() {
+  let (db, _guard) = support::database().await;
+  let pool = db.pool();
+  for statement in [
+    "INSERT INTO admins(id,email,role,status,created_at,updated_at) VALUES('adm_ana','ana@example.com','admin','active',now(),now())",
+    "INSERT INTO users(id,email,status,created_at,updated_at) VALUES('usr_ana','ana@example.com','active',now(),now())",
+  ] {
+    sqlx::query(statement).execute(pool).await.unwrap();
+  }
+  let error = MIGRATOR.undo(pool, 20261109080010).await.unwrap_err();
+  assert!(error.to_string().contains("cannot roll back"), "{error}");
+  let admins: i64 = sqlx::query_scalar("SELECT count(*) FROM admins")
+    .fetch_one(pool)
+    .await
+    .unwrap();
+  assert_eq!(admins, 1);
 }
