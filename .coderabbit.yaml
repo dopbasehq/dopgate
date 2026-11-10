@@ -1,0 +1,116 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit reviews every pull request and only advises: it never approves,
+# requests changes, or blocks a merge. Same-repo branches use the copy of this
+# file on their own branch; pull requests from forks use the target branch's.
+language: en-US
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  # Keep the summary in CodeRabbit's comment so the PR body is never edited.
+  high_level_summary_in_walkthrough: true
+  poem: false
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    # Every target branch: main, release/*, and the stack/* branches that
+    # stacked pull requests merge into.
+    base_branches:
+      - ".*"
+    # Roll-up pull requests (a stack into release/*, or release/* into main)
+    # bundle work that was already reviewed. Label them skip-review.
+    labels:
+      - "!skip-review"
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
+
+  # Excluded files don't count toward the per-review file limit.
+  path_filters:
+    - "!**/Cargo.lock"
+    - "!**/bun.lock"
+    - "!**/target/**"
+    - "!**/node_modules/**"
+    - "!ui/dist/**"
+    - "!**/*.{png,jpg,jpeg,gif,webp,ico,woff,woff2,ttf,mp4,mov,webm}"
+
+  path_instructions:
+    - path: "app/src/services/{authz,jwt,keys,token,password,otp,oidc,secret_box,rate_limit,limits}.rs"
+      instructions: &auth |
+        Auth and access code. Look for privilege escalation, admin-only routes
+        a user or agent token can reach, checks made on a name instead of the
+        token's kind (human or agent), refresh tokens that can be reused,
+        personal tokens without an expiry, secrets or codes that end up in logs
+        or responses, and comparisons of secrets that aren't constant time.
+        Admins (adm_ IDs, root included) are separate from the app's users.
+    - path: "app/src/{extractors,middlewares}/**"
+      instructions: *auth
+    - path: "app/src/modules/{accounts,auth,admins,agents,console,keys,mfa,personal_tokens,recovery,sessions,sso,tokens,users,verification,bootstrap}/**"
+      instructions: *auth
+    - path: "app/migrations/**"
+      instructions: &migrations |
+        Every migration has a matching up and down file with a UTC timestamp
+        version, and the down file reverses exactly that change. Tables live in
+        the configured schema (DOPGATE_DATABASE_SCHEMA), never a hard-coded
+        one. Once a release ships, its migrations must never be edited or
+        renamed. Flag destructive changes the PR description doesn't mention.
+    - path: "app/src/services/db.rs"
+      instructions: *migrations
+    - path: "ui/src/**/*.{vue,ts}"
+      instructions: |
+        Vue admin console. Server reads go through the shared query cache in
+        ui/src/queries, and API calls through ui/src/services. Forms and dialogs
+        need labels, visible focus, and keyboard use. Never keep tokens or
+        secrets anywhere a script on another page could read them.
+    - path: "{docs/**,README.md,CHANGELOG.md}"
+      instructions: |
+        Docs must match what the code in this PR does. CHANGELOG.md follows
+        Keep a Changelog. Wording is plain and direct, and example emails use
+        the example.com domain.
+
+  tools:
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    hadolint:
+      enabled: true
+
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    custom_checks:
+      - name: "CHANGELOG and docs updated"
+        mode: warning
+        instructions: |
+          Fail when the PR changes public behavior (an HTTP API, a CLI command
+          or flag, a DOPGATE_* environment variable, a config file key, or the
+          database schema) and changes neither CHANGELOG.md nor a file under
+          docs/. Pass for internal-only, test, CI, and refactor changes.
+      - name: "Breaking change has a migration note"
+        mode: warning
+        instructions: |
+          Fail when the PR title contains "!" before the colon, or the diff
+          breaks compatibility for existing users, and the PR description gives
+          no migration step. Pass otherwise.
+
+knowledge_base:
+  learnings:
+    scope: local
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "README.md"
+      - "CONTEXT.md"
+      - "CONTRIBUTING.md"
+
+chat:
+  auto_reply: true

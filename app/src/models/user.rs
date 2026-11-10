@@ -1,16 +1,14 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// What an account may do. Stored in `users.role`.
+/// What an admin may do. Stored in `admins.role`.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
   /// The instance owner, created at setup. Exactly one exists.
   Root,
-  /// Manages members and settings.
+  /// Manages users and settings.
   Admin,
-  /// An end user of your app.
-  Member,
 }
 
 impl Role {
@@ -18,7 +16,6 @@ impl Role {
     match self {
       Self::Root => "root",
       Self::Admin => "admin",
-      Self::Member => "member",
     }
   }
 
@@ -26,24 +23,27 @@ impl Role {
     match value {
       "root" => Some(Self::Root),
       "admin" => Some(Self::Admin),
-      "member" => Some(Self::Member),
       _ => None,
     }
   }
-
-  /// Root and admins reach the admin API.
-  pub fn is_admin(self) -> bool {
-    matches!(self, Self::Root | Self::Admin)
-  }
 }
 
-/// Whether an account may sign in. Stored in `users.status`.
+/// Whether an account may sign in. Stored in `status` on admins and users.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum UserStatus {
   Active,
   /// Sign-in is refused and existing sessions stop refreshing.
   Disabled,
+}
+
+impl UserStatus {
+  pub fn as_str(self) -> &'static str {
+    match self {
+      Self::Active => "active",
+      Self::Disabled => "disabled",
+    }
+  }
 }
 
 /// A user account as the API returns it. Never includes the password hash
@@ -57,7 +57,6 @@ pub struct User {
   pub email_verified: bool,
   pub display_name: Option<String>,
   pub avatar_url: Option<String>,
-  pub role: Role,
   pub status: UserStatus,
   /// JSON the user can read and change, such as preferences.
   pub user_metadata: serde_json::Value,
@@ -66,6 +65,27 @@ pub struct User {
   /// Whether the account has a password. Accounts created for sign-in by
   /// emailed code may not.
   pub has_password: bool,
+  pub last_sign_in_at: Option<chrono::DateTime<chrono::Utc>>,
+  pub created_at: chrono::DateTime<chrono::Utc>,
+  pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Root or an admin, as the console and the admin API return it.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Admin {
+  /// Admin ID with the `adm_` prefix.
+  pub id: String,
+  pub email: String,
+  pub display_name: Option<String>,
+  pub avatar_url: Option<String>,
+  pub role: Role,
+  pub status: UserStatus,
+  /// Whether the admin has a password. One without signs in with emailed
+  /// codes.
+  pub has_password: bool,
+  /// Set while the account is locked after wrong passwords.
+  pub locked_until: Option<chrono::DateTime<chrono::Utc>>,
   pub last_sign_in_at: Option<chrono::DateTime<chrono::Utc>>,
   pub created_at: chrono::DateTime<chrono::Utc>,
   pub updated_at: chrono::DateTime<chrono::Utc>,

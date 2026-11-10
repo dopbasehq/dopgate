@@ -28,7 +28,7 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | `ALREADY_INITIALIZED` | 409 | `POST /bootstrap/root` on an instance that already has root. |
 | `AUTHENTICATION_INVALID` | 401 | Wrong email or password, a locked account, a wrong current password, an `Authorization` header that isn't `Bearer <token>`, or a bearer token that is neither a JWT nor the service key. |
 | `AUTHENTICATION_REQUIRED` | 401 | No `Authorization` header, or `POST /auth/logout` with neither an access token nor a refresh token. |
-| `AUTHORIZATION_DENIED` | 403 | The caller's role can't do this: a member on the admin API, an admin managing an admin, anyone but root rotating keys or changing roles, or the service key on an endpoint for a signed-in user. |
+| `AUTHORIZATION_DENIED` | 403 | The caller can't do this: a user on the admin API, an admin token on a user endpoint or a user token on a console endpoint, anyone but root managing admins or rotating keys, or the service key on an endpoint for a signed-in account. |
 | `CODE_EXPIRED` | 400 | The emailed code is past its lifetime. |
 | `CODE_INVALID` | 400 | The code is wrong, used up after too many wrong tries, or there is no code for this email and purpose. |
 | `EMAIL_INVALID` | 422 | The email isn't valid, or an email change names the current address. `400` for the `to` of an SMTP test, and when the service key asks for a test email it has no address for. |

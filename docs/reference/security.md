@@ -23,7 +23,9 @@ The database is the boundary that matters most. Keep the `dopgate` schema readab
 
 ## Tokens
 
-Access tokens are ES256 JWTs. Dopgate only accepts `alg: ES256` with a known `kid`, checks the issuer and expiry with 30 seconds of leeway, and on its own endpoints also checks that the session is still open and the account still active. Your backend verifies offline and can't make those last two checks. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
+App access tokens are ES256 JWTs. Dopgate accepts one only with `alg: ES256` and a `kid` from the key set, checks the issuer and expiry with 30 seconds of leeway, and on its own endpoints also checks that the session is still open and the account still active. Your backend verifies offline and can't make those last two checks.
+
+Console access tokens are HS256 JWTs signed with a secret that never leaves Dopgate and isn't in the JWKS. Dopgate accepts one only when its `kid` is the current console secret and its audience is `dopgate-console`, then runs the same issuer, expiry, session and account checks. A backend that trusts the JWKS can't verify them, so an admin's token never works against your app. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
 
 Refresh tokens rotate on every use. A spent token presented again ends its session, since it means two parties hold the same token.
 
@@ -49,11 +51,13 @@ Every response carries:
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: no-referrer`
 
-API responses also carry `Cache-Control: no-store`. Request bodies are limited to 3 MB and requests to 30 seconds. CORS allows only the origins in `DOPGATE_ALLOWED_ORIGINS` and never allows credentials. The console's refresh cookie is `HttpOnly`, `SameSite=Strict`, limited to `/api/v1/auth`, and `Secure` on an HTTPS public URL.
+API responses also carry `Cache-Control: no-store`. Request bodies are limited to 3 MB and requests to 30 seconds. CORS allows only the origins in `DOPGATE_ALLOWED_ORIGINS` and never allows credentials. Both refresh cookies are `HttpOnly`, `SameSite=Strict`, and `Secure` on an HTTPS public URL. The app's `dopgate_refresh` cookie is limited to `/api/v1/auth`, and the console's `dopgate_console` cookie to `/api/v1/console`.
 
-## Roles
+## Admins and users
 
-Root, admins, members, and the service key have the permissions listed in [Users and roles](/guide/users-and-roles). Root can't be changed through the admin API by anyone, root included, and only root rotates keys or manages admins.
+Admins and your app's users are separate accounts in separate tables, with separate sessions and codes. Root, admins, users, and the service key have the permissions listed in [Admins and users](/guide/admins-and-users). Root can't be changed through the admin API by anyone, root included, and only root rotates keys or manages admins.
+
+Console tokens are signed with HS256 and a 32-byte secret in `console_keys`. The secret never leaves Dopgate and isn't in the JWKS, so a backend that trusts the key set can't accept an admin's token. Rotating the signing keys replaces it too.
 
 ## Audit log
 

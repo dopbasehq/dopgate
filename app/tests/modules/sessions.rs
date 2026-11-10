@@ -8,7 +8,7 @@ use crate::support::{PASSWORD, TestApp};
 async fn users_see_their_sessions_and_end_one_or_the_others() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   let laptop = app.login("ada@example.com", PASSWORD).await;
   let phone = app.login("ada@example.com", PASSWORD).await;
   let tablet = app.login("ada@example.com", PASSWORD).await;
@@ -62,12 +62,28 @@ async fn users_see_their_sessions_and_end_one_or_the_others() {
 async fn nobody_ends_someone_elses_session() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
+  app.create_user(&root, "bo@example.com").await;
   let ada = app.login("ada@example.com", PASSWORD).await;
+  let bo = app.login("bo@example.com", PASSWORD).await;
   let (_, mine) = app
-    .request_with(Method::GET, "/api/v1/auth/sessions", None, Some(&root))
+    .request_with(Method::GET, "/api/v1/auth/sessions", None, Some(&bo))
     .await;
-  let root_session = mine["data"][0]["id"].as_str().unwrap().to_owned();
+  let bo_session = mine["data"][0]["id"].as_str().unwrap().to_owned();
+  let (status, _) = app
+    .request_with(
+      Method::DELETE,
+      &format!("/api/v1/auth/sessions/{bo_session}"),
+      None,
+      Some(&ada),
+    )
+    .await;
+  assert_eq!(status, StatusCode::NOT_FOUND);
+  // Nor can a user end an admin's console session, which lives elsewhere.
+  let (_, console) = app
+    .request_with(Method::GET, "/api/v1/console/sessions", None, Some(&root))
+    .await;
+  let root_session = console["data"][0]["id"].as_str().unwrap().to_owned();
   let (status, _) = app
     .request_with(
       Method::DELETE,

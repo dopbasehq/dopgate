@@ -5,7 +5,7 @@ use crate::{
       ALREADY_INITIALIZED, EMAIL_INVALID, EMAIL_INVALID_MESSAGE, PASSWORD_INVALID, RATE_LIMITED,
       SETUP_TOKEN_INVALID,
     },
-    tokens::USER_ID_PREFIX,
+    tokens::ADMIN_ID_PREFIX,
   },
   http::HttpError,
   modules::audit,
@@ -51,11 +51,11 @@ pub async fn bootstrap_root(
       "The setup token is wrong. Copy it from the server log.",
     ));
   }
-  let user_id = create_root(&state.db, &request.email, &request.password).await?;
+  let admin_id = create_root(&state.db, &request.email, &request.password).await?;
   setup.token = None;
   state.rate_limiter.clear(&limiter_key).await;
   Ok(RootCreated {
-    user_id,
+    admin_id,
     email: email::normalize(&request.email).unwrap_or(request.email),
   })
 }
@@ -86,7 +86,7 @@ pub async fn create_root(
       tracing::error!(%error, "failed to hash the root password");
       HttpError::internal()
     })?;
-  let id = token::public_id(USER_ID_PREFIX);
+  let id = token::public_id(ADMIN_ID_PREFIX);
   let mut tx = db.pool().begin().await?;
   if let Err(error) = repository::insert_root(&mut tx, &id, &email, &password_hash).await {
     if error
@@ -104,7 +104,7 @@ pub async fn create_root(
       actor_id: None,
       actor_label: Some("setup"),
       action: "instance.initialized",
-      resource_type: Some("user"),
+      resource_type: Some("admin"),
       resource_id: Some(&id),
       metadata: serde_json::json!({ "email": email }),
     },

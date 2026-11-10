@@ -51,7 +51,9 @@ async fn malformed_headers_are_refused() {
 #[tokio::test]
 async fn the_bearer_scheme_ignores_case() {
   let app = TestApp::new().await;
-  let token = app.root_token().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let token = app.login("ada@example.com", crate::support::PASSWORD).await;
   for scheme in ["Bearer", "bearer", "BEARER"] {
     let (status, _) = me_with(&app, &format!("{scheme} {token}")).await;
     assert_eq!(status, StatusCode::OK, "{scheme}");

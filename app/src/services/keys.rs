@@ -5,6 +5,12 @@
 //! still verifies the tokens it signed. A retiring key is retired once no
 //! token it signed can still be valid: access tokens last at most a day.
 //! The public halves of active and retiring keys form the JWKS.
+//!
+//! Console access tokens use a separate HS256 secret in `console_keys`. It
+//! never leaves Dopgate and is not in the JWKS. Rotation replaces it too;
+//! the console then refreshes its token. It is read from the database on
+//! every use rather than cached, so every server drops a retired secret at
+//! the moment of rotation.
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -20,7 +26,10 @@ use serde_json::{Value, json};
 use sqlx::{PgConnection, PgPool};
 use tokio::sync::RwLock;
 
-use crate::{constants::tokens::SIGNING_KEY_ID_PREFIX, services::token};
+use crate::{
+  constants::tokens::{CONSOLE_KEY_ID_PREFIX, SIGNING_KEY_ID_PREFIX},
+  services::token,
+};
 
 /// A retiring key verifies tokens for this long after rotation, the longest
 /// an access token can last.
@@ -89,6 +98,29 @@ pub async fn insert_active(
   .map(|_| ())
 }
 
+/// Make a new console secret the active one, retiring the old one. Tokens
+/// it signed stop verifying, and the console refreshes them.
+pub async fn rotate_console_key(connection: &mut PgConnection) -> Result<(), sqlx::Error> {
+  sqlx::query("LOCK TABLE console_keys IN SHARE ROW EXCLUSIVE MODE")
+    .execute(&mut *connection)
+    .await?;
+  sqlx::query("UPDATE console_keys SET status='retired', retired_at=now() WHERE status='active'")
+    .execute(&mut *connection)
+    .await?;
+  insert_console_key(connection).await
+}
+
+async fn insert_console_key(connection: &mut PgConnection) -> Result<(), sqlx::Error> {
+  let mut secret = [0_u8; 32];
+  getrandom::fill(&mut secret).map_err(|error| sqlx::Error::Protocol(error.to_string()))?;
+  sqlx::query("INSERT INTO console_keys(id,secret,status,created_at) VALUES($1,$2,'active',now())")
+    .bind(token::public_id(CONSOLE_KEY_ID_PREFIX))
+    .bind(secret.as_slice())
+    .execute(connection)
+    .await
+    .map(|_| ())
+}
+
 impl KeyStore {
   /// Make sure an active key exists, retire keys past their window, and
   /// load everything into the cache. Runs at startup.
@@ -109,6 +141,16 @@ impl KeyStore {
       let key = generate()?;
       insert_active(&mut tx, &key).await?;
       tracing::info!(kid = %key.id, "generated a signing key");
+    }
+    sqlx::query("LOCK TABLE console_keys IN SHARE ROW EXCLUSIVE MODE")
+      .execute(&mut *tx)
+      .await?;
+    let console: bool =
+      sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM console_keys WHERE status='active')")
+        .fetch_one(&mut *tx)
+        .await?;
+    if !console {
+      insert_console_key(&mut tx).await?;
     }
     tx.commit().await?;
     self.reload(pool).await
@@ -164,6 +206,31 @@ impl KeyStore {
       tracing::warn!(%error, "failed to reload signing keys");
     }
     self.cache.read().await.verifying.get(kid).cloned()
+  }
+
+  /// The ID and secret that sign console tokens. Read from the database
+  /// each time, not cached, so a rotation from the CLI or another server
+  /// takes effect at once.
+  pub async fn console_key(
+    &self,
+    pool: &PgPool,
+  ) -> Result<Option<(String, Vec<u8>)>, sqlx::Error> {
+    sqlx::query_as("SELECT id, secret FROM console_keys WHERE status='active'")
+      .fetch_optional(pool)
+      .await
+  }
+
+  /// The console secret with this ID, only while it is the active one, so
+  /// a token signed before a rotation stops verifying everywhere at once.
+  pub async fn console_secret(
+    &self,
+    pool: &PgPool,
+    kid: &str,
+  ) -> Result<Option<Vec<u8>>, sqlx::Error> {
+    sqlx::query_scalar("SELECT secret FROM console_keys WHERE id = $1 AND status='active'")
+      .bind(kid)
+      .fetch_optional(pool)
+      .await
   }
 
   /// The JSON Web Key Set apps verify tokens with.

@@ -32,11 +32,13 @@ A schema name must use lowercase letters, digits, and underscores, start with a 
 
 | Table | Holds |
 | --- | --- |
-| `users` | Accounts: root, admins, and members, with their password hashes and metadata |
-| `sessions` | One row per signed-in device |
-| `refresh_tokens` | SHA-256 hashes of refresh tokens |
-| `verification_tokens` | SHA-256 hashes of emailed 6-digit codes |
+| `admins` | Root and admins, with their password hashes |
+| `users` | Your app's users, with their password hashes and metadata |
+| `sessions`, `admin_sessions` | One row per signed-in device, for users and for admins |
+| `refresh_tokens`, `admin_refresh_tokens` | SHA-256 hashes of refresh tokens |
+| `verification_tokens`, `admin_codes` | SHA-256 hashes of emailed 6-digit codes |
 | `signing_keys` | The ES256 keys that sign access tokens, private keys included |
+| `console_keys` | The HS256 secret that signs console tokens |
 | `settings` | Runtime settings, one JSON object per section |
 | `email_templates` | Admin overrides of the built-in emails |
 | `sso_providers`, `user_identities`, `sso_flows` | Reserved for single sign-on, which is planned |
@@ -46,7 +48,7 @@ Treat these as Dopgate's private storage and use the API to read or change accou
 
 ## Give Dopgate its own role
 
-`signing_keys` holds the private key that signs every access token. Anyone who can read it can sign a token for any user. Your app's database role shouldn't be able to read it, and neither should any reporting or analytics user.
+`signing_keys` holds the private key that signs every access token, and `console_keys` the secret behind console tokens. Anyone who can read it can sign a token for any user. Your app's database role shouldn't be able to read it, and neither should any reporting or analytics user.
 
 Create a role for Dopgate and let it create its own schema:
 

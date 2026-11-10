@@ -3,9 +3,12 @@ use utoipa::openapi::OpenApi;
 
 use crate::state::AppState;
 
+pub mod accounts;
+pub mod admins;
 pub mod audit;
 pub mod auth;
 pub mod bootstrap;
+pub mod console;
 pub mod email_templates;
 pub mod health;
 pub mod keys;
@@ -22,12 +25,14 @@ pub fn routes() -> Router<AppState> {
     .merge(health::routes())
     .merge(bootstrap::routes())
     .merge(auth::routes())
+    .merge(console::routes())
     .merge(recovery::routes())
     .merge(verification::routes())
     .merge(sessions::routes())
     .merge(mfa::routes())
     .merge(sso::routes())
     .merge(users::routes())
+    .merge(admins::routes())
     .merge(keys::routes())
     .merge(settings::routes())
     .merge(email_templates::routes())
@@ -40,10 +45,12 @@ pub fn openapi() -> OpenApi {
   let mut doc = health::doc::build();
   doc.merge(bootstrap::doc::build());
   doc.merge(auth::doc::build());
+  doc.merge(console::doc::build());
   doc.merge(recovery::doc::build());
   doc.merge(verification::doc::build());
   doc.merge(sessions::doc::build());
   doc.merge(users::doc::build());
+  doc.merge(admins::doc::build());
   doc.merge(keys::doc::build());
   doc.merge(settings::doc::build());
   doc.merge(email_templates::doc::build());

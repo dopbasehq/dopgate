@@ -66,7 +66,8 @@ pub async fn get(
 /// Create a user
 ///
 /// Create an account without sending any email. Leave out `password` for an
-/// account that signs in with emailed codes. Only root creates admins.
+/// account that signs in with emailed codes. Admins are added at
+/// `/admin/admins`.
 #[utoipa::path(
   post,
   path = crate::constants::api::users::COLLECTION,
@@ -75,7 +76,6 @@ pub async fn get(
   request_body = CreateUserRequest,
   responses(
     (status = 201, description = "User created", body = inline(HttpResponseFormat<AdminUser>)),
-    (status = 403, description = "Only root creates admins", body = crate::http::ErrorBody),
     (status = 409, description = "The email is taken", body = crate::http::ErrorBody),
     (status = 422, description = "A value was refused", body = crate::http::ErrorBody),
   ),
@@ -93,8 +93,7 @@ pub async fn create(
 
 /// Update a user
 ///
-/// Change the profile, metadata, verified flag, or (root only) the role.
-/// Root can't be changed; admins manage members only.
+/// Change the profile, metadata, or verified flag.
 #[utoipa::path(
   patch,
   path = crate::constants::api::users::ITEM,
@@ -104,7 +103,7 @@ pub async fn create(
   request_body = UpdateUserRequest,
   responses(
     (status = 200, description = "User updated", body = inline(HttpResponseFormat<AdminUser>)),
-    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 403, description = "Only admins and the service key", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
     (status = 422, description = "A value was refused", body = crate::http::ErrorBody),
   ),
@@ -133,7 +132,7 @@ pub async fn update(
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
     (status = 204, description = "User deleted"),
-    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 403, description = "Only admins and the service key", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
   ),
 )]
@@ -157,7 +156,7 @@ pub async fn delete(
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
     (status = 200, description = "User disabled", body = inline(HttpResponseFormat<AdminUser>)),
-    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 403, description = "Only admins and the service key", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
   ),
 )]
@@ -181,7 +180,7 @@ pub async fn disable(
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
     (status = 200, description = "User enabled", body = inline(HttpResponseFormat<AdminUser>)),
-    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 403, description = "Only admins and the service key", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
   ),
 )]
@@ -207,7 +206,7 @@ pub async fn enable(
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
     (status = 200, description = "Code sent", body = inline(HttpResponseFormat<serde_json::Value>)),
-    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 403, description = "Only admins and the service key", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
   ),
 )]
@@ -255,7 +254,7 @@ pub async fn sessions(
   params(("id" = String, Path, description = "User ID with the usr_ prefix")),
   responses(
     (status = 200, description = "Sessions ended", body = inline(HttpResponseFormat<serde_json::Value>)),
-    (status = 403, description = "Root, or an admin acting on an admin", body = crate::http::ErrorBody),
+    (status = 403, description = "Only admins and the service key", body = crate::http::ErrorBody),
     (status = 404, description = "No such user", body = crate::http::ErrorBody),
   ),
 )]

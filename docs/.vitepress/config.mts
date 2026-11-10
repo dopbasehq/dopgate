@@ -220,7 +220,7 @@ const config = defineConfig({
         {
           text: "Accounts",
           items: [
-            { text: "Users and roles", link: "/guide/users-and-roles" },
+            { text: "Admins and users", link: "/guide/admins-and-users" },
             { text: "Sign-up and email verification", link: "/guide/sign-up-and-verification" },
             { text: "Sign-in with a password or a code", link: "/guide/sign-in" },
             { text: "Password reset", link: "/guide/password-reset" },

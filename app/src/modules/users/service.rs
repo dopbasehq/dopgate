@@ -1,4 +1,4 @@
-//! Admin user management, for root, admins, and the service key.
+//! Managing your app's users, for root, admins, and the service key.
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
@@ -9,18 +9,18 @@ use super::{
 };
 use crate::{
   constants::{
-    errors::{AUTHORIZATION_DENIED, EMAIL_TAKEN, NOT_FOUND, REQUEST_INVALID},
+    errors::{EMAIL_TAKEN, NOT_FOUND, REQUEST_INVALID},
     tokens::USER_ID_PREFIX,
   },
   http::HttpError,
-  models::{AuthIdentity, Role, UserStatus},
+  models::{AuthIdentity, Realm, UserStatus},
   modules::{
     audit,
     sessions::{self, model::SessionResponse},
     settings,
     verification::service::{self as verification, CodeTarget},
   },
-  services::{authz, otp::Purpose, password, token},
+  services::{otp::Purpose, password, token},
   state::AppState,
   utils::validate,
 };
@@ -59,7 +59,6 @@ pub async fn list(
     state.db.pool(),
     &repository::ListFilter {
       search,
-      role: query.role,
       status: query.status,
       before: cursor.as_ref().map(|(time, id)| (*time, id.as_str())),
       limit: i64::from(limit) + 1,
@@ -94,32 +93,11 @@ pub async fn get(
   Ok(find(state, id).await?.to_admin())
 }
 
-fn require_root_for(
-  actor: &AuthIdentity,
-  role: Role,
-) -> Result<(), HttpError> {
-  match role {
-    Role::Root => Err(HttpError::forbidden(
-      AUTHORIZATION_DENIED,
-      "There is exactly one root account.",
-    )),
-    Role::Admin => authz::require_root(actor).map_err(|_| {
-      HttpError::forbidden(
-        AUTHORIZATION_DENIED,
-        "Only root can create admins or change roles.",
-      )
-    }),
-    Role::Member => Ok(()),
-  }
-}
-
 pub async fn create(
   state: &AppState,
   actor: &AuthIdentity,
   request: CreateUserRequest,
 ) -> Result<AdminUser, HttpError> {
-  let role = request.role.unwrap_or(Role::Member);
-  require_root_for(actor, role)?;
   let email = validate::email(&request.email)?;
   let display_name = validate::display_name(request.display_name)?.flatten();
   let public_metadata = validate::metadata(
@@ -154,7 +132,6 @@ pub async fn create(
       email: &email,
       password_hash: password_hash.as_deref(),
       display_name: display_name.as_deref(),
-      role,
       email_verified: request.email_verified,
       public_metadata: &public_metadata,
       private_metadata: &private_metadata,
@@ -166,7 +143,7 @@ pub async fn create(
     Err(error) if repository::is_email_taken(&error) => {
       return Err(HttpError::conflict(
         EMAIL_TAKEN,
-        "Another account already uses this email.",
+        "Another user already uses this email.",
       ));
     }
     Err(error) => return Err(error.into()),
@@ -175,7 +152,7 @@ pub async fn create(
     &mut tx,
     audit::service::Event::by(actor, "user.created")
       .resource("user", Some(&user.id))
-      .metadata(serde_json::json!({ "email": user.email, "role": user.role })),
+      .metadata(serde_json::json!({ "email": user.email })),
   )
   .await?;
   tx.commit().await?;
@@ -188,16 +165,7 @@ pub async fn update(
   id: &str,
   request: UpdateUserRequest,
 ) -> Result<AdminUser, HttpError> {
-  let target = find(state, id).await?;
-  authz::check_manage(actor, target.role())?;
-  if let Some(role) = request.role
-    && role != target.role()
-  {
-    require_root_for(actor, role)?;
-    if target.role() == Role::Admin {
-      authz::require_root(actor)?;
-    }
-  }
+  find(state, id).await?;
   let changes = ProfileChanges {
     display_name: validate::display_name(request.display_name)?,
     avatar_url: validate::avatar_url(request.avatar_url)?,
@@ -211,7 +179,6 @@ pub async fn update(
       .map(|value| validate::metadata("privateMetadata", value))
       .transpose()?,
     email_verified: request.email_verified,
-    role: request.role,
   };
   let mut tx = state.db.pool().begin().await?;
   let updated = repository::update_profile(&mut *tx, id, &changes).await?;
@@ -222,7 +189,6 @@ pub async fn update(
     ("publicMetadata", changes.public_metadata.is_some()),
     ("privateMetadata", changes.private_metadata.is_some()),
     ("emailVerified", changes.email_verified.is_some()),
-    ("role", changes.role.is_some()),
   ] {
     if changed {
       fields.push(name);
@@ -232,7 +198,7 @@ pub async fn update(
     &mut tx,
     audit::service::Event::by(actor, "user.updated")
       .resource("user", Some(id))
-      .metadata(serde_json::json!({ "fields": fields, "role": updated.role })),
+      .metadata(serde_json::json!({ "fields": fields })),
   )
   .await?;
   tx.commit().await?;
@@ -245,7 +211,6 @@ pub async fn delete(
   id: &str,
 ) -> Result<(), HttpError> {
   let target = find(state, id).await?;
-  authz::check_manage(actor, target.role())?;
   let mut tx = state.db.pool().begin().await?;
   if !repository::delete(&mut *tx, id).await? {
     return Err(not_found());
@@ -254,7 +219,7 @@ pub async fn delete(
     &mut tx,
     audit::service::Event::by(actor, "user.deleted")
       .resource("user", Some(id))
-      .metadata(serde_json::json!({ "email": target.email, "role": target.role })),
+      .metadata(serde_json::json!({ "email": target.email })),
   )
   .await?;
   tx.commit().await?;
@@ -267,14 +232,13 @@ pub async fn set_status(
   id: &str,
   status: UserStatus,
 ) -> Result<AdminUser, HttpError> {
-  let target = find(state, id).await?;
-  authz::check_manage(actor, target.role())?;
+  find(state, id).await?;
   let mut tx = state.db.pool().begin().await?;
   let updated = repository::set_status(&mut *tx, id, status).await?;
   let (action, ended) = match status {
     UserStatus::Disabled => (
       "user.disabled",
-      sessions::service::revoke_all(&mut tx, id, None, "account_disabled").await?,
+      sessions::service::revoke_all(&mut tx, Realm::App, id, None, "account_disabled").await?,
     ),
     UserStatus::Active => ("user.enabled", 0),
   };
@@ -296,13 +260,13 @@ pub async fn send_password_reset(
   id: &str,
 ) -> Result<(), HttpError> {
   let target = find(state, id).await?;
-  authz::check_manage(actor, target.role())?;
   verification::issue(
     state,
+    Realm::App,
     Purpose::PasswordReset,
     CodeTarget {
       email: &target.email,
-      user_id: Some(&target.id),
+      account_id: Some(&target.id),
       display_name: target.display_name.as_deref(),
       current_email: None,
     },
@@ -321,7 +285,7 @@ pub async fn sessions(
   id: &str,
 ) -> Result<Vec<SessionResponse>, HttpError> {
   find(state, id).await?;
-  sessions::service::list(state, id, None).await
+  sessions::service::list(state, Realm::App, id, None).await
 }
 
 pub async fn revoke_sessions(
@@ -329,10 +293,10 @@ pub async fn revoke_sessions(
   actor: &AuthIdentity,
   id: &str,
 ) -> Result<(), HttpError> {
-  let target = find(state, id).await?;
-  authz::check_manage(actor, target.role())?;
+  find(state, id).await?;
   let mut tx = state.db.pool().begin().await?;
-  let ended = sessions::service::revoke_all(&mut tx, id, None, "revoked_by_admin").await?;
+  let ended =
+    sessions::service::revoke_all(&mut tx, Realm::App, id, None, "revoked_by_admin").await?;
   audit::service::record(
     &mut tx,
     audit::service::Event::by(actor, "user.sessions_revoked")

@@ -2,7 +2,7 @@ use super::{error::AuthError, model::*, service};
 use crate::{
   extractors::{RequestContext, SessionMode, UserIdentity},
   http::{HttpError, HttpResponse, HttpResponseFormat},
-  models::User,
+  models::{Realm, User},
   modules::sessions,
   state::AppState,
 };
@@ -35,7 +35,7 @@ pub async fn methods(
 
 /// Sign up
 ///
-/// Create a member account with an email and password, and email a 6-digit
+/// Create an account with an email and password, and email a 6-digit
 /// verification code. When settings require a verified email (the
 /// default), `tokens` is null: confirm the code with
 /// `/auth/verification/confirm` to sign in.
@@ -86,7 +86,15 @@ pub async fn login(
   Json(request): Json<LoginRequest>,
 ) -> Result<HttpResponse<AuthTokens>, AuthError> {
   let tokens = service::login(&state, request, context.user_agent.as_deref()).await?;
-  sessions::service::deliver(&state, &context, tokens, "SIGNED_IN", StatusCode::OK).await
+  sessions::service::deliver(
+    &state,
+    &context,
+    Realm::App,
+    tokens,
+    "SIGNED_IN",
+    StatusCode::OK,
+  )
+  .await
 }
 
 /// Refresh tokens
@@ -120,8 +128,17 @@ pub async fn refresh(
         "Your session has ended. Sign in again.",
       )
     })?;
-  let tokens = sessions::service::refresh(&state, &token).await?;
-  sessions::service::deliver(&state, &context, tokens, "TOKENS_REFRESHED", StatusCode::OK).await
+  let (user, grant) = sessions::service::refresh(&state, Realm::App, &token).await?;
+  let tokens = service::app_tokens(&state, &user.id, grant).await?;
+  sessions::service::deliver(
+    &state,
+    &context,
+    Realm::App,
+    tokens,
+    "TOKENS_REFRESHED",
+    StatusCode::OK,
+  )
+  .await
 }
 
 /// Sign out
@@ -150,9 +167,14 @@ pub async fn logout(
   let refresh_token = request
     .refresh_token
     .or_else(|| context.refresh_cookie.clone());
+  let current = user
+    .as_ref()
+    .ok()
+    .map(|user| (user.user_id.as_str(), user.session_id.as_str()));
   let result = service::logout(
     &state,
-    user.as_ref().ok(),
+    Realm::App,
+    current,
     refresh_token.as_deref(),
     request.all_sessions,
   )
@@ -162,7 +184,7 @@ pub async fn logout(
     Err(error) => error.into_response(),
   };
   if context.session_mode == SessionMode::Cookie || context.refresh_cookie.is_some() {
-    let (name, value) = sessions::service::clear_cookie(&state);
+    let (name, value) = sessions::service::clear_cookie(&state, Realm::App);
     response.headers_mut().append(name, value);
   }
   Ok(response)
@@ -239,7 +261,7 @@ pub async fn change_password(
   user: UserIdentity,
   Json(request): Json<ChangePasswordRequest>,
 ) -> Result<HttpResponse<serde_json::Value>, AuthError> {
-  service::change_password(&state, &user, request).await?;
+  service::change_password(&state, Realm::App, &user.user_id, &user.session_id, request).await?;
   Ok(HttpResponse::done("PASSWORD_CHANGED"))
 }
 
@@ -267,6 +289,6 @@ pub async fn change_email(
   user: UserIdentity,
   Json(request): Json<ChangeEmailRequest>,
 ) -> Result<HttpResponse<serde_json::Value>, AuthError> {
-  service::change_email(&state, &user, request).await?;
+  service::change_email(&state, Realm::App, &user.user_id, request).await?;
   Ok(HttpResponse::done("EMAIL_CHANGE_CODE_SENT"))
 }

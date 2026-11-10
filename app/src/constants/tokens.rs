@@ -1,4 +1,6 @@
+pub const ADMIN_ID_PREFIX: &str = "adm_";
 pub const AUDIT_EVENT_ID_PREFIX: &str = "aud_";
+pub const CONSOLE_KEY_ID_PREFIX: &str = "ckey_";
 pub const REFRESH_TOKEN_ID_PREFIX: &str = "rft_";
 pub const REFRESH_TOKEN_PREFIX: &str = "dgr_";
 pub const SESSION_ID_PREFIX: &str = "ses_";
@@ -15,5 +17,9 @@ pub const VERIFICATION_ID_PREFIX: &str = "vrf_";
 /// then travels in an HttpOnly cookie instead of the response body.
 pub const SESSION_MODE_HEADER: &str = "x-dopgate-session";
 pub const SESSION_MODE_COOKIE: &str = "cookie";
-/// The HttpOnly cookie that carries the console's refresh token.
+/// The HttpOnly cookie that carries an app's refresh token in cookie mode.
 pub const REFRESH_COOKIE: &str = "dopgate_refresh";
+/// The HttpOnly cookie that carries the console's refresh token.
+pub const CONSOLE_REFRESH_COOKIE: &str = "dopgate_console";
+/// The `aud` of console access tokens.
+pub const CONSOLE_AUDIENCE: &str = "dopgate-console";

@@ -1,13 +1,16 @@
-//! Forgot and reset password, by emailed code.
+//! Forgot and reset password, by emailed code, for admins and users. The
+//! endpoints here are the app's; the console calls the same functions with
+//! its realm.
 
 use super::model::*;
 use crate::{
   constants::errors::{ACCOUNT_DISABLED, CODE_INVALID},
   http::HttpError,
+  models::Realm,
   modules::{
+    accounts::repository as accounts,
     audit, email_templates, sessions, settings,
-    users::repository as users,
-    verification::service::{self as verification, CodeTarget},
+    verification::service::{self as verification},
   },
   services::{limits, otp::Purpose, password},
   state::AppState,
@@ -18,23 +21,20 @@ use crate::{
 /// an account, so the endpoint cannot be used to find accounts.
 pub async fn forgot(
   state: &AppState,
+  realm: Realm,
   request: ForgotPasswordRequest,
 ) -> Result<(), HttpError> {
   limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
-  verification::check_send_limits(state, Purpose::PasswordReset, &email).await?;
-  if let Some(user) = users::find_by_email(state.db.pool(), &email).await?
-    && user.is_active()
+  verification::check_send_limits(state, realm, Purpose::PasswordReset, &email).await?;
+  if let Some(account) = accounts::find_by_email(state.db.pool(), realm, &email).await?
+    && account.is_active()
   {
     verification::issue(
       state,
+      realm,
       Purpose::PasswordReset,
-      CodeTarget {
-        email: &user.email,
-        user_id: Some(&user.id),
-        display_name: user.display_name.as_deref(),
-        current_email: None,
-      },
+      verification::target_for(&account),
     )
     .await?;
   }
@@ -46,6 +46,7 @@ pub async fn forgot(
 /// proved they read that inbox.
 pub async fn reset(
   state: &AppState,
+  realm: Realm,
   request: ResetPasswordRequest,
 ) -> Result<(), HttpError> {
   limits::per_address(state).await?;
@@ -53,9 +54,9 @@ pub async fn reset(
   let policy = settings::service::password(state.db.pool()).await?;
   validate::new_password(&request.new_password, policy.min_length)?;
   let (mut tx, row) =
-    verification::consume(state, Purpose::PasswordReset, &email, &request.code).await?;
-  let user = match row.user_id.as_deref() {
-    Some(id) => users::find_by_id_for_update(&mut tx, id).await?,
+    verification::consume(state, realm, Purpose::PasswordReset, &email, &request.code).await?;
+  let user = match row.account_id.as_deref() {
+    Some(id) => accounts::find_by_id_for_update(&mut tx, realm, id).await?,
     None => None,
   }
   .ok_or_else(|| {
@@ -76,12 +77,15 @@ pub async fn reset(
       tracing::error!(%error, "failed to hash a password");
       HttpError::internal()
     })?;
-  users::set_password(&mut *tx, &user.id, &hash).await?;
-  users::mark_verified(&mut *tx, &user.id).await?;
-  let ended = sessions::service::revoke_all(&mut tx, &user.id, None, "password_reset").await?;
+  accounts::set_password(&mut *tx, realm, &user.id, &hash).await?;
+  accounts::mark_verified(&mut *tx, realm, &user.id).await?;
+  let ended =
+    sessions::service::revoke_all(&mut tx, realm, &user.id, None, "password_reset").await?;
+  let actor_type = verification::actor_type_of(&mut tx, realm, &user.id).await?;
+  let action = format!("{}.password_reset", realm.resource());
   audit::service::record(
     &mut tx,
-    audit::service::Event::user(&user.id, &user.email, &user.role, "user.password_reset")
+    audit::service::Event::account(realm, &user.id, &user.email, &actor_type, &action)
       .metadata(serde_json::json!({ "sessionsEnded": ended })),
   )
   .await?;

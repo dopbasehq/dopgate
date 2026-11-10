@@ -43,7 +43,7 @@ async fn confirm(
 #[tokio::test]
 async fn an_emailed_code_signs_an_existing_user_in() {
   let (app, smtp, root) = app_with_mail().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   let (status, _) = send(&app, "Ada@Example.com", "login").await;
   assert_eq!(status, StatusCode::OK);
   let code = smtp.code_for("ada@example.com").await;
@@ -64,7 +64,7 @@ async fn unknown_emails_get_the_same_answer_and_no_mail() {
 }
 
 #[tokio::test]
-async fn passwordless_signup_creates_a_verified_member_when_allowed() {
+async fn passwordless_signup_creates_a_verified_user_when_allowed() {
   let (app, smtp, root) = app_with_mail().await;
   app
     .settings(&root, json!({ "signup": { "enabled": true, "requireEmailVerification": true, "passwordlessSignup": true } }))
@@ -73,7 +73,12 @@ async fn passwordless_signup_creates_a_verified_member_when_allowed() {
   let code = smtp.code_for("new@example.com").await;
   let (status, body) = confirm(&app, "new@example.com", &code).await;
   assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(body["data"]["user"]["role"], "member");
+  assert!(
+    body["data"]["user"]["id"]
+      .as_str()
+      .unwrap()
+      .starts_with("usr_")
+  );
   assert_eq!(body["data"]["user"]["emailVerified"], true);
   assert_eq!(body["data"]["user"]["hasPassword"], false);
 }
@@ -81,7 +86,7 @@ async fn passwordless_signup_creates_a_verified_member_when_allowed() {
 #[tokio::test]
 async fn wrong_codes_count_down_then_burn_the_code() {
   let (app, smtp, root) = app_with_mail().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   send(&app, "ada@example.com", "login").await;
   let code = smtp.code_for("ada@example.com").await;
   let wrong = if code == "000000" { "111111" } else { "000000" };
@@ -106,7 +111,7 @@ async fn wrong_codes_count_down_then_burn_the_code() {
 #[tokio::test]
 async fn an_expired_code_is_refused() {
   let (app, smtp, root) = app_with_mail().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   send(&app, "ada@example.com", "login").await;
   let code = smtp.code_for("ada@example.com").await;
   sqlx::query("UPDATE verification_tokens SET expires_at = now() - interval '1 second'")
@@ -121,7 +126,7 @@ async fn an_expired_code_is_refused() {
 #[tokio::test]
 async fn asking_again_waits_and_replaces_the_earlier_code() {
   let (app, smtp, root) = app_with_mail().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   send(&app, "ada@example.com", "login").await;
   let first = smtp.code_for("ada@example.com").await;
   let reply = app

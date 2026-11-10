@@ -81,6 +81,12 @@ pub struct AuthTokens {
   pub user: User,
 }
 
+impl crate::modules::sessions::service::CarriesRefresh for AuthTokens {
+  fn take_refresh_token(&mut self) -> Option<String> {
+    self.refresh_token.take()
+  }
+}
+
 /// Fields left out stay as they are. An empty string clears `displayName`
 /// or `avatarUrl`.
 #[derive(Deserialize, ToSchema)]

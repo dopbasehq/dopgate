@@ -25,10 +25,10 @@ An access token is a JWT signed with ES256. Its header names the signing key in 
 | `sid` | `ses_01JC8Z...` | The session ID |
 | `email` | `ana@example.com` | The email when the token was issued |
 | `email_verified` | `true` | Whether the email was confirmed when the token was issued |
-| `role` | `member` | `root`, `admin`, or `member` |
+| `kind` | `human` | `human` for a person who signed in |
 | `iat`, `exp` | `1762700000` | Issued at and expiry, in Unix seconds |
 
-There is no `aud` claim. [Token claims](/reference/token-claims) has the full reference.
+There is no `aud` claim. Admins never get one of these tokens: the console signs them in with tokens that only Dopgate can verify. [Token claims](/reference/token-claims) has the full reference.
 
 ## Verifying a token in your backend
 
@@ -115,7 +115,7 @@ Your backend verifies tokens without asking Dopgate, which keeps requests fast a
 
 When a user signs out, an admin disables the account, or a password reset ends every session, Dopgate stops refreshing those sessions at once and refuses their access tokens on its own endpoints. A backend that verifies offline keeps accepting the last access token for up to the access token lifetime, 15 minutes by default. If that gap matters for an action, such as deleting data or moving money, shorten `accessTokenMinutes`, or check the user with `GET /api/v1/admin/users/{id}` before acting.
 
-The same goes for claims. `email`, `email_verified`, and `role` are copied into the token when it is issued and only change on the next refresh.
+The same goes for claims. `email` and `email_verified` are copied into the token when it is issued and only change on the next refresh.
 
 ## Refresh token rotation
 

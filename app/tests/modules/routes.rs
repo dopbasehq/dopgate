@@ -67,6 +67,43 @@ fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
       Some(json!({"purpose": "login", "email": "user@example.com", "code": "123456"})),
       400,
     ),
+    (
+      "POST",
+      "/api/v1/console/login",
+      Some(json!({"email": "nobody@example.com", "password": "correct-horse"})),
+      401,
+    ),
+    (
+      "POST",
+      "/api/v1/console/refresh",
+      Some(json!({"refreshToken": "dgr_x"})),
+      401,
+    ),
+    ("POST", "/api/v1/console/logout", Some(json!({})), 401),
+    (
+      "POST",
+      "/api/v1/console/codes/send",
+      Some(json!({"email": "admin@example.com"})),
+      200,
+    ),
+    (
+      "POST",
+      "/api/v1/console/codes/confirm",
+      Some(json!({"purpose": "login", "email": "admin@example.com", "code": "123456"})),
+      400,
+    ),
+    (
+      "POST",
+      "/api/v1/console/password/forgot",
+      Some(json!({"email": "admin@example.com"})),
+      200,
+    ),
+    (
+      "POST",
+      "/api/v1/console/password/reset",
+      Some(json!({"email": "admin@example.com", "code": "123456", "newPassword": "correct-horse"})),
+      400,
+    ),
     // Planned features.
     (
       "POST",

@@ -1,7 +1,7 @@
 use super::{controller, model::*};
 use crate::{
   http::{ErrorBody, HttpResponseFormat},
-  models::{Role, User, UserStatus},
+  models::{User, UserStatus},
 };
 use utoipa::OpenApi;
 
@@ -25,7 +25,6 @@ use utoipa::OpenApi;
     CreateUserRequest,
     UpdateUserRequest,
     User,
-    Role,
     UserStatus,
     ErrorBody,
     HttpResponseFormat<UserPage>,
@@ -33,7 +32,7 @@ use utoipa::OpenApi;
     HttpResponseFormat<serde_json::Value>,
     HttpResponseFormat<Vec<crate::modules::sessions::model::SessionResponse>>
   )),
-  tags((name = "users", description = "Admin: manage accounts. Root, admins, and the service key."))
+  tags((name = "users", description = "Admin: manage your app's users. Root, admins, and the service key."))
 )]
 struct UsersApi;
 

@@ -9,7 +9,9 @@ use axum::{
 };
 
 use crate::{
-  constants::tokens::{REFRESH_COOKIE, SESSION_MODE_COOKIE, SESSION_MODE_HEADER},
+  constants::tokens::{
+    CONSOLE_REFRESH_COOKIE, REFRESH_COOKIE, SESSION_MODE_COOKIE, SESSION_MODE_HEADER,
+  },
   state::AppState,
 };
 
@@ -18,7 +20,7 @@ use crate::{
 pub enum SessionMode {
   /// In the response body. Apps store it themselves.
   Body,
-  /// In an HttpOnly cookie, for the admin console.
+  /// In an HttpOnly cookie, as the console uses it.
   Cookie,
 }
 
@@ -26,8 +28,10 @@ pub enum SessionMode {
 pub struct RequestContext {
   pub user_agent: Option<String>,
   pub session_mode: SessionMode,
-  /// The refresh token from the console's cookie, when one was sent.
+  /// The refresh token from an app's refresh cookie, when one was sent.
   pub refresh_cookie: Option<String>,
+  /// The refresh token from the console's cookie, when one was sent.
+  pub console_refresh_cookie: Option<String>,
 }
 
 impl FromRequestParts<AppState> for RequestContext {
@@ -50,20 +54,23 @@ impl FromRequestParts<AppState> for RequestContext {
       Some(value) if value.eq_ignore_ascii_case(SESSION_MODE_COOKIE) => SessionMode::Cookie,
       _ => SessionMode::Body,
     };
-    let refresh_cookie = parts
-      .headers
-      .get_all(COOKIE)
-      .iter()
-      .filter_map(|value| value.to_str().ok())
-      .flat_map(|value| value.split(';'))
-      .filter_map(|pair| pair.trim().split_once('='))
-      .find(|(name, _)| *name == REFRESH_COOKIE)
-      .map(|(_, value)| value.to_owned())
-      .filter(|value| !value.is_empty());
+    let cookie = |wanted: &str| {
+      parts
+        .headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(';'))
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(name, _)| *name == wanted)
+        .map(|(_, value)| value.to_owned())
+        .filter(|value| !value.is_empty())
+    };
     Ok(Self {
       user_agent,
       session_mode,
-      refresh_cookie,
+      refresh_cookie: cookie(REFRESH_COOKIE),
+      console_refresh_cookie: cookie(CONSOLE_REFRESH_COOKIE),
     })
   }
 }

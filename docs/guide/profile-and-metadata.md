@@ -54,7 +54,7 @@ curl -X PATCH https://auth.example.com/api/v1/admin/users/usr_01JC8... \
   -d '{"publicMetadata":{"plan":"pro"},"privateMetadata":{"stripeCustomerId":"cus_123"}}'
 ```
 
-The admin update accepts `displayName`, `avatarUrl`, `emailVerified`, `role` (root only), `publicMetadata`, and `privateMetadata`. It does not change `userMetadata`.
+The admin update accepts `displayName`, `avatarUrl`, `emailVerified`, `publicMetadata`, and `privateMetadata`. It does not change `userMetadata`.
 
 ## Changing the email
 

@@ -1,4 +1,6 @@
-//! Sign-up, sign-in, and the signed-in account.
+//! Sign-up, sign-in, and the signed-in account. The password, sign-out,
+//! and email-change steps take the realm, so the console uses them for
+//! admins too.
 
 use axum::http::StatusCode;
 
@@ -13,15 +15,16 @@ use crate::{
   },
   extractors::UserIdentity,
   http::HttpError,
-  models::{Role, User},
+  models::{AccessClaims, Realm, TokenKind, User},
   modules::{
+    accounts::repository::{self as accounts, AccountRow},
     audit, email_templates,
-    sessions::{self, model::SignInMethod},
+    sessions::{self, model::SignInMethod, service::Grant},
     settings,
     users::repository::{self as users, ProfileChanges, UserRow},
     verification::service::{self as verification, CodeTarget},
   },
-  services::{limits, otp::Purpose, password},
+  services::{jwt, limits, otp::Purpose, password},
   state::AppState,
   utils::validate,
 };
@@ -89,7 +92,6 @@ pub async fn signup(
       email: &email,
       password_hash: Some(&hash),
       display_name: display_name.as_deref(),
-      role: Role::Member,
       email_verified: false,
       public_metadata: &empty,
       private_metadata: &empty,
@@ -108,17 +110,35 @@ pub async fn signup(
   };
   audit::service::record(
     &mut tx,
-    audit::service::Event::user(&user.id, &user.email, &user.role, "user.signed_up")
+    audit::service::Event::user(&user.id, &user.email, "user.signed_up")
       .metadata(serde_json::json!({ "method": "password" })),
   )
   .await?;
-  let tokens = if signup.require_email_verification {
+  let grant = if signup.require_email_verification {
     None
   } else {
-    Some(sessions::service::start(state, &mut tx, &user, SignInMethod::Password, user_agent).await?)
+    let account = accounts::find_by_id(&mut *tx, Realm::App, &user.id)
+      .await?
+      .ok_or_else(HttpError::internal)?;
+    Some(
+      sessions::service::start(
+        state,
+        &mut tx,
+        Realm::App,
+        &account,
+        "user",
+        SignInMethod::Password,
+        user_agent,
+      )
+      .await?,
+    )
   };
   tx.commit().await?;
-  verification::issue(state, Purpose::EmailVerify, code_target(&user)).await?;
+  let tokens = match grant {
+    Some(grant) => Some(app_tokens(state, &user.id, grant).await?),
+    None => None,
+  };
+  verification::issue(state, Realm::App, Purpose::EmailVerify, code_target(&user)).await?;
   Ok(SignupResult {
     user: tokens
       .as_ref()
@@ -132,64 +152,112 @@ pub async fn signup(
 fn code_target(user: &UserRow) -> CodeTarget<'_> {
   CodeTarget {
     email: &user.email,
-    user_id: Some(&user.id),
+    account_id: Some(&user.id),
     display_name: user.display_name.as_deref(),
     current_email: None,
   }
 }
 
-/// Sign in with an email and password. Wrong passwords count toward the
-/// account lockout. While locked, every attempt gets the same answer as a
-/// wrong password. A disabled or unverified account is only reported after
-/// the right password, so the answer never reveals that an account exists.
-pub async fn login(
+/// The app's access token and refresh token for a started or refreshed
+/// session.
+pub async fn app_tokens(
   state: &AppState,
-  request: LoginRequest,
-  user_agent: Option<&str>,
+  user_id: &str,
+  grant: Grant,
 ) -> Result<AuthTokens, HttpError> {
+  let user = users::find_by_id(state.db.pool(), user_id)
+    .await?
+    .ok_or_else(HttpError::internal)?;
+  let now = chrono::Utc::now();
+  let expires_in = i64::from(grant.access_minutes) * 60;
+  let claims = AccessClaims {
+    iss: state.config.issuer().to_owned(),
+    sub: user.id.clone(),
+    exp: now.timestamp() + expires_in,
+    iat: now.timestamp(),
+    sid: grant.session_id,
+    kind: TokenKind::Human,
+    email: user.email.clone(),
+    email_verified: user.is_verified(),
+  };
+  Ok(AuthTokens {
+    access_token: jwt::sign(state, &claims).await?,
+    token_type: "Bearer".into(),
+    expires_in,
+    refresh_token: Some(grant.refresh_token),
+    user: user.to_user(),
+  })
+}
+
+/// Check an email and password. Wrong passwords count toward the account
+/// lockout. While locked, every attempt gets the same answer as a wrong
+/// password. A disabled account is only reported after the right password,
+/// so the answer never reveals that an account exists.
+pub async fn check_password(
+  state: &AppState,
+  realm: Realm,
+  email: &str,
+  given: String,
+) -> Result<AccountRow, HttpError> {
   limits::per_address(state).await?;
   let pool = state.db.pool();
-  let Some(email) = crate::utils::email::normalize(&request.email) else {
+  let Some(email) = crate::utils::email::normalize(email) else {
     return Err(wrong_credentials());
   };
-  let user = users::find_by_email(pool, &email).await?;
-  let stored = user
+  let account = accounts::find_by_email(pool, realm, &email).await?;
+  let stored = account
     .as_ref()
-    .and_then(|user| user.password_hash.clone())
+    .and_then(|account| account.password_hash.clone())
     .unwrap_or_else(|| DUMMY_HASH.clone());
-  let matches = password::verify_async(request.password, stored).await;
-  let Some(user) = user else {
+  let matches = password::verify_async(given, stored).await;
+  let Some(account) = account else {
     return Err(wrong_credentials());
   };
-  if user.is_locked() {
+  let mut tx = pool.begin().await?;
+  let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
+  tx.commit().await?;
+  let failed = format!("{}.sign_in_failed", realm.resource());
+  if account.is_locked() {
     audit::service::record_now(
       pool,
-      audit::service::Event::user(&user.id, &user.email, &user.role, "user.sign_in_failed")
+      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
         .metadata(serde_json::json!({ "reason": "locked" })),
     )
     .await;
     return Err(wrong_credentials());
   }
-  if !matches || user.password_hash.is_none() {
+  if !matches || account.password_hash.is_none() {
     let config = settings::service::limits(pool).await?;
-    let locked = users::record_failure(
+    let locked = accounts::record_failure(
       pool,
-      &user.id,
+      realm,
+      &account.id,
       i32::try_from(config.lockout_attempts).unwrap_or(i32::MAX),
       i32::try_from(config.lockout_minutes).unwrap_or(i32::MAX),
     )
     .await?;
     audit::service::record_now(
       pool,
-      audit::service::Event::user(&user.id, &user.email, &user.role, "user.sign_in_failed")
+      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
         .metadata(serde_json::json!({ "reason": "password", "locked": locked })),
     )
     .await;
     return Err(wrong_credentials());
   }
-  if !user.is_active() {
+  if !account.is_active() {
     return Err(disabled());
   }
+  Ok(account)
+}
+
+/// Sign in to your app with an email and password.
+pub async fn login(
+  state: &AppState,
+  request: LoginRequest,
+  user_agent: Option<&str>,
+) -> Result<AuthTokens, HttpError> {
+  let user = check_password(state, Realm::App, &request.email, request.password).await?;
+  let pool = state.db.pool();
   let signup = settings::service::signup(pool).await?;
   if signup.require_email_verification && !user.is_verified() {
     return Err(HttpError::forbidden(
@@ -201,25 +269,34 @@ pub async fn login(
     ));
   }
   let mut tx = pool.begin().await?;
-  let tokens =
-    sessions::service::start(state, &mut tx, &user, SignInMethod::Password, user_agent).await?;
+  let grant = sessions::service::start(
+    state,
+    &mut tx,
+    Realm::App,
+    &user,
+    "user",
+    SignInMethod::Password,
+    user_agent,
+  )
+  .await?;
   tx.commit().await?;
-  Ok(tokens)
+  app_tokens(state, &user.id, grant).await
 }
 
-/// Sign out. With an access token, its session ends (or all of them). With
-/// only a refresh token, that token's session ends.
+/// Sign out. With a signed-in session, it ends (or all of them). With only
+/// a refresh token, that token's session ends.
 pub async fn logout(
   state: &AppState,
-  user: Option<&UserIdentity>,
+  realm: Realm,
+  current: Option<(&str, &str)>,
   refresh_token: Option<&str>,
   all_sessions: bool,
 ) -> Result<(), HttpError> {
-  let target = match (user, refresh_token) {
-    (Some(user), _) => Some((user.user_id.clone(), user.session_id.clone())),
-    (None, Some(token)) => sessions::service::session_of_refresh_token(state, token)
+  let target = match (current, refresh_token) {
+    (Some((account_id, session_id)), _) => Some((account_id.to_owned(), session_id.to_owned())),
+    (None, Some(token)) => sessions::service::session_of_refresh_token(state, realm, token)
       .await?
-      .map(|(session_id, user_id)| (user_id, session_id)),
+      .map(|(session_id, account_id)| (account_id, session_id)),
     (None, None) => {
       return Err(HttpError::unauthorized(
         crate::constants::errors::AUTHENTICATION_REQUIRED,
@@ -227,25 +304,23 @@ pub async fn logout(
       ));
     }
   };
-  let Some((user_id, session_id)) = target else {
+  let Some((account_id, session_id)) = target else {
     return Ok(());
   };
   let mut tx = state.db.pool().begin().await?;
   if all_sessions {
-    sessions::service::revoke_all(&mut tx, &user_id, None, "signed_out_everywhere").await?;
+    sessions::service::revoke_all(&mut tx, realm, &account_id, None, "signed_out_everywhere")
+      .await?;
   } else {
-    sessions::service::revoke_current(&mut tx, &user_id, &session_id).await?;
+    sessions::service::revoke_current(&mut tx, realm, &account_id, &session_id).await?;
   }
-  if let Some(account) = users::find_by_id(&mut *tx, &user_id).await? {
+  if let Some(account) = accounts::find_by_id(&mut *tx, realm, &account_id).await? {
+    let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
+    let action = format!("{}.signed_out", realm.resource());
     audit::service::record(
       &mut tx,
-      audit::service::Event::user(
-        &account.id,
-        &account.email,
-        &account.role,
-        "user.signed_out",
-      )
-      .metadata(serde_json::json!({ "allSessions": all_sessions, "sessionId": session_id })),
+      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &action)
+        .metadata(serde_json::json!({ "allSessions": all_sessions, "sessionId": session_id })),
     )
     .await?;
   }
@@ -287,21 +362,26 @@ pub async fn update_me(
   let updated = users::update_profile(&mut *tx, &user.user_id, &changes).await?;
   audit::service::record(
     &mut tx,
-    audit::service::Event::user(
-      &updated.id,
-      &updated.email,
-      &updated.role,
-      "user.profile_updated",
-    ),
+    audit::service::Event::user(&updated.id, &updated.email, "user.profile_updated"),
   )
   .await?;
   tx.commit().await?;
   Ok(updated.to_user())
 }
 
+async fn find_account(
+  state: &AppState,
+  realm: Realm,
+  account_id: &str,
+) -> Result<AccountRow, HttpError> {
+  accounts::find_by_id(state.db.pool(), realm, account_id)
+    .await?
+    .ok_or_else(|| HttpError::not_found(NOT_FOUND, "This account no longer exists."))
+}
+
 /// Check the current password of an account that has one.
 async fn confirm_password(
-  account: &UserRow,
+  account: &AccountRow,
   given: Option<String>,
 ) -> Result<(), HttpError> {
   let Some(stored) = account.password_hash.clone() else {
@@ -318,13 +398,15 @@ async fn confirm_password(
   }
 }
 
-/// Set a new password. Other sessions end; this one stays signed in.
+/// Set a new password. Other sessions end; the current one stays signed in.
 pub async fn change_password(
   state: &AppState,
-  user: &UserIdentity,
+  realm: Realm,
+  account_id: &str,
+  session_id: &str,
   request: ChangePasswordRequest,
 ) -> Result<(), HttpError> {
-  let account = current(state, &user.user_id).await?;
+  let account = find_account(state, realm, account_id).await?;
   confirm_password(&account, request.current_password).await?;
   let policy = settings::service::password(state.db.pool()).await?;
   validate::new_password(&request.new_password, policy.min_length)?;
@@ -335,23 +417,21 @@ pub async fn change_password(
       HttpError::internal()
     })?;
   let mut tx = state.db.pool().begin().await?;
-  users::set_password(&mut *tx, &account.id, &hash).await?;
+  accounts::set_password(&mut *tx, realm, &account.id, &hash).await?;
   let ended = sessions::service::revoke_all(
     &mut tx,
+    realm,
     &account.id,
-    Some(&user.session_id),
+    Some(session_id),
     "password_changed",
   )
   .await?;
+  let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
+  let action = format!("{}.password_changed", realm.resource());
   audit::service::record(
     &mut tx,
-    audit::service::Event::user(
-      &account.id,
-      &account.email,
-      &account.role,
-      "user.password_changed",
-    )
-    .metadata(serde_json::json!({ "otherSessionsEnded": ended })),
+    audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &action)
+      .metadata(serde_json::json!({ "otherSessionsEnded": ended })),
   )
   .await?;
   tx.commit().await?;
@@ -362,13 +442,14 @@ pub async fn change_password(
 }
 
 /// Start an email change: a code goes to the new address. The account moves
-/// once the code is confirmed with `/auth/verification/confirm`.
+/// once the code is confirmed.
 pub async fn change_email(
   state: &AppState,
-  user: &UserIdentity,
+  realm: Realm,
+  account_id: &str,
   request: ChangeEmailRequest,
 ) -> Result<(), HttpError> {
-  let account = current(state, &user.user_id).await?;
+  let account = find_account(state, realm, account_id).await?;
   let new_email = validate::email(&request.new_email)?;
   if new_email == account.email {
     return Err(HttpError::new(
@@ -378,7 +459,7 @@ pub async fn change_email(
     ));
   }
   confirm_password(&account, request.password).await?;
-  if users::find_by_email(state.db.pool(), &new_email)
+  if accounts::find_by_email(state.db.pool(), realm, &new_email)
     .await?
     .is_some()
   {
@@ -387,13 +468,14 @@ pub async fn change_email(
       "Another account already uses this email.",
     ));
   }
-  verification::check_send_limits(state, Purpose::EmailChange, &new_email).await?;
+  verification::check_send_limits(state, realm, Purpose::EmailChange, &new_email).await?;
   verification::issue(
     state,
+    realm,
     Purpose::EmailChange,
     CodeTarget {
       email: &new_email,
-      user_id: Some(&account.id),
+      account_id: Some(&account.id),
       display_name: account.display_name.as_deref(),
       current_email: Some(&account.email),
     },

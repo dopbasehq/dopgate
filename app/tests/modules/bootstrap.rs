@@ -31,7 +31,12 @@ async fn setup_token_creates_root_once() {
     .await;
   assert_eq!(status, StatusCode::CREATED, "{body}");
   assert_eq!(body["data"]["email"], "root@example.com");
-  assert!(body["data"]["userId"].as_str().unwrap().starts_with("usr_"));
+  assert!(
+    body["data"]["adminId"]
+      .as_str()
+      .unwrap()
+      .starts_with("adm_")
+  );
 
   let (_, status_body) = app
     .request(Method::GET, "/api/v1/bootstrap/status", None)
@@ -202,12 +207,12 @@ async fn root_email_creates_root_with_a_generated_password_once() {
     router,
     _schema: crate::support::SchemaGuard(crate::support::unique_schema()),
   };
-  let token = app.login("owner@example.com", &password).await;
+  let token = app.console_login("owner@example.com", &password).await;
   let (_, me) = app
-    .request_with(Method::GET, "/api/v1/auth/me", None, Some(&token))
+    .request_with(Method::GET, "/api/v1/console/me", None, Some(&token))
     .await;
   assert_eq!(me["data"]["role"], "root");
-  assert_eq!(me["data"]["emailVerified"], true);
+  assert!(me["data"]["id"].as_str().unwrap().starts_with("adm_"));
 
   let (_, again) = app::server::build_state_with_setup(config).await.unwrap();
   assert!(matches!(again, app::server::RootSetup::Exists));

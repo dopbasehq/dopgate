@@ -81,8 +81,8 @@ async fn an_override_is_used_for_real_mail_until_reset() {
   app
     .request(
       Method::POST,
-      "/api/v1/auth/verification/send",
-      Some(json!({ "email": crate::support::ROOT_EMAIL, "purpose": "login" })),
+      "/api/v1/console/codes/send",
+      Some(json!({ "email": crate::support::ROOT_EMAIL })),
     )
     .await;
   smtp.code_for(crate::support::ROOT_EMAIL).await;
@@ -159,7 +159,7 @@ async fn previews_escape_values_in_html_only() {
 async fn members_cannot_touch_templates() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  app.create_user(&root, "member@example.com", "member").await;
+  app.create_user(&root, "member@example.com").await;
   let member = app
     .login("member@example.com", crate::support::PASSWORD)
     .await;

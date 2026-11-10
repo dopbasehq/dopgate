@@ -17,7 +17,8 @@ pub async fn list(state: &AppState) -> Result<Vec<SigningKeyResponse>, HttpError
 }
 
 /// Make a new active key. The old one keeps verifying the tokens it signed
-/// for a day, then leaves the key set.
+/// for a day, then leaves the key set. The console secret is replaced at
+/// the same time.
 pub async fn rotate(
   state: &AppState,
   actor: Option<&AuthIdentity>,
@@ -32,6 +33,7 @@ pub async fn rotate(
     .await?;
   repository::retire_active(&mut tx).await?;
   keys::insert_active(&mut tx, &key).await?;
+  keys::rotate_console_key(&mut tx).await?;
   let event = match actor {
     Some(actor) => audit::service::Event::by(actor, "key.rotated"),
     None => audit::service::Event {

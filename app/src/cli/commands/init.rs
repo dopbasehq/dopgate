@@ -29,7 +29,7 @@ pub async fn run(
     None => prompt(inquire::Text::new("Root email:").prompt())?,
   };
   let password = Zeroizing::new(read_password(args.password_stdin)?);
-  let user_id = bootstrap::service::create_root(&db, &email, &password)
+  let admin_id = bootstrap::service::create_root(&db, &email, &password)
     .await
     .map_err(|error| anyhow::anyhow!("{error}"))?;
   let email = crate::utils::email::normalize(&email).unwrap_or(email);
@@ -38,7 +38,7 @@ pub async fn run(
   if json {
     output::print_json(&serde_json::json!({
       "success": true,
-      "data": { "userId": user_id, "email": email, "schema": schema },
+      "data": { "adminId": admin_id, "email": email, "schema": schema },
     }));
   } else {
     output::print_success(&format!("Root account created for {email}."));

@@ -24,7 +24,7 @@ pub mod bootstrap {
 
 /// End-user authentication. Your app's frontend calls these.
 pub mod auth {
-  /// The cookie path for the console's refresh token.
+  /// The cookie path for an app's refresh token in cookie mode.
   pub const COOKIE_PATH: &str = "/api/v1/auth";
   pub const METHODS: &str = api_path!("/auth/methods");
   pub const SIGNUP: &str = api_path!("/auth/signup");
@@ -34,6 +34,25 @@ pub mod auth {
   pub const ME: &str = api_path!("/auth/me");
   pub const PASSWORD_CHANGE: &str = api_path!("/auth/password/change");
   pub const EMAIL_CHANGE: &str = api_path!("/auth/email/change");
+}
+
+/// Console sign-in and the signed-in admin's account. Only the console
+/// calls these.
+pub mod console {
+  /// The cookie path for the console's refresh token.
+  pub const COOKIE_PATH: &str = "/api/v1/console";
+  pub const LOGIN: &str = api_path!("/console/login");
+  pub const REFRESH: &str = api_path!("/console/refresh");
+  pub const LOGOUT: &str = api_path!("/console/logout");
+  pub const CODES_SEND: &str = api_path!("/console/codes/send");
+  pub const CODES_CONFIRM: &str = api_path!("/console/codes/confirm");
+  pub const PASSWORD_FORGOT: &str = api_path!("/console/password/forgot");
+  pub const PASSWORD_RESET: &str = api_path!("/console/password/reset");
+  pub const PASSWORD_CHANGE: &str = api_path!("/console/password/change");
+  pub const ME: &str = api_path!("/console/me");
+  pub const EMAIL_CHANGE: &str = api_path!("/console/email/change");
+  pub const SESSIONS: &str = api_path!("/console/sessions");
+  pub const SESSION: &str = api_path!("/console/sessions/{id}");
 }
 
 pub mod recovery {
@@ -75,6 +94,13 @@ pub mod users {
   pub const DISABLE: &str = api_path!("/admin/users/{id}/disable");
   pub const ENABLE: &str = api_path!("/admin/users/{id}/enable");
   pub const PASSWORD_RESET: &str = api_path!("/admin/users/{id}/password-reset");
+}
+
+pub mod admins {
+  pub const COLLECTION: &str = api_path!("/admin/admins");
+  pub const ITEM: &str = api_path!("/admin/admins/{id}");
+  pub const DISABLE: &str = api_path!("/admin/admins/{id}/disable");
+  pub const ENABLE: &str = api_path!("/admin/admins/{id}/enable");
 }
 
 pub mod email_templates {

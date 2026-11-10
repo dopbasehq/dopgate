@@ -10,7 +10,7 @@ async fn a_reset_code_sets_a_new_password_and_ends_every_session() {
   let smtp = FakeSmtp::start().await;
   let app = TestApp::with(|config| use_smtp(config, &smtp)).await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   let session = app.login("ada@example.com", PASSWORD).await;
 
   let (status, _) = app
@@ -69,7 +69,7 @@ async fn a_reset_unlocks_a_locked_account() {
   let smtp = FakeSmtp::start().await;
   let app = TestApp::with(|config| use_smtp(config, &smtp)).await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   for _ in 0..5 {
     app
       .request(

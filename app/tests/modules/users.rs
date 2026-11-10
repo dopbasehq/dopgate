@@ -1,4 +1,4 @@
-//! Admin user management: who may do what, and what each action does.
+//! Managing your app's users: who may do what, and what each action does.
 
 use axum::http::{Method, StatusCode};
 use serde_json::json;
@@ -11,13 +11,13 @@ async fn admins_list_search_and_page_through_users() {
   let root = app.root_token().await;
   for index in 0..5 {
     app
-      .create_user(&root, &format!("user{index}@example.com"), "member")
+      .create_user(&root, &format!("user{index}@example.com"))
       .await;
   }
   let (status, body) = app
     .request_with(
       Method::GET,
-      "/api/v1/admin/users?limit=2&role=member",
+      "/api/v1/admin/users?limit=2&status=active",
       None,
       Some(&root),
     )
@@ -37,7 +37,7 @@ async fn admins_list_search_and_page_through_users() {
     let (_, page) = app
       .request_with(
         Method::GET,
-        &format!("/api/v1/admin/users?limit=2&role=member&cursor={next}"),
+        &format!("/api/v1/admin/users?limit=2&status=active&cursor={next}"),
         None,
         Some(&root),
       )
@@ -68,93 +68,52 @@ async fn admins_list_search_and_page_through_users() {
 }
 
 #[tokio::test]
-async fn only_root_creates_and_manages_admins() {
+async fn admins_and_users_are_separate_accounts() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  let admin_id = app.create_user(&root, "admin@example.com", "admin").await;
-  let other_admin = app.create_user(&root, "admin2@example.com", "admin").await;
-  let member_id = app.create_user(&root, "member@example.com", "member").await;
-  let admin = app.login("admin@example.com", PASSWORD).await;
-
-  let (status, _) = app
-    .request_with(
-      Method::POST,
-      "/api/v1/admin/users",
-      Some(json!({ "email": "x@example.com", "role": "admin" })),
-      Some(&admin),
-    )
-    .await;
-  assert_eq!(status, StatusCode::FORBIDDEN);
-  let (status, _) = app
-    .request_with(
-      Method::POST,
-      &format!("/api/v1/admin/users/{other_admin}/disable"),
-      None,
-      Some(&admin),
-    )
-    .await;
-  assert_eq!(status, StatusCode::FORBIDDEN);
-  let (status, _) = app
-    .request_with(
-      Method::PATCH,
-      &format!("/api/v1/admin/users/{member_id}"),
-      Some(json!({ "role": "admin" })),
-      Some(&admin),
-    )
-    .await;
-  assert_eq!(status, StatusCode::FORBIDDEN);
+  app.create_admin(&root, "ana@example.com").await;
+  let admin = app.console_login("ana@example.com", PASSWORD).await;
+  // The same email can also have an app account, with its own password.
+  let user_id = app.create_user(&admin, "ana@example.com").await;
+  assert!(user_id.starts_with("usr_"));
   let (status, body) = app
     .request_with(
       Method::PATCH,
-      &format!("/api/v1/admin/users/{member_id}"),
-      Some(json!({ "privateMetadata": { "crm": "c_1" }, "displayName": "Mem" })),
+      &format!("/api/v1/admin/users/{user_id}"),
+      Some(json!({ "privateMetadata": { "crm": "c_1" }, "displayName": "Ana" })),
       Some(&admin),
     )
     .await;
   assert_eq!(status, StatusCode::OK, "{body}");
   assert_eq!(body["data"]["privateMetadata"]["crm"], "c_1");
+  assert!(body["data"].get("role").is_none(), "{body}");
 
-  let (status, body) = app
-    .request_with(
-      Method::PATCH,
-      &format!("/api/v1/admin/users/{admin_id}"),
-      Some(json!({ "role": "member" })),
-      Some(&root),
-    )
+  // The users list holds app users only.
+  let (_, list) = app
+    .request_with(Method::GET, "/api/v1/admin/users", None, Some(&root))
     .await;
-  assert_eq!(status, StatusCode::OK);
-  assert_eq!(body["data"]["role"], "member");
-}
+  let emails: Vec<&str> = list["data"]["items"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|user| user["email"].as_str().unwrap())
+    .collect();
+  assert_eq!(emails, ["ana@example.com"]);
+  assert_eq!(list["data"]["items"][0]["id"], user_id.as_str());
 
-#[tokio::test]
-async fn root_cannot_be_changed_through_the_api() {
-  let app = TestApp::new().await;
-  let root = app.root_token().await;
-  let (_, me) = app
-    .request_with(Method::GET, "/api/v1/auth/me", None, Some(&root))
+  // A user's token can't use the admin API.
+  let user = app.login("ana@example.com", PASSWORD).await;
+  let (status, _) = app
+    .request_with(Method::GET, "/api/v1/admin/users", None, Some(&user))
     .await;
-  let root_id = me["data"]["id"].as_str().unwrap().to_owned();
-  for (method, path) in [
-    (Method::DELETE, format!("/api/v1/admin/users/{root_id}")),
-    (
-      Method::POST,
-      format!("/api/v1/admin/users/{root_id}/disable"),
-    ),
-    (Method::PATCH, format!("/api/v1/admin/users/{root_id}")),
-  ] {
-    let (status, body) = app
-      .request_with(method, &path, Some(json!({})), Some(&root))
-      .await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "{path}");
-    assert!(body["error"]["ROOT_PROTECTED"].is_string(), "{body}");
-  }
+  assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
 async fn disabling_ends_sessions_and_blocks_sign_in() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  let id = app.create_user(&root, "ada@example.com", "member").await;
+  let id = app.create_user(&root, "ada@example.com").await;
   let session = app.login("ada@example.com", PASSWORD).await;
   let (status, body) = app
     .request_with(
@@ -194,7 +153,7 @@ async fn disabling_ends_sessions_and_blocks_sign_in() {
 async fn deleting_frees_the_email_and_is_audited() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  let id = app.create_user(&root, "ada@example.com", "member").await;
+  let id = app.create_user(&root, "ada@example.com").await;
   let reply = app
     .call(
       Method::DELETE,
@@ -214,7 +173,7 @@ async fn deleting_frees_the_email_and_is_audited() {
     )
     .await;
   assert_eq!(status, StatusCode::NOT_FOUND);
-  let new_id = app.create_user(&root, "ada@example.com", "member").await;
+  let new_id = app.create_user(&root, "ada@example.com").await;
   assert_ne!(new_id, id);
   let (_, events) = app
     .request_with(
@@ -234,7 +193,7 @@ async fn deleting_frees_the_email_and_is_audited() {
 async fn admins_see_and_end_a_users_sessions() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  let id = app.create_user(&root, "ada@example.com", "member").await;
+  let id = app.create_user(&root, "ada@example.com").await;
   let session = app.login("ada@example.com", PASSWORD).await;
   let path = format!("/api/v1/admin/users/{id}/sessions");
   let (_, body) = app
@@ -255,7 +214,7 @@ async fn admins_see_and_end_a_users_sessions() {
 async fn bad_input_is_refused_with_a_reason() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
-  app.create_user(&root, "ada@example.com", "member").await;
+  app.create_user(&root, "ada@example.com").await;
   for (body, expected) in [
     (json!({ "email": "ada@example.com" }), StatusCode::CONFLICT),
     (json!({ "email": "bad" }), StatusCode::UNPROCESSABLE_ENTITY),
@@ -266,10 +225,6 @@ async fn bad_input_is_refused_with_a_reason() {
     (
       json!({ "email": "b@example.com", "publicMetadata": "x" }),
       StatusCode::UNPROCESSABLE_ENTITY,
-    ),
-    (
-      json!({ "email": "b@example.com", "role": "root" }),
-      StatusCode::FORBIDDEN,
     ),
   ] {
     let (status, reply) = app

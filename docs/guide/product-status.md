@@ -19,7 +19,9 @@ This page lists what works in Dopgate {{version}}. Planned endpoints already exi
 | Profile, metadata, and email change | `/api/v1/auth/me`, `/api/v1/auth/email/change` |
 | Sessions | `/api/v1/auth/sessions`, `/api/v1/auth/sessions/{id}` |
 | ES256 access tokens and the key set | `/.well-known/jwks.json`, `/api/v1/admin/keys`, `/api/v1/admin/keys/rotate`, `dopgate keys rotate` |
+| Console sign-in for admins | `/api/v1/console` and everything under it |
 | User management | `/api/v1/admin/users` and everything under it |
+| Admin management | `/api/v1/admin/admins` and everything under it |
 | Settings | `/api/v1/admin/settings`, `/api/v1/admin/settings/smtp/test` |
 | Email templates | `/api/v1/admin/email-templates` and everything under it |
 | Audit log with hash chain and retention | `/api/v1/admin/audit-events`, `/api/v1/admin/audit-events/verify` |

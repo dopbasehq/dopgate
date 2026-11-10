@@ -1,6 +1,8 @@
+mod admins;
 mod audit;
 mod auth;
 mod bootstrap;
+mod console;
 mod docs;
 mod email_templates;
 mod health;

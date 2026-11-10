@@ -24,7 +24,7 @@ pub async fn forgot(
   State(state): State<AppState>,
   Json(request): Json<ForgotPasswordRequest>,
 ) -> Result<HttpResponse<serde_json::Value>, RecoveryError> {
-  service::forgot(&state, request).await?;
+  service::forgot(&state, crate::models::Realm::App, request).await?;
   Ok(HttpResponse::done("PASSWORD_RESET_SENT"))
 }
 
@@ -48,6 +48,6 @@ pub async fn reset(
   State(state): State<AppState>,
   Json(request): Json<ResetPasswordRequest>,
 ) -> Result<HttpResponse<serde_json::Value>, RecoveryError> {
-  service::reset(&state, request).await?;
+  service::reset(&state, crate::models::Realm::App, request).await?;
   Ok(HttpResponse::done("PASSWORD_RESET"))
 }
