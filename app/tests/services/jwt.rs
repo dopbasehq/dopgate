@@ -146,3 +146,30 @@ async fn rotation_keeps_old_tokens_valid_and_signs_with_the_new_key() {
     .await;
   assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+/// A console key rotated by the CLI or another server applies at once,
+/// without this server reloading its keys.
+#[tokio::test]
+async fn a_console_key_rotated_elsewhere_applies_at_once() {
+  let app = TestApp::new().await;
+  let old = app.root_token().await;
+  let old_kid = decode_header(&old).unwrap().kid.unwrap();
+  let mut tx = app.state.db.pool().begin().await.unwrap();
+  app::services::keys::rotate_console_key(&mut tx)
+    .await
+    .unwrap();
+  tx.commit().await.unwrap();
+
+  let (status, _) = app
+    .request_with(Method::GET, "/api/v1/console/me", None, Some(&old))
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  let fresh = app
+    .console_login(crate::support::ROOT_EMAIL, crate::support::PASSWORD)
+    .await;
+  assert_ne!(decode_header(&fresh).unwrap().kid.unwrap(), old_kid);
+  let (status, _) = app
+    .request_with(Method::GET, "/api/v1/console/me", None, Some(&fresh))
+    .await;
+  assert_eq!(status, StatusCode::OK);
+}
