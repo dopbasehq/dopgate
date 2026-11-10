@@ -49,6 +49,46 @@ export interface ConsoleTokens {
   admin: Admin;
 }
 
+/** A user's personal token as lists show it. The token itself is never shown again. */
+export interface PersonalToken {
+  id: string;
+  name: string;
+  lastFour: string;
+  expiresAt: string | null;
+  expired: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+/** A flat capability value: what an agent's access token carries. */
+export type CapabilityValue = string | number | boolean | string[];
+
+export interface AgentOwner {
+  id: string;
+  kind: "admin" | "user";
+  email: string;
+}
+
+/** An account for a bot, owned by an admin or a user. */
+export interface Agent {
+  id: string;
+  name: string;
+  description: string | null;
+  owner: AgentOwner;
+  capabilities: Record<string, CapabilityValue>;
+  status: UserStatus;
+  lastFour: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** An agent with its new token, which is shown this once. */
+export interface AgentWithToken {
+  token: string;
+  agent: Agent;
+}
+
 export interface Session {
   id: string;
   method: "password" | "otp" | "sso";
@@ -113,6 +153,14 @@ export interface LimitSettings {
   ipRequestsPerMinute: number;
 }
 
+/** What your app's users may make for themselves. Off by default. */
+export interface SelfServiceSettings {
+  agents: boolean;
+  maxAgentsPerUser: number;
+  personalTokens: boolean;
+  maxPersonalTokensPerUser: number;
+}
+
 export type SmtpSecurity = "starttls" | "tls" | "none";
 
 export interface SmtpSettings {
@@ -150,6 +198,7 @@ export interface Settings {
   password: PasswordSettings;
   tokens: TokenSettings;
   limits: LimitSettings;
+  selfService: SelfServiceSettings;
   smtp: SmtpSettings;
   branding: Branding;
 }

@@ -29,6 +29,16 @@ export const router = createRouter({
       component: () => import("~/pages/User/User.page.vue"),
     },
     {
+      path: "/agents",
+      name: "agents",
+      component: () => import("~/pages/Agents/Agents.page.vue"),
+    },
+    {
+      path: "/agents/:id",
+      name: "agent",
+      component: () => import("~/pages/Agent/Agent.page.vue"),
+    },
+    {
       path: "/admins",
       name: "admins",
       component: () => import("~/pages/Admins/Admins.page.vue"),

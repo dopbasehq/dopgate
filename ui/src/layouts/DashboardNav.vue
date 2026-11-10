@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Component } from "vue";
 import {
+  BotIcon,
   HistoryIcon,
   KeyIcon,
   MailIcon,
@@ -28,6 +29,7 @@ const emit = defineEmits<{ "sign-out": [] }>();
 
 const icons: Record<PageName, Component> = {
   users: UsersIcon,
+  agents: BotIcon,
   templates: MailIcon,
   admins: ShieldIcon,
   settings: SlidersHorizontalIcon,

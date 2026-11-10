@@ -7,11 +7,17 @@ import {
   disableUser,
   enableUser,
   revokeUserSessions,
+  revokeUserToken,
   sendPasswordReset,
   updateUser,
 } from "~/services/admin.api";
-import type { AdminUser } from "~/services/types";
-import { userQuery, userSessionsQuery } from "~/queries/admin";
+import type { AdminUser, PersonalToken } from "~/services/types";
+import {
+  userAgentsQuery,
+  userQuery,
+  userSessionsQuery,
+  userTokensQuery,
+} from "~/queries/admin";
 import { useInvalidate } from "~/queries/invalidate";
 import { formatJson, parseJsonObject } from "~/utils/json";
 
@@ -31,6 +37,8 @@ export function useUserController() {
   const id = computed(() => String(route.params.id ?? ""));
   const userRead = useQuery(() => userQuery(id.value));
   const sessionsRead = useQuery(() => userSessionsQuery(id.value));
+  const tokensRead = useQuery(() => userTokensQuery(id.value));
+  const agentsRead = useQuery(() => userAgentsQuery(id.value));
 
   const user = computed<AdminUser | null>(() => userRead.data.value ?? null);
   const loadError = computed(() =>
@@ -44,6 +52,50 @@ export function useUserController() {
       ? errorMessage(sessionsRead.error.value, "Couldn't load sessions.")
       : null,
   );
+
+  const tokens = computed(() => tokensRead.data.value ?? null);
+  const tokensError = computed(() =>
+    tokensRead.error.value
+      ? errorMessage(tokensRead.error.value, "Couldn't load personal tokens.")
+      : null,
+  );
+  const agents = computed(() => agentsRead.data.value ?? null);
+  const agentsError = computed(() =>
+    agentsRead.error.value
+      ? errorMessage(agentsRead.error.value, "Couldn't load agents.")
+      : null,
+  );
+
+  // Revoking a personal token asks first.
+  const tokenToRevoke = ref<PersonalToken | null>(null);
+  const revoking = ref(false);
+  const revokeError = ref<string | null>(null);
+
+  function askRevoke(token: PersonalToken): void {
+    revokeError.value = null;
+    tokenToRevoke.value = token;
+  }
+
+  function cancelRevoke(): void {
+    if (!revoking.value) tokenToRevoke.value = null;
+  }
+
+  async function revokeToken(): Promise<void> {
+    const token = tokenToRevoke.value;
+    if (!token || revoking.value) return;
+    revoking.value = true;
+    revokeError.value = null;
+    try {
+      await revokeUserToken(id.value, token.id);
+      tokenToRevoke.value = null;
+      notice.value = `Revoked the personal token “${token.name}”.`;
+      await invalidate.userTokensChanged(id.value);
+    } catch (cause) {
+      revokeError.value = errorMessage(cause, "Couldn't revoke the token.");
+    } finally {
+      revoking.value = false;
+    }
+  }
 
   /** Every admin manages every user, once the user has loaded. */
   const canManage = computed(() => user.value !== null);
@@ -241,7 +293,12 @@ export function useUserController() {
   }
 
   async function reload(): Promise<void> {
-    await Promise.all([userRead.refetch(), sessionsRead.refetch()]);
+    await Promise.all([
+      userRead.refetch(),
+      sessionsRead.refetch(),
+      tokensRead.refetch(),
+      agentsRead.refetch(),
+    ]);
   }
 
   return {
@@ -250,6 +307,16 @@ export function useUserController() {
     loadError,
     sessions,
     sessionsError,
+    tokens,
+    tokensError,
+    agents,
+    agentsError,
+    tokenToRevoke,
+    revoking,
+    revokeError,
+    askRevoke,
+    cancelRevoke,
+    revokeToken,
     canManage,
     canDisableOrDelete,
     displayName,
