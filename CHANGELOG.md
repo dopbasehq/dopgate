@@ -32,7 +32,9 @@ with an admin console and Docker images. Nothing below has shipped before.
   `/api/v1/console`. Their tokens are signed with an internal key that isn't
   in the JWKS, so no backend can accept them. The same email can belong to an
   admin and a user. Instances from before the split move root and admins
-  across on upgrade, passwords included.
+  across on upgrade, passwords included, and settings and templates keep the
+  admin who last saved them. Rotating keys retires the console key on every
+  server at once.
 - Admin API for users: search, create, update metadata, disable, delete, send
   reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it.
 - Root manages admins at `/api/v1/admin/admins`; admins and the service key
