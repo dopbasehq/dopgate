@@ -38,7 +38,7 @@ The answer is `201` with:
 
 The password must have at least 8 characters, or the minimum length in settings if an admin raised it, and at most 1024 bytes. `displayName` is optional, one line, up to 255 characters.
 
-When `requireEmailVerification` is on, `tokens` is `null`. Show a code field and confirm the code to sign the user in. When it is off, `tokens` holds an access token and a refresh token straight away, and the code stays useful for marking the email verified later.
+When `requireEmailVerification` is on, `tokens` is `null`. Show a code field and confirm the code to sign the user in. When it is off, `tokens` holds an access token and a refresh token straight away. The code still works later: confirming it marks the email verified and returns a new set of tokens.
 
 ## Confirm the code
 
@@ -62,7 +62,7 @@ curl -X POST https://auth.example.com/api/v1/auth/verification/send \
 
 The answer is always `200 CODE_SENT`, whether or not the email has an account, so the endpoint can't be used to find accounts. A code only goes out when the account exists, is active, and is not verified yet. A new code replaces the earlier one.
 
-The same email can get one code per purpose every 60 seconds and 5 codes per hour across all purposes. Past that, the answer is `429 RATE_LIMITED` with a `Retry-After` header. [Rate limits and lockout](/guide/rate-limits) has the details.
+By default the same email can get one code per purpose every 60 seconds and 5 codes per hour across all purposes. Admins change these numbers, and the code's lifetime and tries, under `limits` in settings. Past that, the answer is `429 RATE_LIMITED` with a `Retry-After` header. [Rate limits and lockout](/guide/rate-limits) has the details.
 
 ## Signing in before verification
 

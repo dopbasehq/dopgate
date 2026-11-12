@@ -57,13 +57,15 @@ volumes:
   pgdata:
 ```
 
+The example runs PostgreSQL 17. On 18 or later, mount the volume at `/var/lib/postgresql` as the bundled Compose file does. The 18 image refuses to start with a volume at `/var/lib/postgresql/data`.
+
 `DOPGATE_URL` and `DOPGATE_ISSUER` are names your backend would read; Dopgate doesn't use them. Your backend can fetch the JWKS and call the admin API over the internal network at `http://dopgate:8850`, but it must still check the issuer against the public URL, because that is what the tokens carry.
 
 The example connects as a `dopgate` database role. The bundled Compose file uses the app's own role for both, which is fine on a laptop. [PostgreSQL and the schema](/self-hosting/postgres#give-dopgate-its-own-role) shows how to create the separate role.
 
 ## Put a proxy in front
 
-Serve Dopgate on its own host name over HTTPS. The console uses absolute paths and a cookie scoped to `/api/v1/auth`, so it can't live under a path such as `app.example.com/auth`. With Caddy:
+Serve Dopgate on its own host name over HTTPS. The console uses absolute paths, and the refresh cookies are scoped to `/api/v1/console` and `/api/v1/auth`, so Dopgate can't live under a path such as `app.example.com/auth`. With Caddy:
 
 ```text
 auth.example.com {

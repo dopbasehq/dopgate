@@ -8,7 +8,7 @@ description: "How Dopgate reads its configuration from DOPGATE_* environment var
 Dopgate has two kinds of configuration:
 
 - Server configuration, read once at startup: the database, the address, the public URL, CORS, the service key, SMTP. It comes from environment variables, an optional TOML file, and command-line flags.
-- Runtime settings, stored in the database and changed without a restart: sign-up rules, the password policy, token lifetimes, limits, branding, and SMTP when the server config sets no SMTP host. Admins change them in the console or with `PATCH /api/v1/admin/settings`. See [the REST API](/reference/api#settings).
+- Runtime settings, stored in the database and changed without a restart: sign-up rules, the password policy, token lifetimes, limits, self-service (personal tokens and agents for your users), branding, and SMTP when the server config sets no SMTP host. Admins change them in the console or with `PATCH /api/v1/admin/settings`. See [the REST API](/reference/api#settings).
 
 ## Environment first
 
@@ -76,7 +76,7 @@ From strongest to weakest:
 
 Dopgate listens on `127.0.0.1:8850` by default. `DOPGATE_HOST` takes an IP address such as `0.0.0.0` or `localhost`, and `DOPGATE_PORT` a port. The Docker image sets `DOPGATE_HOST=0.0.0.0`.
 
-`DOPGATE_PUBLIC_URL` is the URL your app and users reach Dopgate on. It is also the `iss` claim of every access token and decides whether the console's cookie is marked `Secure`. When you don't set it:
+`DOPGATE_PUBLIC_URL` is the URL your app and users reach Dopgate on. It is also the `iss` claim of every access token and decides whether the refresh cookies are marked `Secure`. When you don't set it:
 
 - on a loopback address it is `http://localhost:<port>`,
 - on any other address it is `http://SERVER_HOST:<port>`, and Dopgate prints a warning telling you to set it.

@@ -22,6 +22,8 @@ DOPGATE_SERVICE_KEY=<the output of the command above>
 
 The key must be at least 32 characters, or Dopgate refuses to start. Leaving `DOPGATE_SERVICE_KEY` unset or empty turns service access off. Treat the key like a database password: it never goes to a browser or a mobile app.
 
+Dopgate also uses the key to encrypt an SMTP password saved from the console. If you change or remove the key, enter that password again in **Settings**. See [Email (SMTP)](/self-hosting/smtp).
+
 ## Send it as a bearer token
 
 ```bash
@@ -62,14 +64,16 @@ The service key acts as an admin. It can:
 - list and read admins,
 - read and change settings, and send an SMTP test to an address you give in `to`,
 - read, change, preview, and reset email templates,
+- list and read agents, and list a user's personal tokens,
 - list signing keys and read and verify the audit log.
 
 It can't:
 
-- add, change, disable, or remove admins, which only root can do (`403 AUTHORIZATION_DENIED` or `403 ROOT_PROTECTED`),
+- add, change, disable, or remove admins, which only root can do (`403 AUTHORIZATION_DENIED`),
 - rotate signing keys, which only root can do,
+- make, change, turn off, or delete agents, or revoke a user's personal token, which need an admin signed in to the console (`403 AUTHORIZATION_DENIED`),
 - call endpoints for a signed-in user or admin, such as `/api/v1/auth/me` or `/api/v1/console/me` (`403 AUTHORIZATION_DENIED`),
-- send a template test email, because it has no inbox. Preview the template instead.
+- send a template test email, because it has no inbox (`400 EMAIL_INVALID`). Preview the template instead.
 
 Audit records written by the service key have the actor type `service` and the label `service`, so you can tell them apart from changes made in the console.
 

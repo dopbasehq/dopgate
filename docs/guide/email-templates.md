@@ -16,7 +16,7 @@ Dopgate sends six emails. Each has a built-in version that works without setup, 
 | `email_changed` | An email change went through; goes to the old address | `app_name`, `email`, `display_name`, `new_email` |
 | `password_changed` | A password was changed or reset | `app_name`, `email`, `display_name` |
 
-[Email template variables](/reference/email-template-variables) says what each variable holds.
+Admins get the same emails from the console: `login_code` when they sign in with a code, `password_reset`, `email_change`, `email_changed`, and `password_changed`. [Email template variables](/reference/email-template-variables) says what each variable holds.
 
 ## Writing a template
 
@@ -31,7 +31,7 @@ A template is refused with `422 TEMPLATE_INVALID` when:
 - a <code v-pre>{{</code> is never closed,
 - a placeholder is not one of the template's variables.
 
-The app name in every email comes from `branding.appName` in settings, `dopgate` by default.
+The app name in every email comes from `branding.appName` in settings, `Dopgate` by default.
 
 ## From the API
 
@@ -72,7 +72,7 @@ where `login_code.json` holds:
 | `POST /api/v1/admin/email-templates/{name}/test` | Render a draft with sample values and send it to the signed-in admin's email. |
 | `DELETE /api/v1/admin/email-templates/{name}` | Remove the override and go back to the built-in version. |
 
-Preview and test take the same body as `PUT`. The sample values are the app name, the admin's email (`person@example.com` for the service key), `Alex`, the code `482913`, the current code lifetime, and `new.address@example.com`. The service key can't send a test, because it has no email of its own.
+Preview and test take the same body as `PUT`. The sample values are the app name, the admin's email (`person@example.com` for the service key), `Alex`, the code `482913`, the current code lifetime, and `new.address@example.com`. The service key can't send a test, because it has no email of its own (`400 EMAIL_INVALID`). A test the SMTP server refuses answers `502 SMTP_SEND_FAILED`. An unknown template name answers `404 NOT_FOUND`.
 
 Saving and resetting are recorded in the audit log as `email_template.updated` and `email_template.reset`.
 

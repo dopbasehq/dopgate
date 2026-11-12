@@ -13,6 +13,7 @@ This page describes what Dopgate protects and how. For the steps you take when d
 | --- | --- |
 | Passwords | Argon2id hashes with a random salt each. Passwords are limited to 1024 bytes so hashing stays cheap enough. |
 | Refresh tokens | SHA-256 hashes. The token itself is 32 random bytes and only exists in the response. |
+| Personal tokens and agent tokens | SHA-256 hashes, plus the last four characters to tell them apart. Each token is 32 random bytes, shown once when it is made. |
 | Emailed codes | SHA-256 hashes, single use, compared in constant time, and burned after too many wrong tries. |
 | Signing keys | The P-256 private key as a PKCS#8 PEM in `signing_keys`, readable by anyone who can read the schema. |
 | Service key | Not stored. It is read from the environment and compared in constant time. |

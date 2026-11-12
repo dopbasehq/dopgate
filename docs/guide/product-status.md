@@ -5,7 +5,7 @@ description: "What works in Dopgate today and what is planned, by feature and by
 
 # Product status
 
-This page lists what works in Dopgate {{version}}. Planned endpoints already exist in the API description so client code can be written against them, and they answer `501 NOT_IMPLEMENTED` until the feature lands. Endpoints that need a signed-in user or an admin check that first, so you may see `401` or `403` before `501`.
+This page lists what works in Dopgate {{version}}. Planned endpoints are already routed and answer `501 NOT_IMPLEMENTED` until the feature lands. They are left out of the API description at `/api/docs` until then. Endpoints that need a signed-in user or an admin check that first, so you may see `401` or `403` before `501`.
 
 ## Works now
 

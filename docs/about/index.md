@@ -23,8 +23,8 @@ Access tokens are JWTs your backend verifies with cached public keys. If Dopgate
 
 ## Hash what can be hashed
 
-Passwords are stored as Argon2id hashes, and refresh tokens and emailed codes as SHA-256 hashes. The signing key has to be read back to sign tokens, so it sits in the `dopgate` schema. Guard that schema like a secret. The [security checklist](/self-hosting/security-checklist) shows how.
+Passwords are stored as Argon2id hashes, and refresh tokens, emailed codes, personal tokens, and agent tokens as SHA-256 hashes. The signing key has to be read back to sign tokens, so it sits in the `dopgate` schema. Guard that schema like a secret. The [security checklist](/self-hosting/security-checklist) shows how.
 
 ## Honest docs
 
-Every endpoint is documented from the day it exists, including the ones that are not built yet, which answer `501` and say so. [Product status](/guide/product-status) is the one place that says what works.
+Single sign-on and multi-factor authentication aren't built yet. Their routes already exist and answer `501` with a message that says so, and they stay out of the API docs at `/api/docs` until they work. [Product status](/guide/product-status) is the one place that says what works.

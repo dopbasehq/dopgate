@@ -40,7 +40,7 @@ A successful sign-in answers `200 SIGNED_IN`:
 
 A wrong email and a wrong password get the same answer and take about the same time, so the endpoint doesn't reveal which emails have accounts. Disabled and unverified accounts are only reported after the right password.
 
-After 5 wrong passwords in a row the account is locked for 15 minutes. While it is locked, even the right password gets `401 AUTHENTICATION_INVALID`. See [Rate limits and lockout](/guide/rate-limits#account-lockout).
+By default, 5 wrong passwords in a row lock the account for 15 minutes. Admins change both numbers under `limits` in settings. While it is locked, even the right password gets `401 AUTHENTICATION_INVALID`. See [Rate limits and lockout](/guide/rate-limits#account-lockout).
 
 ## With an emailed code
 
@@ -60,9 +60,9 @@ curl -X POST https://auth.example.com/api/v1/auth/verification/confirm \
   -d '{"email":"ana@example.com","purpose":"login","code":"482913"}'
 ```
 
-The answer has the same tokens as a password sign-in. A code sign-in also marks the email verified, and it works for accounts created without a password. The session's `method` is `otp`, where a password sign-in records `password`.
+The answer has the same tokens as a password sign-in. A code sign-in also marks the email verified, and it works for accounts created without a password. A wrong code answers `400 CODE_INVALID`, an expired one `400 CODE_EXPIRED`, and a disabled account `403 ACCOUNT_DISABLED`. The session's `method` is `otp`, where a password sign-in records `password`.
 
-The code limits from [sign-up](/guide/sign-up-and-verification#confirm-the-code) apply here too: 10 minutes, 5 wrong tries, one code per purpose every 60 seconds, and 5 codes per email per hour.
+The code limits from [sign-up](/guide/sign-up-and-verification#confirm-the-code) apply here too. By default that is 10 minutes, 5 wrong tries, one code per purpose every 60 seconds, and 5 codes per email per hour.
 
 ## Signing up with a code
 

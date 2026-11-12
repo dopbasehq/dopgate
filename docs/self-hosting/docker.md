@@ -30,7 +30,7 @@ docker build -t dopgate .
 | User | `nonroot` |
 | Health check | `dopgate healthcheck` every 15 seconds, after a 40-second start period |
 
-To reach Dopgate on another port, change the published port (`-p 9000:8850`) and leave `DOPGATE_PORT` alone. The bundled `docker-compose.yml` maps to container port 8850 and passes `.env` into the container, so a `DOPGATE_PORT` in `.env` would move the server away from the mapped port.
+To reach Dopgate on another port, change the published port (`-p 9000:8850`) and leave `DOPGATE_PORT` alone. The bundled `docker-compose.yml` pins `DOPGATE_PORT` to 8850 inside the container and publishes it on `DOPGATE_HOST_PORT`, 8850 by default. Set `DOPGATE_HOST_PORT` in `.env` to use another port on the host.
 
 ## Run it
 

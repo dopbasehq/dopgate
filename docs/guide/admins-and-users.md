@@ -22,7 +22,7 @@ Admins have one of two roles.
 | Role | What it may do |
 | --- | --- |
 | `root` | The instance owner. Exactly one exists. Everything admins can do, plus manage admins and rotate signing keys. |
-| `admin` | Use the console and the admin API: manage users, settings, and email templates, and read keys and the audit log. |
+| `admin` | Use the console and the admin API: manage users, agents, settings, and email templates, and read keys and the audit log. |
 
 Root is created at setup. See [the quick start](/guide/quick-start) and [`dopgate init`](/cli/commands#init). Root adds admins on the console's **Admins** page or with `POST /api/v1/admin/admins`:
 
@@ -42,7 +42,7 @@ Console tokens only work on Dopgate's own endpoints. They are signed with a secr
 Users sign in to your app through `/api/v1/auth/*` and manage their own account there. Accounts come from three places:
 
 - Sign-up through `POST /api/v1/auth/signup`, when sign-up is on.
-- A first sign-in by emailed code for an unknown email, when **passwordless sign-up** is on. See [Sign-in with a password or a code](/guide/sign-in).
+- A first sign-in by emailed code for an unknown email, when `signup.passwordlessSignup` is on. See [Sign-in with a password or a code](/guide/sign-in).
 - `POST /api/v1/admin/users`, from the console or your backend. No email is sent. Leave out `password` for an account that signs in with codes only, and set `emailVerified: true` to skip verification.
 
 ```bash
@@ -62,15 +62,15 @@ User emails are stored lowercased and are unique among users. A second user with
 | Admin | Yes | Read only | Read only |
 | Service key | Yes | Read only | Read only |
 
-"Manage" covers updating, disabling, enabling, deleting, ending sessions, and sending a password reset code. Your backend can call the admin API with the [service key](/guide/admin-api). The service key acts as an admin. It has no account, so it can't call the endpoints for a signed-in user or admin, and it never acts as root.
+For users, "manage" covers updating, disabling, enabling, deleting, ending sessions, and sending a password reset code. For admins it covers updating, disabling, enabling, and removing them. Your backend can call the admin API with the [service key](/guide/admin-api). The service key acts as an admin. It has no account, so it can't call the endpoints for a signed-in user or admin, and it never acts as root.
 
 ## Account status
 
-An account is `active` or `disabled`. Disabling a user (`POST /api/v1/admin/users/{id}/disable`) ends every session at once and refuses new sign-ins with `403 ACCOUNT_DISABLED`. Dopgate also refuses the user's access tokens right away, but a backend that verifies tokens offline accepts the last one until it expires. Enable the account again with `POST /api/v1/admin/users/{id}/enable`. Root disables and enables admins the same way under `/api/v1/admin/admins/{id}`.
+An account is `active` or `disabled`. Disabling a user (`POST /api/v1/admin/users/{id}/disable`) ends every session at once and refuses new sign-ins with `403 ACCOUNT_DISABLED`. Dopgate also refuses the user's access tokens right away, but a backend that verifies tokens offline accepts the last one until it expires. The user's personal tokens and agents can't trade their tokens for new access tokens while the account is disabled. Enable the account again with `POST /api/v1/admin/users/{id}/enable`. Root disables and enables admins the same way under `/api/v1/admin/admins/{id}`.
 
 ## Deleting accounts
 
-`DELETE /api/v1/admin/users/{id}` removes the user, their sessions, and their codes, and answers `204`. The audit log keeps a `user.deleted` event with the email. The same email can sign up again later as a new account with a new ID, so clean up your own rows keyed by the old `sub`. Root removes admins with `DELETE /api/v1/admin/admins/{id}`, which leaves an `admin.deleted` event.
+`DELETE /api/v1/admin/users/{id}` removes the user, their sessions, codes, personal tokens, and agents, and answers `204`. The audit log keeps a `user.deleted` event with the email. The same email can sign up again later as a new account with a new ID, so clean up your own rows keyed by the old `sub`. Root removes admins with `DELETE /api/v1/admin/admins/{id}`, which also removes the admin's agents and leaves an `admin.deleted` event.
 
 ## Listing and searching
 

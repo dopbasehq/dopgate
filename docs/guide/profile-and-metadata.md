@@ -45,6 +45,8 @@ curl -X PATCH https://auth.example.com/api/v1/auth/me \
 
 Fields you leave out stay as they are. An empty string clears `displayName` or `avatarUrl`. The display name is one line of at most 255 characters. The avatar URL must start with `https://` or `http://` and be at most 2048 characters. Other values answer `422 PROFILE_INVALID`.
 
+An access token from a [personal token](/guide/personal-tokens) can read and update the profile too. Changing the email or the password needs a token from a password or code sign-in.
+
 ## Setting metadata from your backend
 
 ```bash

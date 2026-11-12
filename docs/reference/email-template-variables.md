@@ -11,7 +11,7 @@ Write a variable as its name in double braces, such as <code v-pre>{{code}}</cod
 
 | Variable | Holds | Preview and test value |
 | --- | --- | --- |
-| `app_name` | `branding.appName` from settings, `dopgate` by default | The current app name |
+| `app_name` | `branding.appName` from settings, `Dopgate` by default | The current app name |
 | `email` | The account's current email. For `email_change`, the address before the change. | The admin's email, or `person@example.com` for the service key |
 | `display_name` | The account's display name, or an empty string | `Alex` |
 | `code` | The 6-digit code | `482913` |
