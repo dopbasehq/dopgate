@@ -31,7 +31,7 @@ Dopgate records sign-ins, account changes, and admin actions in the `audit_event
 | --- | --- |
 | `actorType` | `root` or `admin` for an admin; `user` for a user of your app; `service` for the service key; `anonymous`; or `system` for setup, retention, and the CLI |
 | `actorId`, `actorLabel` | The admin or user ID and email, `service` for the service key, or a label such as `setup`, `cli`, `retention`, or `refresh` |
-| `resourceType`, `resourceId` | What the action touched: `admin`, `user`, `session`, `settings`, `email_template`, `signing_key`, or `audit` |
+| `resourceType`, `resourceId` | What the action touched: `admin`, `user`, `session`, `agent`, `personal_token`, `settings`, `email_template`, `signing_key`, or `audit` |
 | `ipAddress` | The client address, through any [trusted proxies](/self-hosting/configuration#behind-a-reverse-proxy). Absent outside a request. |
 | `metadata` | Extra details per action, listed below. Never holds passwords, codes, or tokens. |
 | `seq`, `prevHash`, `recordHash` | The record's place in the hash chain |

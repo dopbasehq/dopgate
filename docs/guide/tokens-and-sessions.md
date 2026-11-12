@@ -12,7 +12,7 @@ Each sign-in starts a session: one signed-in device. A session hands out two kin
 | Access token | An ES256 JWT, `eyJ...` | 15 minutes | Sent to your backend as `Authorization: Bearer <token>` |
 | Refresh token | `dgr_` and 43 random characters | 30 days unused, single use | Traded at `POST /api/v1/auth/refresh` for new tokens |
 
-Admins change the lifetimes in settings under `tokens`: `accessTokenMinutes` (1 to 1440), `refreshTokenIdleDays` (1 to 3650), and `sessionAbsoluteDays` (1 to 3650, at least the idle limit). A session ends at the latest `sessionAbsoluteDays` (90 by default) after sign-in, however often it refreshes.
+Admins change the lifetimes in settings under `tokens`: `accessTokenMinutes` (1 to 1440), `refreshTokenIdleDays` (1 to 3650), and `sessionAbsoluteDays` (1 to 3650, at least the idle limit). A session ends at the latest `sessionAbsoluteDays` (90 by default) after sign-in, however often it refreshes. `PATCH /api/v1/admin/settings` replaces the whole `tokens` section, so send all three fields.
 
 ## Access tokens
 
@@ -27,6 +27,8 @@ An access token is a JWT signed with ES256. Its header names the signing key in 
 | `email_verified` | `true` | Whether the email was confirmed when the token was issued |
 | `kind` | `human` | `human` for a person who signed in |
 | `iat`, `exp` | `1762700000` | Issued at and expiry, in Unix seconds |
+
+A token traded from a [personal token](/guide/personal-tokens) carries `via: "pat"` and `tid`, the token's ID, in place of `sid`. An [agent's](/guide/agents) token has `kind: "agent"`, with `owner` and `capabilities` in place of the email claims.
 
 There is no `aud` claim. Admins never get one of these tokens: the console signs them in with tokens that only Dopgate can verify. [Token claims](/reference/token-claims) has the full reference.
 
@@ -148,7 +150,7 @@ Each session has `id`, `method` (`password` or `otp`), `ipAddress`, `userAgent`,
 | --- | --- |
 | `DELETE /api/v1/auth/sessions/{id}` | End one session of the current account. |
 | `DELETE /api/v1/auth/sessions` | End every session. Add `?keepCurrent=true` to stay signed in here. |
-| `POST /api/v1/auth/logout` | End the current session, or every session with `{"allSessions": true}`. |
+| `POST /api/v1/auth/logout` | End the current session, or every session with `{"allSessions": true}`. It also takes `{"refreshToken": "dgr_..."}` without an access token, so an app can sign out after the access token expired. |
 
 Admins see and end a user's sessions with `GET` and `DELETE /api/v1/admin/users/{id}/sessions`.
 
@@ -157,10 +159,10 @@ Admins see and end a user's sessions with `GET` and `DELETE /api/v1/admin/users/
 - The user signs out, ends it from the session list, or signs out everywhere.
 - The user changes their password. Every other session ends.
 - A password reset. Every session ends.
-- An admin disables the account or ends its sessions.
+- An admin disables or deletes the account, or ends its sessions.
 - A spent refresh token is presented again.
 - The refresh token goes unused for `refreshTokenIdleDays`, or `sessionAbsoluteDays` pass.
 
 ## Signing keys
 
-Dopgate generates a P-256 key the first time it starts and keeps it in the `signing_keys` table. Root rotates it from the console's **Signing keys** page, with `POST /api/v1/admin/keys/rotate`, or with [`dopgate keys rotate`](/cli/commands#keys-rotate). After a rotation the old key is `retiring`: it stays in the key set and verifies the tokens it signed for 24 hours, the longest an access token can live, and is then `retired` and leaves the key set.
+Dopgate generates a P-256 key the first time it starts and keeps it in the `signing_keys` table. Root rotates it from the console's **Signing keys** page, with `POST /api/v1/admin/keys/rotate`, or with [`dopgate keys rotate`](/cli/commands#keys-rotate). After a rotation the old key is `retiring`: it stays in the key set and verifies the tokens it signed for 24 hours, the longest an access token can live, and is then `retired` and leaves the key set. A rotation also replaces the console's own signing secret. Admins stay signed in: the console's current access tokens stop working, and the console refreshes them.

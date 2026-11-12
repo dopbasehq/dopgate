@@ -14,12 +14,12 @@ Every endpoint lives under `/api/v1`, except the key set at `/.well-known/jwks.j
 | Label | Send |
 | --- | --- |
 | Public | Nothing |
-| User | `Authorization: Bearer <access token>` of a signed-in user of your app. Console tokens and the service key are refused with `403 AUTHORIZATION_DENIED`. |
+| User | `Authorization: Bearer <access token>` of a user of your app who signed in with a password or a code. Console tokens and the service key are refused with `403 AUTHORIZATION_DENIED`. An access token traded from a personal token is accepted only by `GET` and `PATCH /auth/me`, and gets `403 AUTHORIZATION_DENIED` everywhere else. |
 | Console | `Authorization: Bearer <console token>` of a signed-in admin, from `/api/v1/console`. User tokens and the service key are refused with `403 AUTHORIZATION_DENIED`. |
 | Admin | A console token of root or an admin, or `Authorization: Bearer <DOPGATE_SERVICE_KEY>`. User tokens get `403 AUTHORIZATION_DENIED`. |
 | Root | A console token of the root account. |
 
-A missing header answers `401 AUTHENTICATION_REQUIRED`. A bad header or an unknown token answers `401 AUTHENTICATION_INVALID` or `401 TOKEN_INVALID`. An access token of a disabled account answers `403 ACCOUNT_DISABLED`. These apply to every authenticated endpoint and aren't repeated below.
+A missing header answers `401 AUTHENTICATION_REQUIRED`. A bad header or an unknown token answers `401 AUTHENTICATION_INVALID` or `401 TOKEN_INVALID`. An access token of a disabled account answers `403 ACCOUNT_DISABLED`. An agent's access token gets `403 AUTHORIZATION_DENIED` from every working endpoint; it is meant for your own backend. These apply to every authenticated endpoint and aren't repeated below.
 
 ### Envelope
 
@@ -163,7 +163,7 @@ Public. Trades a refresh token for new tokens.
 | --- | --- | --- |
 | `refreshToken` | no | Leave it out to use the `dopgate_refresh` cookie |
 
-Answers `200 TOKENS_REFRESHED` with tokens. The old refresh token is spent; presenting it again ends the session. Errors: `401 TOKEN_INVALID` (unknown, spent, or expired token, or an ended session), `403 ACCOUNT_DISABLED`.
+Answers `200 TOKENS_REFRESHED` with tokens. The old refresh token is spent; presenting it again ends the session. Errors: `401 TOKEN_INVALID` (no token sent, an unknown, spent, or expired token, or an ended session), `403 ACCOUNT_DISABLED`.
 
 ### `POST /api/v1/auth/logout`
 
@@ -178,11 +178,11 @@ Answers `200 SIGNED_OUT` with `data: null`, and clears the `dopgate_refresh` coo
 
 ### `GET /api/v1/auth/me`
 
-User. Returns the signed-in user with `200 ACCOUNT_FETCHED`. `404 NOT_FOUND` if the account was deleted.
+User, including an access token traded from a personal token. Returns the signed-in user with `200 ACCOUNT_FETCHED`. `404 NOT_FOUND` if the account was deleted.
 
 ### `PATCH /api/v1/auth/me`
 
-User. Updates the signed-in user's profile. Fields you leave out stay as they are.
+User, including an access token traded from a personal token. Updates the signed-in user's profile. Fields you leave out stay as they are.
 
 | Request field | Notes |
 | --- | --- |
@@ -233,8 +233,8 @@ Every `/auth/personal-tokens` endpoint needs User from a password or code sign-i
 | `GET /api/v1/auth/personal-tokens` | The user's tokens, newest first, as `{ "items": [...] }`, with `id`, `name`, `lastFour`, `expiresAt`, `expired`, `lastUsedAt`, `createdAt`. Answers `200 PERSONAL_TOKENS_FETCHED`. |
 | `POST /api/v1/auth/personal-tokens` | `name` (1 to 64 characters, unique per user) and `expiresAt` (optional, up to 3 years ahead). Answers `201 PERSONAL_TOKEN_CREATED` with `token`, shown once, and `personalToken`. Errors: `403 FEATURE_DISABLED`, `409 TOKEN_NAME_TAKEN`, `409 LIMIT_REACHED`, `422 REQUEST_INVALID`. |
 | `DELETE /api/v1/auth/personal-tokens/{id}` | Deletes the token. Answers `200 PERSONAL_TOKEN_DELETED`, or `404 NOT_FOUND`. |
-| `GET /api/v1/admin/users/{id}/personal-tokens` | Admin. A user's tokens, without the tokens themselves. |
-| `DELETE /api/v1/admin/users/{id}/personal-tokens/{tokenId}` | Console only, not the service key. Revokes the token. |
+| `GET /api/v1/admin/users/{id}/personal-tokens` | Admin. A user's tokens, without the tokens themselves, in `200 PERSONAL_TOKENS_FETCHED`. `404 NOT_FOUND` for an unknown user. |
+| `DELETE /api/v1/admin/users/{id}/personal-tokens/{tokenId}` | Console only, not the service key. Revokes the token. Answers `200 PERSONAL_TOKEN_DELETED`, or `404 NOT_FOUND`. |
 
 ## Agents
 
@@ -271,7 +271,7 @@ Public. Emails a 6-digit code. Always answers `200 CODE_SENT`, whether or not th
 | `email` | yes | |
 | `purpose` | yes | `email_verify` or `login` |
 
-A code goes out for `email_verify` when the account is active and unverified, and for `login` when the account is active, or when the email is unknown and passwordless sign-up is on. Errors: `422 EMAIL_INVALID`, `422 REQUEST_INVALID` (another purpose), `429 RATE_LIMITED`.
+A code goes out for `email_verify` when the account is active and unverified, and for `login` when the account is active, or when the email is unknown and both sign-up and passwordless sign-up are on. Errors: `422 EMAIL_INVALID`, `422 REQUEST_INVALID` (another purpose), `429 RATE_LIMITED`.
 
 ### `POST /api/v1/auth/verification/confirm`
 
@@ -450,7 +450,7 @@ Admin. Answers `200 SETTINGS_FETCHED` with every section.
 | `tokens` | `accessTokenMinutes` (`15`, 1 to 1440), `refreshTokenIdleDays` (`30`, 1 to 3650), `sessionAbsoluteDays` (`90`, 1 to 3650, not less than the idle limit) |
 | `limits` | `codeMinutes` (`10`), `codeMaxAttempts` (`5`), `codeResendSeconds` (`60`), `codesPerHour` (`5`), `lockoutAttempts` (`5`), `lockoutMinutes` (`15`), `ipRequestsPerMinute` (`20`). Ranges in [Rate limits](/guide/rate-limits). |
 | `selfService` | `agents` (`false`), `maxAgentsPerUser` (`10`, 1 to 1000), `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [Agents](/guide/agents) and [Personal tokens](/guide/personal-tokens). |
-| `branding` | `appName` (`dopgate`, one line up to 255 characters), `logoUrl` (`null`, an `http(s)` URL) |
+| `branding` | `appName` (`Dopgate`, one line up to 255 characters), `logoUrl` (`null`, an `http(s)` URL) |
 | `smtp` | `host` (`null`), `port` (`587`, `465`, or `25` by security), `security` (`starttls`), `username`, `passwordSet`, `fromEmail` (`no-reply@dopgate.com`), `fromName`, `source` (`server_config`, `database`, or `log`), `canStorePassword`. See [Email (SMTP)](/self-hosting/smtp#where-the-settings-come-from). |
 
 ### `PATCH /api/v1/admin/settings`
@@ -463,7 +463,7 @@ Admin. Send any of `signup`, `password`, `tokens`, `limits`, `selfService`, `bra
 
 ### `POST /api/v1/admin/settings/smtp/test`
 
-Admin. Sends a test message through the SMTP server in use. Optional `to`; the default is the caller's own email. Answers `200 SMTP_TEST_SENT`. Errors: `400 EMAIL_INVALID`, `400 SMTP_NOT_CONFIGURED`, `400 SMTP_PASSWORD_UNREADABLE`, `502 SMTP_SEND_FAILED`.
+Admin. Sends a test message through the SMTP server in use. Optional `to`; the default is the caller's own email, so the service key has to send one. Answers `200 SMTP_TEST_SENT`. Errors: `422 EMAIL_INVALID` (a bad `to`, or none from the service key), `400 SMTP_NOT_CONFIGURED`, `400 SMTP_PASSWORD_UNREADABLE`, `502 SMTP_SEND_FAILED`.
 
 ## Email templates
 
@@ -491,7 +491,7 @@ Renders a draft with sample values without saving or sending. Answers `200 EMAIL
 
 ### `POST /api/v1/admin/email-templates/{name}/test`
 
-Renders a draft with sample values and sends it to the caller's email. Answers `200 EMAIL_TEMPLATE_TEST_SENT`. Errors: `400 EMAIL_INVALID` for the service key, `422 TEMPLATE_INVALID`, `502 SMTP_SEND_FAILED`. Without SMTP the message is written to the log.
+Renders a draft with sample values and sends it to the caller's email. Answers `200 EMAIL_TEMPLATE_TEST_SENT`. Errors: `400 EMAIL_INVALID` for the service key, `400 SMTP_PASSWORD_UNREADABLE`, `422 TEMPLATE_INVALID`, `502 SMTP_SEND_FAILED`. Without SMTP the message is written to the log.
 
 ## Audit
 
@@ -505,13 +505,13 @@ Admin. Recomputes the hash chain and answers `200 AUDIT_CHAIN_VERIFIED` with `ok
 
 ## Planned endpoints
 
-These routes exist but answer `501 NOT_IMPLEMENTED` after their authentication check. They are left out of the Swagger UI at `/api/docs` and `/api/v1/openapi.json` until they work.
+These routes exist but answer `501 NOT_IMPLEMENTED` after their authentication check and request parsing. They are left out of the Swagger UI at `/api/docs` and `/api/v1/openapi.json` until they work. The three authenticator app routes accept any valid bearer token for now, whoever it belongs to.
 
 | Endpoint | Auth | Feature |
 | --- | --- | --- |
-| `POST /api/v1/auth/mfa/totp/enroll` | User | Start authenticator app setup |
-| `POST /api/v1/auth/mfa/totp/verify` | User | Confirm the authenticator app and get recovery codes |
-| `DELETE /api/v1/auth/mfa/totp` | User | Remove the authenticator app |
+| `POST /api/v1/auth/mfa/totp/enroll` | Any token | Start authenticator app setup |
+| `POST /api/v1/auth/mfa/totp/verify` | Any token | Confirm the authenticator app and get recovery codes |
+| `DELETE /api/v1/auth/mfa/totp` | Any token | Remove the authenticator app |
 | `POST /api/v1/auth/mfa/challenge` | Public | Finish a sign-in with a second factor |
 | `GET /api/v1/auth/sso/providers` | Public | Enabled single sign-on providers |
 | `GET /api/v1/auth/sso/{provider_id}/start` | Public | Start a provider sign-in |

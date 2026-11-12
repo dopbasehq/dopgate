@@ -62,13 +62,13 @@ DOPGATE_SMTP_FROM_NAME=Acme
 | `DOPGATE_SMTP_FROM_EMAIL` | The sender address. Defaults to `no-reply@dopgate.com`. |
 | `DOPGATE_SMTP_FROM_NAME` | Optional display name for the sender, such as your app's name. |
 
-Empty values count as unset. A bad value stops Dopgate at startup with a message that names it: a host with a port or scheme in it, an invalid from address, an unknown security mode, or a username or name with a line break.
+Empty values count as unset, except for `DOPGATE_SMTP_PORT` and `DOPGATE_SMTP_SECURITY`: when present, they must hold a port number and a known mode. A bad value stops Dopgate at startup with a message that names it: a host with a port or scheme in it, an invalid from address, an unknown security mode, or a username or name with a line break.
 
 Dopgate checks the server's certificate against the trusted roots of the image and waits up to 15 seconds for each SMTP command.
 
 ## Check it with a test email
 
-From the console, open **Settings** and use **Send a test email** in the SMTP section. From the API:
+From the console, open **Settings** and use **Send test email** in the SMTP section. From the API:
 
 ```bash
 curl -X POST https://auth.example.com/api/v1/admin/settings/smtp/test \
@@ -84,7 +84,7 @@ Without `to`, the message goes to the signed-in admin's own email. The service k
 | `200 SMTP_TEST_SENT` | The SMTP server accepted the message. |
 | `400 SMTP_NOT_CONFIGURED` | No host is set, in the server config or the console. |
 | `400 SMTP_PASSWORD_UNREADABLE` | The password saved in the console can't be decrypted because the service key changed. Enter it again. |
-| `400 EMAIL_INVALID` | `to` is not a valid address, or the service key left it out. |
+| `422 EMAIL_INVALID` | `to` is not a valid address, or the service key left it out. |
 | `502 SMTP_SEND_FAILED` | The server refused the message or couldn't be reached. The message holds the server's answer. |
 
 `GET /api/v1/admin/settings` returns the settings in use under `smtp`, without the password: `host`, `port`, `security`, `username`, `passwordSet`, `fromEmail`, `fromName`, `source`, and `canStorePassword`. `source` is `server_config` when the server config sets a host, `database` when the console does, and `log` when neither does. `canStorePassword` is `false` until `DOPGATE_SERVICE_KEY` is set.

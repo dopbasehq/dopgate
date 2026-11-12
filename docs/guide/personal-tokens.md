@@ -13,8 +13,10 @@ Personal tokens are off until an admin turns them on: **Settings → Tokens and 
 curl -X PATCH https://auth.example.com/api/v1/admin/settings \
   -H "authorization: Bearer $DOPGATE_SERVICE_KEY" \
   -H 'content-type: application/json' \
-  -d '{"selfService":{"personalTokens":true,"maxPersonalTokensPerUser":10}}'
+  -d '{"selfService":{"personalTokens":true,"maxPersonalTokensPerUser":10,"agents":false,"maxAgentsPerUser":10}}'
 ```
+
+The API replaces the whole `selfService` section, and a field you leave out goes back to its default. Send the [agent](/guide/agents) fields too, or saving this turns user agents off.
 
 ## Making a token
 
@@ -42,9 +44,16 @@ curl -X POST https://auth.example.com/api/v1/auth/personal-tokens \
 }
 ```
 
-The `token` is in this answer only. Dopgate stores a SHA-256 hash and the last four characters, so show the token once and tell the user to copy it. Names are 1 to 64 characters and unique per user. The expiry can be up to three years ahead; leave it out for a token that never expires.
+The `token` is in this answer only. Dopgate stores a SHA-256 hash and the last four characters, so show the token once and tell the user to copy it. Names are one line of 1 to 64 characters and unique per user. The expiry can be up to three years ahead; leave it out for a token that never expires.
 
-Only a password or code sign-in can make, list, or delete personal tokens. An access token traded from a personal token gets `403` there, so a leaked token can't make more of itself.
+| Answer | When |
+| --- | --- |
+| `403 FEATURE_DISABLED` | `selfService.personalTokens` is off. |
+| `409 LIMIT_REACHED` | The user already has `maxPersonalTokensPerUser` tokens. |
+| `409 TOKEN_NAME_TAKEN` | The user already has a token with this name. |
+| `422 REQUEST_INVALID` | The name is empty or too long, or the expiry is in the past or more than three years ahead. |
+
+Only a password or code sign-in can make, list, or delete personal tokens. An access token traded from a personal token gets `403 AUTHORIZATION_DENIED` there, so a leaked token can't make more of itself.
 
 ## Signing in with a token
 
@@ -60,14 +69,16 @@ curl -X POST https://auth.example.com/api/v1/auth/token \
 { "accessToken": "eyJhbGciOiJFUzI1NiIs...", "tokenType": "Bearer", "expiresIn": 900 }
 ```
 
-The access token is an ordinary ES256 user token, verified against the JWKS like any other. Its claims carry the user's `sub` and `kind: "human"`, plus `via: "pat"` and `tid`, the token's ID, in place of `sid`. There is no refresh token and no session: trade the token again when the access token expires. See [Token claims](/reference/token-claims).
+The access token is an ordinary ES256 user token, verified against the JWKS like any other. Its claims carry the user's `sub`, `email`, `email_verified`, and `kind: "human"`, plus `via: "pat"` and `tid`, the token's ID, in place of `sid`. There is no refresh token and no session: trade the token again when the access token expires. See [Token claims](/reference/token-claims).
+
+On Dopgate itself, this access token can read and update the profile at `/api/v1/auth/me`. Changing the password or email, and managing sessions, personal tokens, or agents, all need a password or code sign-in.
 
 | Answer | When |
 | --- | --- |
 | `401 TOKEN_INVALID` | The token is wrong or was deleted. Recorded in the audit log as `token.rejected`, with only the last four characters. |
 | `401 TOKEN_EXPIRED` | The token is past its expiry. It stays in the user's list, marked `expired`, until they delete it. |
 | `403 ACCOUNT_DISABLED` | The user is disabled. Enabling them makes the token work again. |
-| `429 RATE_LIMITED` | Too many attempts from this address, as on password sign-in. |
+| `429 RATE_LIMITED` | Too many requests from this address. Trading counts toward the same [per-address limit](/guide/rate-limits#the-per-address-limit) as password sign-in. |
 
 ## Listing and deleting
 

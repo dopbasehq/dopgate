@@ -5,11 +5,11 @@ description: "The per-address limit, the per-email code limits, account lockout 
 
 # Rate limits and lockout
 
-Dopgate slows down guessing and email flooding in three ways: a limit per client address, limits per email on sending codes, and an account lockout after wrong passwords. Admins change every number under `limits` in settings, on the console's **Settings** page or with `PATCH /api/v1/admin/settings`.
+Dopgate slows down guessing and email flooding in three ways: a limit per client address, limits per email on sending codes, and an account lockout after wrong passwords. Admins change every number under `limits` in settings, in the **Codes and lockout** section of the console's **Settings** page or with `PATCH /api/v1/admin/settings`. The API replaces the whole `limits` section, so send every field: one you leave out goes back to its default.
 
 | Setting (`limits.*`) | Default | Allowed | What it limits |
 | --- | --- | --- | --- |
-| `ipRequestsPerMinute` | 20 | 1 to 10000 | Requests per minute from one client address to the sign-in, sign-up, and code endpoints, counted together |
+| `ipRequestsPerMinute` | 20 | 1 to 10000 | Requests per minute from one client address to the sign-in, sign-up, code, and token endpoints, counted together |
 | `codeResendSeconds` | 60 | 0 to 3600 | Seconds before the same email can get another code of the same purpose. 0 turns the wait off. |
 | `codesPerHour` | 5 | 1 to 100 | Codes one email can receive per hour, all purposes together |
 | `codeMinutes` | 10 | 1 to 60 | Minutes a code stays valid |
@@ -27,6 +27,8 @@ These endpoints share one budget per client address:
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/verification/send` and `/confirm`
 - `POST /api/v1/auth/password/forgot` and `/reset`
+- `POST /api/v1/auth/token`, where scripts and agents trade their tokens
+- the console's sign-in endpoints: `POST /api/v1/console/login`, `/console/codes/send` and `/confirm`, and `/console/password/forgot` and `/reset`
 
 The address is the connection's peer address. Behind a reverse proxy, every request would seem to come from the proxy and share one budget, so list the proxy in `DOPGATE_TRUSTED_PROXIES`. Dopgate then reads `X-Forwarded-For` from the right, skipping trusted hops. See [Configuration](/self-hosting/configuration#behind-a-reverse-proxy).
 
@@ -38,7 +40,7 @@ A new code replaces the previous one of the same purpose. Each code allows `code
 
 ## Account lockout
 
-After `lockoutAttempts` wrong passwords in a row, the account locks for `lockoutMinutes`. While it is locked, every password sign-in answers `401 AUTHENTICATION_INVALID`, the same as a wrong password, so an attacker can't tell the lock from a miss. The audit log records each failed attempt as `user.sign_in_failed` with the reason `password` or `locked`.
+After `lockoutAttempts` wrong passwords in a row, the account locks for `lockoutMinutes`. While it is locked, every password sign-in answers `401 AUTHENTICATION_INVALID`, the same as a wrong password, so an attacker can't tell the lock from a miss. The audit log records each failed attempt as `user.sign_in_failed` with the reason `password` or `locked`. Admin accounts lock the same way when they sign in to the console, recorded as `admin.sign_in_failed`.
 
 The counter starts over after the account locks, and these clear it:
 

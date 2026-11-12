@@ -37,18 +37,20 @@ A schema name must use lowercase letters, digits, and underscores, start with a 
 | `sessions`, `admin_sessions` | One row per signed-in device, for users and for admins |
 | `refresh_tokens`, `admin_refresh_tokens` | SHA-256 hashes of refresh tokens |
 | `verification_tokens`, `admin_codes` | SHA-256 hashes of emailed 6-digit codes |
+| `personal_tokens` | Users' personal tokens, as SHA-256 hashes |
+| `agents` | Agents, their owners and capabilities, and SHA-256 hashes of their tokens |
 | `signing_keys` | The ES256 keys that sign access tokens, private keys included |
 | `console_keys` | The HS256 secret that signs console tokens |
-| `settings` | Runtime settings, one JSON object per section |
+| `settings` | Runtime settings, one JSON object per section. A saved SMTP password is encrypted with a key derived from `DOPGATE_SERVICE_KEY`. |
 | `email_templates` | Admin overrides of the built-in emails |
 | `sso_providers`, `user_identities`, `sso_flows` | Reserved for single sign-on, which is planned |
-| `audit_events` | The audit log and its hash chain |
+| `audit_events`, `audit_chain_anchor`, `audit_chain_genesis` | The audit log and its hash chain |
 
 Treat these as Dopgate's private storage and use the API to read or change accounts. Writing to them directly can break the audit chain and the invariants the code relies on.
 
 ## Give Dopgate its own role
 
-`signing_keys` holds the private key that signs every access token, and `console_keys` the secret behind console tokens. Anyone who can read it can sign a token for any user. Your app's database role shouldn't be able to read it, and neither should any reporting or analytics user.
+`signing_keys` holds the private key that signs every access token, and `console_keys` the secret behind console tokens. Anyone who can read them can sign a token for any user or admin. Your app's database role shouldn't be able to read them, and neither should any reporting or analytics user.
 
 Create a role for Dopgate and let it create its own schema:
 

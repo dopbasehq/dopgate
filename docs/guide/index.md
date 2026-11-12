@@ -46,7 +46,8 @@ When your backend needs to do something to an account, such as set a plan in the
 - Profiles with a display name, an avatar URL, and three kinds of JSON metadata
 - Access and refresh tokens, with refresh token rotation and reuse detection, and a list of signed-in devices each user can end
 - Admins who run Dopgate from the console, kept apart from the users who sign in to your app
-- An admin API for users, settings, email templates, signing keys, and the audit log
+- Personal tokens a user makes to sign in from a script, and agents: accounts for bots that sign in with a token
+- An admin API for users, admins, agents, settings, email templates, signing keys, and the audit log
 - Rate limits per address and per email, and account lockout after wrong passwords
 - Six email templates you can rewrite from the console or the API
 - A hash-chained audit log

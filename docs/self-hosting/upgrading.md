@@ -25,6 +25,10 @@ An older binary can't start on a database that a newer one migrated, because the
 
 Two Dopgate processes starting at once against the same schema is safe: sqlx takes a lock for migrations, and key generation locks the `signing_keys` table. Still, upgrade one at a time and keep in mind that [rate limit counters](/guide/rate-limits#counters-live-in-memory) are per process.
 
+## Coming from a build before the admin split
+
+Earlier development builds kept root and admins in the `users` table with a `role` column. The first start of a newer build moves them into `admins`, keeping their passwords. Their IDs change from `usr_` to `adm_`, the `role` column is dropped, and their old sessions and codes are deleted, so they sign in to the console again. Settings and templates keep the admin who last saved them.
+
 ## Coming from a 0.1.0 preview
 
 Early 0.1.0 previews stored data in SQLite under a data directory, `.dev-data` during development, with a master key file. The current version reads none of that and has no import from it. Start with a fresh PostgreSQL database, and delete the old `.dev-data` folder.

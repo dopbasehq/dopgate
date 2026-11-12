@@ -1,6 +1,6 @@
 ---
 title: "Commands"
-description: "Reference for Dopgate serve, init, keys rotate, and healthcheck, with every option."
+description: "Reference for the dopgate serve, init, keys rotate, and healthcheck commands, with every option."
 ---
 
 # Commands
@@ -24,7 +24,7 @@ dopgate serve [--database-url URL] [--config PATH] [--port PORT] [--host IP]
 | `--docs` | `true` | Serve Swagger UI at `/api/docs` and the OpenAPI document at `/api/v1/openapi.json` |
 | `--web-ui` | `true` | Serve the admin console at `/` |
 
-On startup `serve` connects to PostgreSQL, runs migrations, applies audit retention, makes sure a signing key exists, and prints a banner with the public URL, the bind address, the API and JWKS URLs, the database without its password, the schema, and the console and API docs URLs. Then it handles the root account:
+On startup `serve` connects to PostgreSQL, runs migrations, applies audit retention, makes sure a signing key exists, and prints a banner with the version, the public URL, the bind address, the API and JWKS URLs, the database without its password, the schema, and the console and API docs URLs. Then it handles the root account:
 
 - If root exists, nothing more happens.
 - If `DOPGATE_ROOT_EMAIL` is set, it creates root and prints a generated password once, or uses `DOPGATE_ROOT_PASSWORD` if set and prints nothing.
@@ -61,9 +61,9 @@ Start signing access tokens with a new key.
 dopgate keys rotate [--database-url URL] [--config PATH]
 ```
 
-The new key becomes `active`. The old one becomes `retiring`: it stays in the JWKS and keeps verifying the tokens it signed for 24 hours, then it is retired. The audit log records `key.rotated` with the actor `system` and the label `cli`.
+The new key becomes `active`. The old one becomes `retiring`: it stays in the JWKS and keeps verifying the tokens it signed for 24 hours, then it is retired. The secret that signs console tokens is replaced in the same step. The audit log records `key.rotated` with the actor `system` and the label `cli`.
 
-A running server reloads its keys every minute, so it starts signing with the new key within a minute of `dopgate keys rotate`. Rotating from the console or with `POST /api/v1/admin/keys/rotate` as root updates the server you call at once.
+A running server reloads its signing keys every minute, so it starts signing with the new key within a minute of `dopgate keys rotate`. It reads the console secret from the database on every request, so console tokens signed with the old secret stop working at once and the console refreshes them. Rotating from the console or with `POST /api/v1/admin/keys/rotate` as root updates the server you call at once.
 
 ## healthcheck
 

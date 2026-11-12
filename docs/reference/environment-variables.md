@@ -5,14 +5,14 @@ description: "Every DOPGATE_* environment variable, its config file key, its def
 
 # Environment variables
 
-Dopgate reads these at startup. Environment variables win over the [config file](/self-hosting/configuration#config-file), and `dopgate serve` flags win over both. Empty values count as unset for the service key, the root email, and the SMTP settings.
+Dopgate reads these at startup. Environment variables win over the [config file](/self-hosting/configuration#config-file), and `dopgate serve` flags win over both. Empty values count as unset for the service key, the root email, and the SMTP host, username, password, sender address, and sender name. An empty number, boolean, or `DOPGATE_SMTP_SECURITY`, such as `DOPGATE_SMTP_PORT=`, fails to parse and stops startup.
 
 ## Server
 
 | Variable | File key | Default | Meaning |
 | --- | --- | --- | --- |
 | `DOPGATE_DATABASE_URL` | `database_url` | none, required | PostgreSQL URL starting with `postgres://` or `postgresql://` |
-| `DOPGATE_DATABASE_SCHEMA` | `database_schema` | `dopgate` | Schema for every Dopgate table. Lowercase letters, digits, and underscores; not starting with `pg_`; at most 63 bytes. |
+| `DOPGATE_DATABASE_SCHEMA` | `database_schema` | `dopgate` | Schema for every Dopgate table. Lowercase letters, digits, and underscores, starting with a letter or underscore; not starting with `pg_`; at most 63 bytes. |
 | `DOPGATE_DATABASE_MAX_CONNECTIONS` | none | `10` | Most connections the pool opens, 1 to 1000 |
 | `DOPGATE_PUBLIC_URL` | `public_url` | `http://localhost:<port>` on loopback, `http://SERVER_HOST:<port>` otherwise | The URL apps and users reach Dopgate on, and the `iss` of every access token. Absolute `http://` or `https://`. |
 | `DOPGATE_HOST` | `host` | `127.0.0.1` (`0.0.0.0` in the image) | IP address to listen on, or `localhost` |
@@ -51,6 +51,8 @@ Dopgate reads these at startup. Environment variables win over the [config file]
 Dopgate refuses to start, with a message naming the problem, when:
 
 - `DOPGATE_DATABASE_URL` is missing or isn't a PostgreSQL URL,
+- `DOPGATE_PUBLIC_URL` isn't an absolute `http://` or `https://` URL,
+- `DOPGATE_DATABASE_MAX_CONNECTIONS` or `DOPGATE_SHUTDOWN_GRACE_SECONDS` is outside its range,
 - the schema name, a number, a boolean, a proxy entry, or an origin can't be parsed,
 - `DOPGATE_SERVICE_KEY` is shorter than 32 characters,
 - `DOPGATE_ROOT_EMAIL` isn't a valid email,
@@ -64,6 +66,7 @@ Booleans take `true` or `false`.
 | Variable | Used by | Meaning |
 | --- | --- | --- |
 | `POSTGRES_PASSWORD`, `POSTGRES_PORT` | `docker-compose.yml` | Password and published port of the bundled PostgreSQL |
+| `DOPGATE_HOST_PORT` | `docker-compose.yml` | Host port that Dopgate's 8850 is published on. Default `8850`. |
 | `DOPGATE_TEST_DATABASE_URL` | `bun run test:app` | PostgreSQL for the backend tests. Default `postgres://postgres:dopgate@localhost:55432/postgres`. |
 | `DOPGATE_API_URL` | the console's Vite dev server | Where `/api` is proxied during development. Default `http://localhost:8850`. |
 | `DOPGATE_DOCS_URL` | `bun run build:docs` | Published address of this site, for canonical links and the sitemap |

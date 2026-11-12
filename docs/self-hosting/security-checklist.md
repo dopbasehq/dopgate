@@ -9,7 +9,7 @@ Go through this list before real users sign in.
 
 ## The public URL uses HTTPS
 
-Set `DOPGATE_PUBLIC_URL` to an `https://` URL and terminate TLS at your proxy. Passwords, codes, and tokens travel in request bodies and headers, and the console's refresh cookie is only marked `Secure` when the public URL is HTTPS. Dopgate prints a warning at startup when the public URL uses `http://` on anything but localhost.
+Set `DOPGATE_PUBLIC_URL` to an `https://` URL and terminate TLS at your proxy. Passwords, codes, and tokens travel in request bodies and headers, and the refresh cookies are only marked `Secure` when the public URL is HTTPS. Dopgate prints a warning at startup when the public URL uses `http://` on anything but localhost.
 
 The public URL is also the `iss` claim. Settle it before you go live: changing it later means updating the issuer check in every backend, and tokens issued before the change carry the old value.
 
@@ -24,7 +24,7 @@ The `signing_keys` table holds the private key that signs access tokens. Anyone 
 - Give Dopgate its own database role and keep your app's role out of the schema. See [PostgreSQL and the schema](/self-hosting/postgres#give-dopgate-its-own-role).
 - Don't let your app, analytics tools, or support staff connect as a superuser.
 - Treat database dumps as secrets. See [Backups](/self-hosting/backups).
-- If you suspect the key leaked, rotate it as root and end every session. The old key keeps verifying for 24 hours after rotation, so tokens signed with it stay valid that long.
+- If you suspect the key leaked, rotate it as root. The old key keeps verifying for 24 hours after rotation, so tokens signed with it stay valid that long.
 
 ## Trusted proxies match your setup
 
@@ -48,9 +48,11 @@ Without an SMTP host, from `DOPGATE_SMTP_HOST` or the console, Dopgate writes em
 
 Check the settings: whether anyone may sign up, whether a verified email is required (on by default), and whether a code sign-in may create accounts (off by default). Raise the minimum password length if your app needs it.
 
+Personal tokens and agents for your users are off by default (`selfService.personalTokens` and `selfService.agents`). Both let a user create long-lived credentials, so turn them on only if your users need them.
+
 ## Optional extras
 
 - Turn off the Swagger UI with `DOPGATE_DOCS=false` if you don't want the API description public.
 - Turn off the console with `DOPGATE_WEB_UI=false` if nobody uses it, and manage users through the admin API.
-- Shorten `accessTokenMinutes` if the [offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap) matters for your app.
+- Shorten `tokens.accessTokenMinutes` if the [offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap) matters for your app.
 - Keep server logs outside the database, so the audit checkpoints they hold can later prove the audit log wasn't rewritten.

@@ -82,7 +82,7 @@ const tokens = await call("/auth/verification/confirm", {
 });
 ```
 
-When an admin has turned off **Require a verified email before signing in**, `signup.tokens` already holds the tokens and the code only marks the email verified later. [Sign-up and email verification](/guide/sign-up-and-verification) covers both cases and resending a code.
+When an admin has turned off **Require a verified email before signing in**, `signup.tokens` already holds the tokens, and confirming the code later marks the email verified. [Sign-up and email verification](/guide/sign-up-and-verification) covers both cases and resending a code.
 
 ## Frontend: sign in
 
@@ -144,7 +144,7 @@ export async function currentUserId(authorizationHeader) {
 }
 ```
 
-Store `sub` as the foreign key in your own tables. It never changes, even when the user changes their email. The token also carries `email`, `email_verified`, `kind`, and `sid`. [Token claims](/reference/token-claims) describes each one, and [Tokens and sessions](/guide/tokens-and-sessions) has the same check in Go and Python.
+Store `sub` as the foreign key in your own tables. It never changes, even when the user changes their email. If you use [agents](/guide/agents), their tokens pass the same check with an `agt_` ID in `sub` and `kind: "agent"`, so check `kind` on routes that only people should reach. The token also carries `email`, `email_verified`, `kind`, and `sid`. [Token claims](/reference/token-claims) describes each one, and [Tokens and sessions](/guide/tokens-and-sessions) has the same check in Go and Python.
 
 ## Backend: call the admin API
 

@@ -10,7 +10,7 @@ A Dopgate deployment is a PostgreSQL database and one Dopgate container. Dopgate
 ```mermaid
 flowchart LR
     accTitle: A Dopgate deployment
-    accDescr: Browsers and your backend reach Dopgate through a reverse proxy over HTTPS. Dopgate stores everything in the Dopgate schema of the PostgreSQL database your app also uses.
+    accDescr: Browsers and your backend reach Dopgate through a reverse proxy over HTTPS. Dopgate stores everything in the dopgate schema of the PostgreSQL database your app also uses.
 
     USERS["Your frontend"] -->|"HTTPS"| PROXY["Reverse proxy"]
     PROXY --> GATE["dopgate container"]
@@ -26,13 +26,13 @@ flowchart LR
 
 ## What you need
 
-- PostgreSQL. The Compose file and the test suite use PostgreSQL 17.
+- PostgreSQL. The bundled Compose file uses PostgreSQL 18, and the test suite runs on 17.
 - A host name for Dopgate, such as `auth.example.com`, served over HTTPS. Dopgate serves the console at `/` and the API under `/api`, so give it its own host name instead of a path on your app's site.
 - An SMTP server for real email. Without one, emails go to the log.
 
 ## What you set
 
-At minimum, set `DOPGATE_DATABASE_URL` and `DOPGATE_PUBLIC_URL`. For a real deployment you will also want `DOPGATE_ALLOWED_ORIGINS`, `DOPGATE_SERVICE_KEY`, `DOPGATE_ROOT_EMAIL`, `DOPGATE_TRUSTED_PROXIES` if a proxy sits in front, and the SMTP variables. [Environment variables](/reference/environment-variables) lists them all.
+At minimum, set `DOPGATE_DATABASE_URL` and `DOPGATE_PUBLIC_URL`. For a real deployment you will also want `DOPGATE_ALLOWED_ORIGINS`, `DOPGATE_SERVICE_KEY`, `DOPGATE_ROOT_EMAIL`, `DOPGATE_TRUSTED_PROXIES` if a proxy sits in front, and SMTP, either with the variables or in the console. [Environment variables](/reference/environment-variables) lists them all.
 
 ## Pages in this section
 

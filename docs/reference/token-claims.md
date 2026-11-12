@@ -5,7 +5,7 @@ description: "The header and claims of a Dopgate access token, and the checks yo
 
 # Token claims
 
-A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256). Only your app's users get these tokens. Admins sign in to the console and get tokens that only Dopgate can verify; see [Admins and users](/guide/admins-and-users).
+A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256). Your app's users and [agents](/guide/agents) get these tokens. Admins sign in to the console and get [console tokens](#console-tokens) that only Dopgate can verify; see [Admins and users](/guide/admins-and-users).
 
 ## Header
 
@@ -34,7 +34,7 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | --- | --- | --- |
 | `iss` | string | Dopgate's `DOPGATE_PUBLIC_URL` without a trailing slash |
 | `sub` | string | The user ID, `usr_` followed by a ULID, or an agent's `agt_` ID. It never changes for the life of the account. |
-| `exp` | number | Expiry, in Unix seconds. `iat` plus `accessTokenMinutes` (15 by default). |
+| `exp` | number | Expiry, in Unix seconds. `iat` plus `accessTokenMinutes` (15 by default), for a sign-in, a refresh, and a traded personal or agent token alike. |
 | `iat` | number | When the token was issued, in Unix seconds |
 | `sid` | string | The session ID, `ses_` followed by a ULID. It matches the `id` in the session list. Absent on a token from a personal token. |
 | `kind` | string | `human` for a person who signed in, `agent` for an [agent](/guide/agents). Check it first. |
@@ -54,9 +54,9 @@ There is no `aud`, `nbf`, or `jti` claim. Profile fields and metadata are not in
 | Signature | ES256 only, with the JWKS key whose `kid` matches. Refuse any other `alg`. |
 | Issuer | `iss` equals your public URL without a trailing slash. |
 | Expiry | `exp` is in the future. A few seconds of leeway for clock skew is fine. |
-| Subject | `sub` is present. Use it as the user ID. |
+| Subject | `sub` is present. Use it as the user ID, or as the agent ID when `kind` is `agent`. |
 
-Inside Dopgate, a token also has to belong to a session that hasn't ended (or a personal token that still exists and hasn't expired) and an account that isn't disabled, and the email and verified flag are read fresh from the database. Your backend can't make those checks offline. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
+Inside Dopgate, a token also has to belong to a session that hasn't ended (or a personal token that still exists and hasn't expired) and an account that isn't disabled, and the email and verified flag are read fresh from the database. Your backend can't make those checks offline. Dopgate's own endpoints refuse agent tokens, so those checks never run for them. See [the offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap).
 
 ## The key set
 
@@ -79,3 +79,7 @@ Inside Dopgate, a token also has to belong to a session that hasn't ended (or a 
 ```
 
 It is served with `Cache-Control: public, max-age=300`. A rotated-out key stays in the set for 24 hours, the longest an access token can live.
+
+## Console tokens
+
+The console gets its own access token from `/api/v1/console`. It is signed with HS256 and a secret that isn't in the key set, and its header `kid` starts with `ckey_`. It carries `iss`, `aud` (always `dopgate-console`), `sub` (the admin's `adm_` ID), `exp`, `iat`, `sid` (the console session), `role` (`root` or `admin`), and `email`. It lives as long as an app access token. Rotating the signing keys replaces the secret, and tokens signed with the old one stop working at once. Your backend can't verify a console token, and shouldn't accept one.

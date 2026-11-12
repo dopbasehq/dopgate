@@ -52,7 +52,7 @@ This password is shown once. Sign in and change it, and clear DOPGATE_ROOT_EMAIL
 Copy the password now. Later starts see that root exists and print nothing.
 
 ::: tip Lost the password?
-Reset it with a code, like any user. Ask for one with `POST /api/v1/auth/password/forgot` and the root email, then send the code and a new password to `POST /api/v1/auth/password/reset`. Without SMTP, the code is in `docker compose logs dopgate`. [Password reset](/guide/password-reset) shows both calls.
+Sign in with a code instead: enter the root email on the console's sign-in page and choose **Email me a code**. To set a new password, ask for a reset code with `POST /api/v1/console/password/forgot` and the root email, then send the code and a new password to `POST /api/v1/console/password/reset`. Root is an admin, and admins don't use `/api/v1/auth`. The console endpoints take the same bodies as the calls in [Password reset](/guide/password-reset). Without SMTP, the code is in `docker compose logs dopgate`.
 :::
 
 ## 4. Sign in to the console

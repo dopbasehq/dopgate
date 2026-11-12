@@ -43,4 +43,5 @@ Errors from any command go to standard error, as JSON with `--json`:
 | --- | --- |
 | `0` | Success, or a healthy server for `healthcheck` |
 | `1` | An error, or an unhealthy server for `healthcheck` |
+| `2` | The command line is invalid, such as an unknown option or a missing value. The usage error is printed as text, even with `--json`. |
 | `130` | You cancelled a prompt with Ctrl-C or Esc. The JSON error code is `CLI_CANCELLED`. |
