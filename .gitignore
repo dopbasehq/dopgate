@@ -13,3 +13,5 @@ docs/.vitepress/dist
 
 # Local secrets for docker compose
 .env
+
+.claude
