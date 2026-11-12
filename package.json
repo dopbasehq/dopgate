@@ -18,6 +18,7 @@
     "test": "bun run test:ui && bun run test:app",
     "test:ui": "bun run --cwd ui test",
     "test:app": "cargo test --manifest-path app/Cargo.toml --all-targets",
+    "test:github": "node --test scripts/github-templates.test.mjs scripts/release.test.mjs",
     "lint": "bun run lint:ui && bun run lint:app",
     "lint:ui": "bun run --cwd ui lint",
     "lint:app": "cargo clippy --manifest-path app/Cargo.toml --all-targets -- -D warnings",
