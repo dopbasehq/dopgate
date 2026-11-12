@@ -33,7 +33,15 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
 
+      # The validator comes from the base branch, so the pull request that
+      # adds it, or one into a branch cut before it, has nothing to run yet.
       - name: Validate pull request body
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
-        run: node scripts/github-templates.mjs validate-pr
+        shell: bash
+        run: |
+          if [[ ! -f scripts/github-templates.mjs ]]; then
+            echo "::notice::The base branch has no PR template validator yet, so the body was not checked."
+            exit 0
+          fi
+          node scripts/github-templates.mjs validate-pr
