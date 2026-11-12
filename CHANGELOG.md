@@ -67,7 +67,13 @@ with an admin console and Docker images. Nothing below has shipped before.
 - The Dopgate brand: the Hash D logo, Gate Red, and the Geist wordmark across
   the console, docs, README, and favicons.
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
-- A `Dockerfile` and a `docker-compose.yml` with PostgreSQL and Dopgate.
-- Documentation site and README for the setup above.
+- A `Dockerfile` and a `docker-compose.yml` with PostgreSQL 18 and Dopgate.
+- Release archives of the `dopgate` binary for Linux and macOS, on amd64 and
+  arm64, with a `checksums.txt` to verify them. Each GitHub release takes its
+  notes from this file.
+- Documentation site and README for the setup above. The docs cover personal
+  tokens, agents, console tokens, and upgrading from builds before the admin
+  split. The home page links each feature to its guide and walks through the
+  four steps from an empty database to a verified token.
 - Single sign-on and MFA routes answer `501 NOT_IMPLEMENTED` until they are
   built. They are hidden from the API docs at `/api/docs` for now.
