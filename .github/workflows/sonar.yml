@@ -1,0 +1,94 @@
+name: Sonar
+
+# SonarQube Cloud analysis. It lives apart from ci.yml so a Sonar outage or a
+# failed quality gate never fails the "CI passed" check. Runs on the same
+# events as CI, minus changes that only touch the docs. The project and the
+# analysis scope are set in sonar-project.properties.
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  push:
+    branches:
+      - main
+      - "release/*"
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonar-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Keep these versions the same as ci.yml.
+env:
+  BUN_VERSION: "1.4.0"
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.98.0"
+
+jobs:
+  scan:
+    name: SonarQube Cloud scan
+    # GitHub keeps SONAR_TOKEN from a pull request opened from a fork, so the
+    # scan can't run there.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      # Sonar reads the whole history for blame and to tell new code from old.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The scanner runs Clippy itself, with Sonar's rules instead of ours.
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install "${RUST_VERSION}" \
+            --profile minimal \
+            --component clippy
+          rustup default "${RUST_VERSION}"
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: app -> target
+          key: sonar
+          cache-workspace-crates: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'ui/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
+
+      # The TypeScript analysis resolves types from node_modules. The console
+      # isn't built: the crate compiles without ui/dist/.
+      - name: Install admin console dependencies
+        working-directory: ui
+        run: bun install --frozen-lockfile
+
+      # When Clippy can't compile the crate the scanner only logs a warning
+      # and reports without most Rust rules. Compiling here first turns that
+      # into a failed job, and leaves the scanner's own run with little to do.
+      - name: Compile for Clippy
+        working-directory: app
+        run: cargo clippy --locked --quiet -- -A clippy::all
+
+      - name: Scan
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
