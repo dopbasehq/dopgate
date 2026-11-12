@@ -1,9 +1,14 @@
 name: Sonar
 
 # SonarQube Cloud analysis. It lives apart from ci.yml so a Sonar outage or a
-# failed quality gate never fails the "CI passed" check. Runs on the same
-# events as CI, minus changes that only touch the docs. The project and the
+# failed quality gate never fails the "CI passed" check. The project and the
 # analysis scope are set in sonar-project.properties.
+#
+# Pull requests are scanned as pull requests, and main is scanned as a branch
+# after a merge. Other branches have no push trigger: a release branch with
+# an open pull request would be scanned twice for every push. Run the
+# workflow by hand to scan a branch that has no pull request. Changes that
+# only touch the docs are skipped.
 on:
   pull_request:
     paths-ignore:
@@ -12,7 +17,6 @@ on:
   push:
     branches:
       - main
-      - "release/*"
     paths-ignore:
       - "docs/**"
       - "**/*.md"
