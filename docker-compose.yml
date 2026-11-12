@@ -17,7 +17,8 @@ services:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PostgreSQL 18 and later keep their data in a versioned folder here.
+      - pgdata:/var/lib/postgresql
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
