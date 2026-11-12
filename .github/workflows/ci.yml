@@ -1,0 +1,289 @@
+name: CI
+
+# Every pull request runs the checks for the areas it changed, whatever its
+# base, so a pull request stacked on a feature branch is checked too. A push
+# to main or a release branch runs the Rust job only, so new pull requests
+# have a Cargo cache to start from. There are no e2e suites yet.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "release/*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUN_VERSION: "1.4.0"
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.98.0"
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      ui: ${{ steps.filter.outputs.ui }}
+      docs: ${{ steps.filter.outputs.docs }}
+      repo: ${{ steps.filter.outputs.repo }}
+    steps:
+      # A pull request run checks out the merge commit. Its first parent is
+      # the base branch, so two commits are enough to list what changed.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Pick the jobs to run
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          app=false ui=false docs=false repo=false
+
+          case "$EVENT_NAME" in
+            pull_request)
+              files=$(git diff --name-only HEAD^1 HEAD)
+              hit() {
+                if grep -qE "$1" <<<"$files"; then echo true; else echo false; fi
+              }
+              # Files every area depends on, plus this workflow itself.
+              shared='^(package\.json|bun\.lock|\.github/workflows/ci\.yml)$'
+              # The binary embeds ui/dist, so a UI change reruns the Rust job.
+              app=$(hit "^(app|ui)/|$shared")
+              ui=$(hit "^ui/|$shared")
+              docs=$(hit "^docs/|$shared")
+              repo=$(hit '^(\.github|scripts)/')
+              ;;
+            push)
+              app=true
+              ;;
+            *)
+              app=true ui=true docs=true repo=true
+              ;;
+          esac
+
+          {
+            echo "app=$app"
+            echo "ui=$ui"
+            echo "docs=$docs"
+            echo "repo=$repo"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  repo:
+    name: Workflow and release script checks
+    needs: changes
+    if: needs.changes.outputs.repo == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test the release scripts and GitHub templates
+        run: node --test scripts/github-templates.test.mjs scripts/release.test.mjs
+
+      - name: Lint workflows and release scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v shellcheck >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --yes shellcheck
+          fi
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash -o "$RUNNER_TEMP/download-actionlint.bash"
+          bash "$RUNNER_TEMP/download-actionlint.bash" 1.7.12 "$RUNNER_TEMP"
+          "$RUNNER_TEMP/actionlint"
+          shellcheck scripts/release/*.sh
+
+  ui:
+    name: UI lint, tests and build
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'ui/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
+
+      # The console has its own lockfile, apart from the docs at the root.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prettier
+        run: bun run format:check
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Unit tests
+        run: bun run test
+
+      # The build runs the typecheck first, so there is no separate step.
+      - name: Typecheck and build
+        run: bun run build
+
+  app:
+    name: Rust fmt, clippy and tests
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DOPGATE_TEST_DATABASE_URL: postgres://postgres:dopgate@localhost:55432/postgres
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The same container as `bun run test:db`. A service container can't
+      # take the max_connections flag, and each test opens its own pool.
+      - name: Start PostgreSQL
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name dopgate-test-pg \
+            --env POSTGRES_PASSWORD=dopgate \
+            --publish 55432:5432 \
+            postgres:17-alpine -c max_connections=400
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install "${RUST_VERSION}" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy
+          rustup default "${RUST_VERSION}"
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: app -> target
+          key: ci
+          cache-workspace-crates: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'ui/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
+
+      # The server embeds the admin console from ui/dist/ at compile time,
+      # and the tests serve its index.html.
+      - name: Build admin console
+        working-directory: ui
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Wait for PostgreSQL
+        shell: bash
+        run: |
+          for _ in $(seq 1 30); do
+            if docker exec dopgate-test-pg pg_isready --username postgres >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs dopgate-test-pg
+          exit 1
+
+      - name: Tests
+        run: cargo test --locked --all-targets --all-features
+
+  docs:
+    name: Docs build
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock', 'ui/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build:docs
+
+  # One result for the whole run. It always runs, so a branch rule can require
+  # it even when the jobs above were skipped for an unchanged area.
+  passed:
+    name: CI passed
+    needs: [changes, repo, ui, app, docs]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fail if a job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        shell: bash
+        run: |
+          echo "Job results: $RESULTS"
+          if [[ "$RESULTS" == *failure* || "$RESULTS" == *cancelled* ]]; then
+            exit 1
+          fi

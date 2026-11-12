@@ -1,0 +1,47 @@
+name: PR template
+
+# Checks the body of every pull request, whatever its base, so feature and
+# stacked pull requests are checked too. Drafts are skipped until they are
+# marked ready for review.
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+
+# Each edit to the body starts a run, so a newer one replaces the last.
+concurrency:
+  group: pr-template-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate PR template
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted validation script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      # The validator comes from the base branch, so the pull request that
+      # adds it, or one into a branch cut before it, has nothing to run yet.
+      - name: Validate pull request body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        shell: bash
+        run: |
+          if [[ ! -f scripts/github-templates.mjs ]]; then
+            echo "::notice::The base branch has no PR template validator yet, so the body was not checked."
+            exit 0
+          fi
+          node scripts/github-templates.mjs validate-pr

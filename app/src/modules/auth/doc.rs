@@ -1,0 +1,49 @@
+use super::{controller, model::*};
+use crate::{
+  http::{ErrorBody, HttpResponseFormat},
+  models::{TokenKind, User, UserStatus},
+};
+use utoipa::OpenApi;
+
+#[derive(OpenApi)]
+#[openapi(
+  paths(
+    controller::methods,
+    controller::signup,
+    controller::login,
+    controller::refresh,
+    controller::logout,
+    controller::me,
+    controller::update_me,
+    controller::change_password,
+    controller::change_email
+  ),
+  components(schemas(
+    AuthMethods,
+    SignupResult,
+    ChangeEmailRequest,
+    crate::modules::settings::model::BrandingSettings,
+    SignupRequest,
+    LoginRequest,
+    RefreshRequest,
+    LogoutRequest,
+    AuthTokens,
+    UpdateProfileRequest,
+    ChangePasswordRequest,
+    User,
+    TokenKind,
+    UserStatus,
+    ErrorBody,
+    HttpResponseFormat<AuthMethods>,
+    HttpResponseFormat<AuthTokens>,
+    HttpResponseFormat<SignupResult>,
+    HttpResponseFormat<User>,
+    HttpResponseFormat<serde_json::Value>
+  )),
+  tags((name = "auth", description = "Sign up, sign in, tokens, and the signed-in account"))
+)]
+struct AuthApi;
+
+pub fn build() -> utoipa::openapi::OpenApi {
+  AuthApi::openapi()
+}
