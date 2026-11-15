@@ -25,9 +25,9 @@ An older binary can't start on a database that a newer one migrated, because the
 
 Two Dopgate processes starting at once against the same schema is safe: sqlx takes a lock for migrations, and key generation locks the `signing_keys` table. Still, upgrade one at a time and keep in mind that [rate limit counters](/guide/rate-limits#counters-live-in-memory) are per process.
 
-## Coming from a build before the admin split
+## Coming from a development build
 
-Earlier development builds kept root and admins in the `users` table with a `role` column. The first start of a newer build moves them into `admins`, keeping their passwords. Their IDs change from `usr_` to `adm_`, the `role` column is dropped, and their old sessions and codes are deleted, so they sign in to the console again. Settings and templates keep the admin who last saved them.
+Until 0.1.0 ships, its tables are defined once and complete, and a change rewrites the file that creates the table instead of adding a new migration. A development build therefore can't upgrade a database made by an older development build: sqlx refuses to start because a migration it already ran has changed. Drop the `dopgate` schema, or remove the database volume, and start again. Releases from 0.1.0 on upgrade in place.
 
 ## Coming from a 0.1.0 preview
 
