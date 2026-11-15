@@ -9,7 +9,7 @@ use axum::{
 
 use crate::{
   constants::{
-    errors::{AUTHENTICATION_INVALID, REQUEST_INVALID},
+    errors::{BACKEND_KEY_INVALID, REQUEST_INVALID},
     tokens::{BACKEND_KEY_HEADER, CLIENT_AGENT_HEADER, CLIENT_IP_HEADER, USER_AGENT_MAX_CHARS},
   },
   http::HttpError,
@@ -54,7 +54,9 @@ pub struct RelayedAgent(pub String);
 /// limits, lockouts, the device list and the audit log describe the person
 /// and not the backend. Without the key those headers are ignored. A wrong
 /// key is refused, so a misconfigured backend fails loudly instead of
-/// sharing one address limit between all of its users.
+/// sharing one address limit between all of its users. The refusal has its
+/// own code, `BACKEND_KEY_INVALID`: on a sign-in it would otherwise read
+/// like the visitor's wrong password.
 ///
 /// Runs inside [`capture`], so its address replaces the resolved one.
 pub async fn relay(
@@ -71,8 +73,8 @@ pub async fn relay(
   };
   if !valid {
     return HttpError::unauthorized(
-      AUTHENTICATION_INVALID,
-      "The backend key is wrong. Send this Dopgate's DOPGATE_SERVICE_KEY.",
+      BACKEND_KEY_INVALID,
+      "The backend key is wrong. Send this Dopgate's DOPGATE_SERVICE_KEY in X-Dopgate-Backend-Key.",
     )
     .into_response();
   }

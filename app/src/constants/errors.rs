@@ -5,6 +5,10 @@ pub const ALREADY_INITIALIZED: &str = "ALREADY_INITIALIZED";
 pub const AUTHENTICATION_INVALID: &str = "AUTHENTICATION_INVALID";
 pub const AUTHENTICATION_REQUIRED: &str = "AUTHENTICATION_REQUIRED";
 pub const AUTHORIZATION_DENIED: &str = "AUTHORIZATION_DENIED";
+/// A backend sent a key in `X-Dopgate-Backend-Key` that isn't the service
+/// key. Its own code, so a backend never mistakes its setup error for the
+/// visitor's wrong password, which is also a 401.
+pub const BACKEND_KEY_INVALID: &str = "BACKEND_KEY_INVALID";
 pub const CAPABILITIES_INVALID: &str = "CAPABILITIES_INVALID";
 pub const CODE_EXPIRED: &str = "CODE_EXPIRED";
 pub const CODE_INVALID: &str = "CODE_INVALID";
