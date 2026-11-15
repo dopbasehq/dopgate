@@ -95,6 +95,38 @@ async fn nobody_ends_someone_elses_session() {
   assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
+/// Only the spent token opens the next one, and only inside the window.
+#[test]
+fn the_next_token_opens_only_with_the_spent_one_inside_the_window() {
+  use app::modules::sessions::reuse;
+  use chrono::{Duration, Utc};
+
+  let sealed = reuse::seal("dgr_spent", "dgr_next");
+  let now = Utc::now();
+  let used = Some(now - Duration::seconds(3));
+  assert_eq!(
+    reuse::recover("dgr_spent", Some(&sealed), used, now, 10).as_deref(),
+    Some("dgr_next")
+  );
+  assert_eq!(
+    reuse::recover("dgr_other", Some(&sealed), used, now, 10),
+    None
+  );
+  assert_eq!(
+    reuse::recover("dgr_spent", Some(&sealed), used, now, 2),
+    None
+  );
+  assert_eq!(
+    reuse::recover("dgr_spent", Some(&sealed), used, now, 0),
+    None
+  );
+  assert_eq!(reuse::recover("dgr_spent", None, used, now, 10), None);
+  assert_eq!(
+    reuse::recover("dgr_spent", Some(&sealed), None, now, 10),
+    None
+  );
+}
+
 async fn me(
   app: &TestApp,
   token: &str,

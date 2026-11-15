@@ -55,6 +55,9 @@ struct StoredSmtp {
 
 const PASSWORD_MIN_LENGTH_MAX: u32 = 128;
 const ACCESS_TOKEN_MINUTES_MAX: u32 = 24 * 60;
+/// Past a minute, a repeated refresh is more likely a copied token than a
+/// second tab.
+const REFRESH_REUSE_SECONDS_MAX: u32 = 60;
 const TEXT_MAX_CHARS: usize = 255;
 
 pub async fn signup(pool: &PgPool) -> Result<SignupSettings, HttpError> {
@@ -372,6 +375,11 @@ fn check_tokens(tokens: &TokenSettings) -> Result<(), HttpError> {
   {
     return Err(invalid(
       "Refresh tokens and sessions must last between 1 day and 10 years.",
+    ));
+  }
+  if tokens.refresh_reuse_seconds > REFRESH_REUSE_SECONDS_MAX {
+    return Err(invalid(
+      "A refresh can be repeated for between 0 and 60 seconds.",
     ));
   }
   if tokens.refresh_token_idle_days > tokens.session_absolute_days {

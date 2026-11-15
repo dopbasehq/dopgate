@@ -121,16 +121,25 @@ async fn the_console_keeps_its_session_in_its_own_cookie() {
     .await;
   assert_eq!(reply.status, StatusCode::OK, "{}", reply.json);
   assert_eq!(reply.json["data"]["admin"]["role"], "root");
+  let next = cookie_value(&reply, "dopgate_console")
+    .unwrap()
+    .split(';')
+    .next()
+    .unwrap()
+    .trim_start_matches("dopgate_console=")
+    .to_owned();
 
-  // Using the old refresh token again ends the session.
-  let (status, _) = app
+  // A second console tab sending the old token a moment later gets the same
+  // new token instead of signing root out.
+  let (status, body) = app
     .request(
       Method::POST,
       "/api/v1/console/refresh",
       Some(json!({ "refreshToken": refresh })),
     )
     .await;
-  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["refreshToken"], next.as_str());
 }
 
 async fn app_with_mail() -> (TestApp, FakeSmtp, String) {

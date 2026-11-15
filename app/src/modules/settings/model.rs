@@ -4,8 +4,9 @@ use utoipa::ToSchema;
 use crate::{
   constants::limits::{
     ACCESS_TOKEN_MINUTES, CODE_RESEND_SECONDS, CODES_PER_HOUR, IP_REQUESTS_PER_MINUTE,
-    LOCKOUT_ATTEMPTS, LOCKOUT_MINUTES, PASSWORD_MIN_LENGTH, REFRESH_TOKEN_IDLE_DAYS,
-    SESSION_ABSOLUTE_DAYS, VERIFICATION_CODE_MINUTES, VERIFICATION_MAX_ATTEMPTS,
+    LOCKOUT_ATTEMPTS, LOCKOUT_MINUTES, PASSWORD_MIN_LENGTH, REFRESH_REUSE_SECONDS,
+    REFRESH_TOKEN_IDLE_DAYS, SESSION_ABSOLUTE_DAYS, VERIFICATION_CODE_MINUTES,
+    VERIFICATION_MAX_ATTEMPTS,
   },
   services::mailer::SmtpSecurity,
 };
@@ -94,6 +95,9 @@ pub struct TokenSettings {
   pub access_token_minutes: u32,
   pub refresh_token_idle_days: u32,
   pub session_absolute_days: u32,
+  /// Seconds, 0 to 60, during which a spent refresh token sent again gets
+  /// the same new token instead of ending the session. 0 turns it off.
+  pub refresh_reuse_seconds: u32,
 }
 
 impl Default for TokenSettings {
@@ -102,6 +106,7 @@ impl Default for TokenSettings {
       access_token_minutes: ACCESS_TOKEN_MINUTES as u32,
       refresh_token_idle_days: REFRESH_TOKEN_IDLE_DAYS as u32,
       session_absolute_days: SESSION_ABSOLUTE_DAYS as u32,
+      refresh_reuse_seconds: REFRESH_REUSE_SECONDS as u32,
     }
   }
 }

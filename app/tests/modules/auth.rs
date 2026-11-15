@@ -172,10 +172,101 @@ async fn wrong_passwords_lock_the_account_with_the_same_answer() {
   assert!(user["data"]["items"][0]["lockedUntil"].is_string());
 }
 
+/// Signs ada in and returns her access token and first refresh token.
+async fn signed_in_ada(app: &TestApp) -> (String, String) {
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let (_, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
+    )
+    .await;
+  (
+    body["data"]["accessToken"].as_str().unwrap().to_owned(),
+    body["data"]["refreshToken"].as_str().unwrap().to_owned(),
+  )
+}
+
+async fn refresh(
+  app: &TestApp,
+  token: &str,
+) -> (StatusCode, Option<String>) {
+  let (status, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/refresh",
+      Some(json!({ "refreshToken": token })),
+    )
+    .await;
+  (
+    status,
+    body["data"]["refreshToken"].as_str().map(str::to_owned),
+  )
+}
+
+#[tokio::test]
+async fn a_refresh_repeated_within_the_window_gets_the_same_token() {
+  let app = TestApp::new().await;
+  let (access, first) = signed_in_ada(&app).await;
+
+  let (status, second) = refresh(&app, &first).await;
+  assert_eq!(status, StatusCode::OK);
+  let second = second.unwrap();
+  // A second tab sends the spent token a moment later and gets the same
+  // answer, so the two tabs hold one token.
+  assert_eq!(
+    refresh(&app, &first).await,
+    (StatusCode::OK, Some(second.clone()))
+  );
+
+  // The chain moves on, and the first token still leads to its newest link.
+  let (status, third) = refresh(&app, &second).await;
+  assert_eq!(status, StatusCode::OK);
+  let third = third.unwrap();
+  assert_ne!(third, second);
+  assert_eq!(
+    refresh(&app, &first).await,
+    (StatusCode::OK, Some(third.clone()))
+  );
+  assert_eq!(me(&app, &access).await, StatusCode::OK);
+  assert_eq!(refresh(&app, &third).await.0, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_refresh_repeated_after_the_window_ends_the_session() {
+  let app = TestApp::new().await;
+  let (access, first) = signed_in_ada(&app).await;
+  let (_, second) = refresh(&app, &first).await;
+  // Move the first use 11 seconds into the past, one past the window.
+  sqlx::query(
+    "UPDATE refresh_tokens SET used_at = used_at - interval '11 seconds' WHERE used_at IS NOT NULL",
+  )
+  .execute(app.state.db.pool())
+  .await
+  .unwrap();
+
+  assert_eq!(refresh(&app, &first).await.0, StatusCode::UNAUTHORIZED);
+  assert_eq!(
+    refresh(&app, &second.unwrap()).await.0,
+    StatusCode::UNAUTHORIZED
+  );
+  assert_eq!(me(&app, &access).await, StatusCode::UNAUTHORIZED);
+}
+
+/// With the window set to 0, a spent token ends the session at once.
 #[tokio::test]
 async fn refresh_tokens_rotate_and_a_reused_one_ends_the_session() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
+  app
+    .settings(
+      &root,
+      json!({ "tokens": { "accessTokenMinutes": 15, "refreshTokenIdleDays": 30,
+                          "sessionAbsoluteDays": 90, "refreshReuseSeconds": 0 } }),
+    )
+    .await;
   app.create_user(&root, "ada@example.com").await;
   let (_, body) = app
     .request(
