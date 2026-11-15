@@ -104,3 +104,66 @@ async fn allowed_origins_pass_cors_and_others_do_not() {
   let refused = preflight("https://evil.example.com").await;
   assert!(refused.headers.get("access-control-allow-origin").is_none());
 }
+
+/// An error message can end up in front of a person: an app may show it as
+/// it is, and a backend that signs people in for them passes it on. So a
+/// message says what happened in plain words. It never names one of
+/// Dopgate's routes, which mean nothing to someone using another app's
+/// pages. What a developer should call is in the docs for the error code.
+#[test]
+fn error_messages_name_no_routes() {
+  fn sources(
+    dir: &std::path::Path,
+    found: &mut Vec<std::path::PathBuf>,
+  ) {
+    for entry in std::fs::read_dir(dir).unwrap() {
+      let path = entry.unwrap().path();
+      if path.is_dir() {
+        sources(&path, found);
+      } else if path.extension().is_some_and(|extension| extension == "rs") {
+        found.push(path);
+      }
+    }
+  }
+  let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+  let mut files = Vec::new();
+  for folder in ["modules", "middlewares", "extractors", "http"] {
+    sources(&src.join(folder), &mut files);
+  }
+  assert!(files.len() > 40, "the source folders moved");
+
+  let mut offenders = Vec::new();
+  for file in files {
+    // Handlers and API docs describe routes on purpose. Messages are made
+    // in services, middleware and extractors.
+    let name = file.file_name().unwrap().to_str().unwrap();
+    if matches!(name, "controller.rs" | "doc.rs" | "mod.rs" | "model.rs") {
+      continue;
+    }
+    let code = std::fs::read_to_string(&file).unwrap();
+    for (number, line) in code.lines().enumerate() {
+      if line.trim_start().starts_with("//") {
+        continue;
+      }
+      // The odd pieces of a line split on quotes are its string literals.
+      let names_a_route = line.split('"').skip(1).step_by(2).any(|literal| {
+        ["/auth/", "/console/", "/admin/", "/api/"]
+          .iter()
+          .any(|route| literal.contains(route))
+      });
+      if names_a_route {
+        offenders.push(format!(
+          "{}:{}: {}",
+          file.display(),
+          number + 1,
+          line.trim()
+        ));
+      }
+    }
+  }
+  assert!(
+    offenders.is_empty(),
+    "messages that name a route:\n{}",
+    offenders.join("\n")
+  );
+}

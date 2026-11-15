@@ -265,10 +265,7 @@ pub async fn login(
   if signup.require_email_verification && !user.is_verified() {
     return Err(HttpError::forbidden(
       EMAIL_NOT_VERIFIED,
-      &format!(
-        "Confirm your email first. Send a code to {} with /auth/verification/send.",
-        user.email
-      ),
+      "Confirm your email before signing in. Enter the code we emailed you, or ask for a new one.",
     ));
   }
   let mut tx = pool.begin().await?;
@@ -451,7 +448,7 @@ pub async fn change_password(
   if first_password && request.code.as_deref().is_none_or(str::is_empty) {
     return Err(HttpError::bad_request(
       CODE_INVALID,
-      "This account has no password yet. Ask for a password reset code and send it as code.",
+      "This account has no password yet. Set one with the code from a password reset email.",
     ));
   }
   confirm_password(state, realm, &account, request.current_password).await?;
