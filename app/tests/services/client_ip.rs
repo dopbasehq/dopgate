@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use app::services::client_ip::{ProxyNetwork, parse_list, resolve};
+use app::services::client_ip::{ProxyNetwork, parse_list, parse_relayed, resolve};
 
 fn ip(value: &str) -> IpAddr {
   value.parse().unwrap()
@@ -46,6 +46,21 @@ fn ipv4_mapped_ipv6_peers_match_ipv4_rules() {
     resolve(Some(ip("::ffff:127.0.0.1")), "198.51.100.7", &trusted),
     Some(ip("198.51.100.7"))
   );
+}
+
+#[test]
+fn a_relayed_address_may_carry_a_port() {
+  assert_eq!(parse_relayed("198.51.100.7"), Some(ip("198.51.100.7")));
+  assert_eq!(
+    parse_relayed("198.51.100.7:51234"),
+    Some(ip("198.51.100.7"))
+  );
+  assert_eq!(parse_relayed("[2001:db8::1]:443"), Some(ip("2001:db8::1")));
+  assert_eq!(
+    parse_relayed("::ffff:198.51.100.7"),
+    Some(ip("198.51.100.7"))
+  );
+  assert_eq!(parse_relayed("not-an-address"), None);
 }
 
 #[test]

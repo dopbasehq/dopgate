@@ -3,6 +3,7 @@
 mod cli;
 mod config;
 mod extractors;
+mod middlewares;
 mod modules;
 mod server;
 mod services;
