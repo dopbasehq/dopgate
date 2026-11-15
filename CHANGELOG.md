@@ -97,3 +97,7 @@ with an admin console and Docker images. Nothing below has shipped before.
 - An account without a password needs an emailed reset code to set one, so a
   stolen access token alone can't add a password and keep the account. The
   console's Account page asks for the code.
+- A value sent to `/api/v1/auth/token` that isn't a `dgp_` or `dga_` token is
+  recorded as `token.rejected` without any of its characters. Before, its
+  last four were kept, which could be the end of a password pasted into the
+  wrong field.
