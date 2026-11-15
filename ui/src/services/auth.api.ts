@@ -97,13 +97,27 @@ export function updateMe(body: {
   return api("/console/me", { method: "PATCH", body });
 }
 
+/**
+ * Sets a new password. An account with a password proves it with the
+ * current one; an account without one sends a code from
+ * {@link sendPasswordCode}.
+ */
 export function changePassword(
-  currentPassword: string,
+  proof: { currentPassword: string } | { code: string },
   newPassword: string,
 ): Promise<null> {
   return api("/console/password/change", {
     method: "POST",
-    body: { currentPassword, newPassword },
+    body: { ...proof, newPassword },
+  });
+}
+
+/** Emails a password reset code to the address. */
+export function sendPasswordCode(email: string): Promise<null> {
+  return api("/console/password/forgot", {
+    method: "POST",
+    body: { email },
+    auth: false,
   });
 }
 

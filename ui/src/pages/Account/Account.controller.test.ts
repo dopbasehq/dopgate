@@ -62,7 +62,7 @@ describe("useAccountController", () => {
       c.confirmPassword.value = "new password";
       await c.submitPassword();
       expect(authApi.changePassword).toHaveBeenCalledWith(
-        "old",
+        { currentPassword: "old" },
         "new password",
       );
       expect(c.passwordChanged.value).toBe(true);
@@ -81,6 +81,50 @@ describe("useAccountController", () => {
       expect(c.passwordErrors.value.current).toBe(
         "This isn't your current password.",
       );
+    });
+
+    it("sets a first password with an emailed code", async () => {
+      signInAs({ ...admin, hasPassword: false });
+      vi.mocked(authApi.sendPasswordCode).mockResolvedValue(null);
+      vi.mocked(authApi.changePassword).mockResolvedValue(null);
+      const c = await mount();
+      expect(c.hasPassword.value).toBe(false);
+
+      c.newPassword.value = "new password";
+      c.confirmPassword.value = "new password";
+      await c.submitPassword();
+      expect(c.passwordErrors.value.code).toBe(
+        "Enter the 6-digit code we emailed you.",
+      );
+      expect(authApi.changePassword).not.toHaveBeenCalled();
+
+      await c.requestPasswordCode();
+      expect(authApi.sendPasswordCode).toHaveBeenCalledWith(admin.email);
+      expect(c.passwordCodeSent.value).toBe(true);
+      c.passwordCode.value = "482913";
+      await c.submitPassword();
+      expect(authApi.changePassword).toHaveBeenCalledWith(
+        { code: "482913" },
+        "new password",
+      );
+      expect(c.passwordChanged.value).toBe(true);
+      expect(useAuthStore().admin?.hasPassword).toBe(true);
+    });
+
+    it("points at a wrong code", async () => {
+      signInAs({ ...admin, hasPassword: false });
+      vi.mocked(authApi.changePassword).mockRejectedValue(
+        apiError(400, "CODE_INVALID", "That code is wrong or has expired."),
+      );
+      const c = await mount();
+      c.passwordCode.value = "000000";
+      c.newPassword.value = "new password";
+      c.confirmPassword.value = "new password";
+      await c.submitPassword();
+      expect(c.passwordErrors.value.code).toBe(
+        "That code is wrong or has expired.",
+      );
+      expect(c.passwordCode.value).toBe("");
     });
   });
 

@@ -7,6 +7,7 @@ import {
   confirmEmailChange,
   revokeMySession,
   revokeOtherSessions,
+  sendPasswordCode,
   updateMe,
 } from "~/services/auth.api";
 import type { Session } from "~/services/types";
@@ -60,11 +61,18 @@ export function useAccountController() {
   }
 
   // Password
+  /** False for an admin who signs in with codes only. */
+  const hasPassword = computed(() => auth.admin?.hasPassword !== false);
   const currentPassword = ref("");
+  /** The emailed code an admin without a password sets one with. */
+  const passwordCode = ref("");
+  const passwordCodeSent = ref(false);
+  const sendingPasswordCode = ref(false);
   const newPassword = ref("");
   const confirmPassword = ref("");
   const passwordErrors = ref<{
     current?: string;
+    code?: string;
     next?: string;
     confirm?: string;
   }>({});
@@ -72,13 +80,34 @@ export function useAccountController() {
   const passwordChanged = ref(false);
   const changingPassword = ref(false);
 
+  async function requestPasswordCode(): Promise<void> {
+    const email = auth.admin?.email;
+    if (sendingPasswordCode.value || !email) return;
+    sendingPasswordCode.value = true;
+    passwordErrors.value = {};
+    passwordError.value = null;
+    try {
+      await sendPasswordCode(email);
+      passwordCodeSent.value = true;
+    } catch (cause) {
+      passwordError.value =
+        cause instanceof ApiError && cause.hasCode("RATE_LIMITED")
+          ? rateLimitMessage(cause)
+          : errorMessage(cause, "Couldn't send the code.");
+    } finally {
+      sendingPasswordCode.value = false;
+    }
+  }
+
   async function submitPassword(): Promise<void> {
     if (changingPassword.value) return;
     passwordError.value = null;
     passwordChanged.value = false;
     const errors: typeof passwordErrors.value = {};
-    if (auth.admin?.hasPassword !== false && currentPassword.value === "")
+    if (hasPassword.value && currentPassword.value === "")
       errors.current = "Enter your current password.";
+    if (!hasPassword.value && passwordCode.value.length !== 6)
+      errors.code = "Enter the 6-digit code we emailed you.";
     if (newPassword.value === "") errors.next = "Choose a new password.";
     if (confirmPassword.value !== newPassword.value)
       errors.confirm = "The passwords don't match.";
@@ -87,8 +116,17 @@ export function useAccountController() {
 
     changingPassword.value = true;
     try {
-      await changePassword(currentPassword.value, newPassword.value);
+      await changePassword(
+        hasPassword.value
+          ? { currentPassword: currentPassword.value }
+          : { code: passwordCode.value },
+        newPassword.value,
+      );
+      if (!hasPassword.value && auth.admin)
+        auth.setAdmin({ ...auth.admin, hasPassword: true });
       currentPassword.value = "";
+      passwordCode.value = "";
+      passwordCodeSent.value = false;
       newPassword.value = "";
       confirmPassword.value = "";
       passwordChanged.value = true;
@@ -99,6 +137,15 @@ export function useAccountController() {
           passwordErrors.value = {
             current: "This isn't your current password.",
           };
+          return;
+        }
+        if (cause.hasCode("CODE_INVALID") || cause.hasCode("CODE_EXPIRED")) {
+          passwordCode.value = "";
+          passwordErrors.value = { code: cause.message };
+          return;
+        }
+        if (cause.hasCode("RATE_LIMITED")) {
+          passwordError.value = rateLimitMessage(cause);
           return;
         }
         if (cause.hasCode("PASSWORD_INVALID")) {
@@ -287,7 +334,12 @@ export function useAccountController() {
     profileError,
     profileSaved,
     saveProfile,
+    hasPassword,
     currentPassword,
+    passwordCode,
+    passwordCodeSent,
+    sendingPasswordCode,
+    requestPasswordCode,
     newPassword,
     confirmPassword,
     passwordErrors,
