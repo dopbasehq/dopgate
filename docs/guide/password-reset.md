@@ -56,7 +56,9 @@ curl -X POST https://auth.example.com/api/v1/auth/password/change \
   -d '{"currentPassword":"correct-horse-battery","newPassword":"a-new-long-password"}'
 ```
 
-Every other session of the account ends, the session making the request stays signed in, and a `password_changed` notice goes to the account's email. A wrong current password answers `401 AUTHENTICATION_INVALID`. Accounts without a password, such as ones created by a code sign-in, leave out `currentPassword` to set their first one. The access token must come from a password or code sign-in. One from a [personal token](/guide/personal-tokens) gets `403 AUTHORIZATION_DENIED`.
+Every other session of the account ends, the session making the request stays signed in, and a `password_changed` notice goes to the account's email. A wrong current password answers `401 AUTHENTICATION_INVALID` and counts toward the [lockout](/guide/rate-limits#account-lockout), so a stolen access token can't be used to guess the password.
+
+An account without a password, such as one created by a code sign-in, sets its first one with a code instead. Ask for a reset code at `/auth/password/forgot`, then send it as `code` with `newPassword`. Without a code the answer is `400 CODE_INVALID`. The code keeps someone holding only a stolen access token from adding a password and keeping the account. Unlike a reset, the session making the request stays signed in. The access token must come from a password or code sign-in. One from a [personal token](/guide/personal-tokens) gets `403 AUTHORIZATION_DENIED`.
 
 ## Sending a reset code as an admin
 

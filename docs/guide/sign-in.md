@@ -70,7 +70,7 @@ When both `signup.enabled` and `signup.passwordlessSignup` are on, a `login` cod
 
 With `passwordlessSignup` off, no code is sent to unknown emails and confirming anything for them answers `400 CODE_INVALID`.
 
-A user without a password can set one later through `POST /api/v1/auth/password/change`, leaving out `currentPassword`. The `hasPassword` field on the user tells you which accounts have one.
+A user without a password can set one later through `POST /api/v1/auth/password/change` with a code from `/auth/password/forgot`. See [Changing a password while signed in](/guide/password-reset#changing-a-password-while-signed-in). The `hasPassword` field on the user tells you which accounts have one.
 
 ## Cookie sessions
 

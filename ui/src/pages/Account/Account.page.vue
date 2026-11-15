@@ -25,7 +25,12 @@ const {
   profileError,
   profileSaved,
   saveProfile,
+  hasPassword,
   currentPassword,
+  passwordCode,
+  passwordCodeSent,
+  sendingPasswordCode,
+  requestPasswordCode,
   newPassword,
   confirmPassword,
   passwordErrors,
@@ -114,11 +119,35 @@ const card = "rounded-card border border-line bg-panel";
           </header>
           <div class="grid gap-3 px-5 py-4 sm:grid-cols-3">
             <DgInput
+              v-if="hasPassword"
               v-model="currentPassword"
               label="Current password"
               type="password"
               autocomplete="current-password"
               :error="passwordErrors.current" />
+            <div
+              v-else
+              class="flex flex-col gap-2 sm:col-span-3"
+              data-testid="password-code">
+              <p class="text-sm text-ink-muted">
+                Your account has no password yet. To set one, we email a code to
+                <span class="font-mono text-ink">{{ user?.email }}</span
+                >.
+              </p>
+              <div class="flex flex-wrap items-end gap-3">
+                <DgCodeInput
+                  v-model="passwordCode"
+                  label="Code"
+                  :error="passwordErrors.code"
+                  :disabled="changingPassword" />
+                <DgButton
+                  variant="ghost"
+                  :loading="sendingPasswordCode"
+                  @click="requestPasswordCode">
+                  {{ passwordCodeSent ? "Send a new code" : "Email me a code" }}
+                </DgButton>
+              </div>
+            </div>
             <DgInput
               v-model="newPassword"
               label="New password"
@@ -146,7 +175,7 @@ const card = "rounded-card border border-line bg-panel";
               type="submit"
               variant="primary"
               :loading="changingPassword">
-              Change password
+              {{ hasPassword ? "Change password" : "Set password" }}
             </DgButton>
           </footer>
         </form>

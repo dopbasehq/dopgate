@@ -57,6 +57,8 @@ with an admin console and Docker images. Nothing below has shipped before.
   test, and reset at `/api/v1/admin/email-templates`.
 - Limits: per-address and per-email request limits, code resend waits, and
   account lockout after five wrong passwords, all editable in settings.
+- `GET /api/v1/admin/users?email=` finds the one user with that email.
+  `search` matches part of an email, so it can't tell `ana@` from `hana@`.
 - A backend that signs people in for them can send the service key in
   `X-Dopgate-Backend-Key` with the visitor's address and browser in
   `X-Dopgate-Client-IP` and `X-Dopgate-Client-Agent`. Limits, the device
@@ -83,3 +85,12 @@ with an admin console and Docker images. Nothing below has shipped before.
   four steps from an empty database to a verified token.
 - Single sign-on and MFA routes answer `501 NOT_IMPLEMENTED` until they are
   built. They are hidden from the API docs at `/api/docs` for now.
+
+### Security
+
+- Wrong current passwords on password and email changes count toward the
+  per-address limit and the account lockout, so a stolen access token can't
+  be used to guess the password.
+- An account without a password needs an emailed reset code to set one, so a
+  stolen access token alone can't add a password and keep the account. The
+  console's Account page asks for the code.

@@ -28,6 +28,7 @@ These endpoints share one budget per client address:
 - `POST /api/v1/auth/verification/send` and `/confirm`
 - `POST /api/v1/auth/password/forgot` and `/reset`
 - `POST /api/v1/auth/token`, where scripts and agents trade their tokens
+- `POST /api/v1/auth/password/change` and `/auth/email/change` for an account with a password, and their console twins
 - the console's sign-in endpoints: `POST /api/v1/console/login`, `/console/codes/send` and `/confirm`, and `/console/password/forgot` and `/reset`
 
 The address is the connection's peer address. Behind a reverse proxy, every request would seem to come from the proxy and share one budget, so list the proxy in `DOPGATE_TRUSTED_PROXIES`. Dopgate then reads `X-Forwarded-For` from the right, skipping trusted hops. See [Configuration](/self-hosting/configuration#behind-a-reverse-proxy).
@@ -43,6 +44,8 @@ A new code replaces the previous one of the same purpose. Each code allows `code
 ## Account lockout
 
 After `lockoutAttempts` wrong passwords in a row, the account locks for `lockoutMinutes`. While it is locked, every password sign-in answers `401 AUTHENTICATION_INVALID`, the same as a wrong password, so an attacker can't tell the lock from a miss. The audit log records each failed attempt as `user.sign_in_failed` with the reason `password` or `locked`. Admin accounts lock the same way when they sign in to the console, recorded as `admin.sign_in_failed`.
+
+A wrong current password on a password or email change counts toward the same lockout, recorded as `user.password_check_failed` (or `admin.password_check_failed`). While the account is locked, those checks answer `401 AUTHENTICATION_INVALID` even for the right password.
 
 The counter starts over after the account locks, and these clear it:
 

@@ -15,8 +15,8 @@ use axum::{
 
 /// List users
 ///
-/// Search and page through accounts, newest first. `search` matches the
-/// email or display name.
+/// Search and page through accounts, newest first. `search` matches part of
+/// the email or display name; `email` matches one whole email.
 #[utoipa::path(
   get,
   path = crate::constants::api::users::COLLECTION,

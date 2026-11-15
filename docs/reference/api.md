@@ -203,9 +203,10 @@ User. Sets a new password and ends every other session of the account.
 | Request field | Required | Notes |
 | --- | --- | --- |
 | `currentPassword` | when the account has a password | |
+| `code` | when the account has no password | A `password_reset` code from `/auth/password/forgot` |
 | `newPassword` | yes | |
 
-Answers `200 PASSWORD_CHANGED` and emails `password_changed`. Errors: `401 AUTHENTICATION_INVALID` (wrong current password), `422 PASSWORD_INVALID`.
+Answers `200 PASSWORD_CHANGED` and emails `password_changed`. Errors: `400 CODE_INVALID` (no password and no code, or a wrong code), `400 CODE_EXPIRED`, `401 AUTHENTICATION_INVALID` (wrong current password, or a locked account), `422 PASSWORD_INVALID`, `429 RATE_LIMITED`. A wrong current password counts toward the per-address limit and the account lockout.
 
 ### `POST /api/v1/auth/email/change`
 
@@ -216,7 +217,7 @@ User. Emails an `email_change` code to the new address. Confirm it with `/auth/v
 | `newEmail` | yes | |
 | `password` | when the account has a password | The current password |
 
-Answers `200 EMAIL_CHANGE_CODE_SENT`. Errors: `401 AUTHENTICATION_INVALID`, `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `429 RATE_LIMITED`.
+Answers `200 EMAIL_CHANGE_CODE_SENT`. Errors: `401 AUTHENTICATION_INVALID` (wrong password, or a locked account), `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `429 RATE_LIMITED`. A wrong password counts toward the per-address limit and the account lockout.
 
 ### `POST /api/v1/auth/token`
 
@@ -338,7 +339,7 @@ The console's own sign-in and the signed-in admin's account. These mirror the ac
 | `POST /api/v1/console/codes/confirm` | Public | `email`, `purpose` (`login` or `email_change`), and `code`. Tokens for `login`, the admin for `email_change`. |
 | `POST /api/v1/console/password/forgot` | Public | `email`. Emails a reset code to the admin. |
 | `POST /api/v1/console/password/reset` | Public | `email`, `code`, `newPassword`. Ends every console session of the admin. |
-| `POST /api/v1/console/password/change` | Console | `currentPassword` and `newPassword`. Ends the admin's other sessions. |
+| `POST /api/v1/console/password/change` | Console | `currentPassword` and `newPassword`, or `code` from `/console/password/forgot` for an admin without a password. Ends the admin's other sessions. |
 | `GET`, `PATCH /api/v1/console/me` | Console | The signed-in admin. `PATCH` takes `displayName` and `avatarUrl`. |
 | `POST /api/v1/console/email/change` | Console | `newEmail` and `password`. Confirm with `/console/codes/confirm`. |
 | `GET`, `DELETE /api/v1/console/sessions` | Console | List the admin's sessions, or end them all (`keepCurrent=true` keeps this one). |
@@ -382,7 +383,8 @@ Lists users, newest first, with `200 USERS_FETCHED`.
 
 | Query | Notes |
 | --- | --- |
-| `search` | Matches the email or display name |
+| `search` | Matches part of the email or display name |
+| `email` | Matches one whole email, ignoring case. Returns that user or none. `422 EMAIL_INVALID` when it isn't an email. |
 | `status` | `active` or `disabled` |
 | `cursor`, `limit` | See [Pagination](#pagination) |
 

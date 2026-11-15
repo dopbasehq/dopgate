@@ -179,6 +179,8 @@ pub async fn delete(
 
 pub struct ListFilter<'a> {
   pub search: Option<&'a str>,
+  /// An exact, already normalized email.
+  pub email: Option<&'a str>,
   pub status: Option<UserStatus>,
   /// Rows strictly older than this (created_at, id).
   pub before: Option<(DateTime<Utc>, &'a str)>,
@@ -208,6 +210,7 @@ pub async fn list(
      WHERE ($1::TEXT IS NULL OR email ILIKE $1 OR display_name ILIKE $1) \
        AND ($2::TEXT IS NULL OR status = $2) \
        AND ($3::TIMESTAMPTZ IS NULL OR (created_at, id) < ($3, $4)) \
+       AND ($6::TEXT IS NULL OR email = $6) \
      ORDER BY created_at DESC, id DESC LIMIT $5"
   ))
   .bind(pattern)
@@ -215,6 +218,7 @@ pub async fn list(
   .bind(before_time)
   .bind(before_id)
   .bind(filter.limit)
+  .bind(filter.email)
   .fetch_all(pool)
   .await
 }

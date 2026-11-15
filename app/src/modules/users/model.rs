@@ -10,6 +10,9 @@ use crate::models::{User, UserStatus};
 pub struct UserQuery {
   /// Match on email or display name.
   pub search: Option<String>,
+  /// Exactly this email, ignoring case: that one user, or an empty list.
+  /// `search=ana@example.com` would also return `hana@example.com`.
+  pub email: Option<String>,
   pub status: Option<UserStatus>,
   /// The `nextCursor` of the previous page.
   pub cursor: Option<String>,

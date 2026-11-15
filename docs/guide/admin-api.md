@@ -5,7 +5,7 @@ description: "Use DOPGATE_SERVICE_KEY to manage users, metadata, and sessions fr
 
 # Calling the admin API from your backend
 
-Your backend calls the admin API (`/api/v1/admin/*`) with a service key. Typical uses are setting a user's plan in `publicMetadata` after a payment, disabling an account, or looking up a user by email.
+Your backend calls the admin API (`/api/v1/admin/*`) with a service key. Typical uses are setting a user's plan in `publicMetadata` after a payment, disabling an account, or looking up a user by email with `?email=`, which matches one whole address. `?search=` matches part of one, so `ana@example.com` also finds `hana@example.com`.
 
 ## Set up the key
 
@@ -27,7 +27,7 @@ Dopgate also uses the key to encrypt an SMTP password saved from the console. If
 ## Send it as a bearer token
 
 ```bash
-curl https://auth.example.com/api/v1/admin/users?search=ana@example.com \
+curl https://auth.example.com/api/v1/admin/users?email=ana@example.com \
   -H "authorization: Bearer $DOPGATE_SERVICE_KEY"
 ```
 
@@ -106,7 +106,8 @@ Without `X-Dopgate-Backend-Key`, Dopgate ignores the other two headers, so a bro
 
 | Call | What it does |
 | --- | --- |
-| `GET /api/v1/admin/users?search=` | Find users by email or display name |
+| `GET /api/v1/admin/users?email=` | Find the one user with this email |
+| `GET /api/v1/admin/users?search=` | Find users by part of an email or display name |
 | `GET /api/v1/admin/users/{id}` | Read one user, including `privateMetadata` |
 | `POST /api/v1/admin/users` | Create a user without sending email |
 | `PATCH /api/v1/admin/users/{id}` | Change the profile, metadata, or `emailVerified` |

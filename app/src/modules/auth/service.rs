@@ -8,8 +8,8 @@ use super::model::*;
 use crate::{
   constants::{
     errors::{
-      ACCOUNT_DISABLED, AUTHENTICATION_INVALID, EMAIL_NOT_VERIFIED, EMAIL_TAKEN, NOT_FOUND,
-      SIGNUP_DISABLED,
+      ACCOUNT_DISABLED, AUTHENTICATION_INVALID, CODE_INVALID, EMAIL_NOT_VERIFIED, EMAIL_TAKEN,
+      NOT_FOUND, SIGNUP_DISABLED,
     },
     tokens::USER_ID_PREFIX,
   },
@@ -382,26 +382,63 @@ async fn find_account(
     .ok_or_else(|| HttpError::not_found(NOT_FOUND, "This account no longer exists."))
 }
 
-/// Check the current password of an account that has one.
+/// Check the current password of an account that has one. A wrong guess
+/// counts like a wrong sign-in, toward the caller's address limit and the
+/// account lockout, and a locked account gets the same answer as a wrong
+/// password. Without this, a stolen access token could guess the password
+/// without limit.
 async fn confirm_password(
+  state: &AppState,
+  realm: Realm,
   account: &AccountRow,
   given: Option<String>,
 ) -> Result<(), HttpError> {
   let Some(stored) = account.password_hash.clone() else {
     return Ok(());
   };
-  let given = given.unwrap_or_default();
-  if password::verify_async(given, stored).await {
-    Ok(())
-  } else {
-    Err(HttpError::unauthorized(
-      AUTHENTICATION_INVALID,
-      "The current password is wrong.",
-    ))
+  limits::per_address(state).await?;
+  let wrong = || HttpError::unauthorized(AUTHENTICATION_INVALID, "The current password is wrong.");
+  let pool = state.db.pool();
+  let mut tx = pool.begin().await?;
+  let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
+  tx.commit().await?;
+  let failed = format!("{}.password_check_failed", realm.resource());
+  if account.is_locked() {
+    audit::service::record_now(
+      pool,
+      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
+        .metadata(serde_json::json!({ "reason": "locked" })),
+    )
+    .await;
+    return Err(wrong());
   }
+  if password::verify_async(given.unwrap_or_default(), stored).await {
+    return Ok(());
+  }
+  let config = settings::service::limits(pool).await?;
+  let locked = accounts::record_failure(
+    pool,
+    realm,
+    &account.id,
+    i32::try_from(config.lockout_attempts).unwrap_or(i32::MAX),
+    i32::try_from(config.lockout_minutes).unwrap_or(i32::MAX),
+  )
+  .await?;
+  audit::service::record_now(
+    pool,
+    audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
+      .metadata(serde_json::json!({ "reason": "password", "locked": locked })),
+  )
+  .await;
+  Err(wrong())
 }
 
 /// Set a new password. Other sessions end; the current one stays signed in.
+///
+/// An account with a password confirms the current one. An account without
+/// one (made by an emailed code, or by an admin without a password) sends a
+/// password reset code instead, so a stolen access token alone can't add a
+/// password and keep the account.
 pub async fn change_password(
   state: &AppState,
   realm: Realm,
@@ -410,7 +447,14 @@ pub async fn change_password(
   request: ChangePasswordRequest,
 ) -> Result<(), HttpError> {
   let account = find_account(state, realm, account_id).await?;
-  confirm_password(&account, request.current_password).await?;
+  let first_password = account.password_hash.is_none();
+  if first_password && request.code.as_deref().is_none_or(str::is_empty) {
+    return Err(HttpError::bad_request(
+      CODE_INVALID,
+      "This account has no password yet. Ask for a password reset code and send it as code.",
+    ));
+  }
+  confirm_password(state, realm, &account, request.current_password).await?;
   let policy = settings::service::password(state.db.pool()).await?;
   validate::new_password(&request.new_password, policy.min_length)?;
   let hash = password::hash_async(request.new_password)
@@ -419,7 +463,23 @@ pub async fn change_password(
       tracing::error!(%error, "failed to hash a password");
       HttpError::internal()
     })?;
-  let mut tx = state.db.pool().begin().await?;
+  let mut tx = match request.code.as_deref().filter(|_| first_password) {
+    Some(code) => {
+      let (mut tx, row) =
+        verification::consume(state, realm, Purpose::PasswordReset, &account.email, code).await?;
+      if row.account_id.as_deref() != Some(account.id.as_str()) {
+        tx.rollback().await?;
+        return Err(HttpError::bad_request(
+          CODE_INVALID,
+          "That code is wrong or has expired. Ask for a new one.",
+        ));
+      }
+      // The code proved the inbox, as a password reset does.
+      accounts::mark_verified(&mut *tx, realm, &account.id).await?;
+      tx
+    }
+    None => state.db.pool().begin().await?,
+  };
   accounts::set_password(&mut *tx, realm, &account.id, &hash).await?;
   let ended = sessions::service::revoke_all(
     &mut tx,
@@ -461,7 +521,7 @@ pub async fn change_email(
       "That is already the email on this account.",
     ));
   }
-  confirm_password(&account, request.password).await?;
+  confirm_password(state, realm, &account, request.password).await?;
   if accounts::find_by_email(state.db.pool(), realm, &new_email)
     .await?
     .is_some()
