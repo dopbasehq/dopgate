@@ -31,10 +31,8 @@ with an admin console and Docker images. Nothing below has shipped before.
   and their own sessions and codes, and sign in to the console only, at
   `/api/v1/console`. Their tokens are signed with an internal key that isn't
   in the JWKS, so no backend can accept them. The same email can belong to an
-  admin and a user. Instances from before the split move root and admins
-  across on upgrade, passwords included, and settings and templates keep the
-  admin who last saved them. Rotating keys retires the console key on every
-  server at once.
+  admin and a user. Rotating keys retires the console key on every server at
+  once.
 - Admin API for users: search, create, update metadata, disable, delete, send
   reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it.
 - Root manages admins at `/api/v1/admin/admins`; admins and the service key
@@ -76,8 +74,8 @@ with an admin console and Docker images. Nothing below has shipped before.
   arm64, with a `checksums.txt` to verify them. Each GitHub release takes its
   notes from this file.
 - Documentation site and README for the setup above. The docs cover personal
-  tokens, agents, console tokens, and upgrading from builds before the admin
-  split. The home page links each feature to its guide and walks through the
+  tokens, agents, console tokens, and starting over from a development
+  build. The home page links each feature to its guide and walks through the
   four steps from an empty database to a verified token.
 - Single sign-on and MFA routes answer `501 NOT_IMPLEMENTED` until they are
   built. They are hidden from the API docs at `/api/docs` for now.

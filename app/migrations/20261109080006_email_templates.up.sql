@@ -7,5 +7,5 @@ CREATE TABLE email_templates (
   html TEXT NOT NULL,
   text TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
-  updated_by TEXT REFERENCES users(id) ON DELETE SET NULL
+  updated_by TEXT REFERENCES admins(id) ON DELETE SET NULL
 );
