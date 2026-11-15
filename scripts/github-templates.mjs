@@ -30,7 +30,7 @@ export const REQUIRED_CHECKLIST_ITEMS = [
 // A Markdown or HTML image, an HTML video, a GitHub upload, or a link to an
 // image or video file.
 const DEMO_MEDIA_PATTERNS = [
-  /!\[[^\]]*\]\([^)\s]+[^)]*\)/,
+  /!\[[^\]]*\]\([^)\s][^)]*\)/,
   /<(img|video)\b[^>]*\bsrc=/i,
   /https:\/\/github\.com\/user-attachments\/assets\/[\w-]+/,
   /https:\/\/\S+\.(png|jpe?g|gif|webp|mp4|mov|webm)(\?\S*)?(\s|\)|$)/i,
