@@ -7,6 +7,8 @@ description: "Call sign-up, sign-in, verification, and refresh from your fronten
 
 An app that uses Dopgate has two halves. The frontend talks to Dopgate to sign users up and in and keeps their tokens. The backend receives the access token with each request, verifies it, and uses the `sub` claim as the user ID. This page walks through both with plain `fetch` calls and one backend example.
 
+This is the setup for mobile apps, scripts, and browser apps without a server of their own. A web app with a backend can keep every token on the server instead, in an encrypted cookie, and Dopgate can then live on any domain. See [Sign-in through your backend](/guide/backend-sessions).
+
 The examples use `https://auth.example.com` as Dopgate's public URL. Use your own `DOPGATE_PUBLIC_URL`.
 
 ## Allow your frontend's origin
@@ -116,7 +118,7 @@ const next = await call("/auth/refresh", { refreshToken: tokens.refreshToken });
 // Replace both tokens. The old refresh token is now used up.
 ```
 
-If two parts of your app refresh with the same token at once, the second call looks like a stolen token and ends the session. Refresh from one place, such as a single shared promise. [Tokens and sessions](/guide/tokens-and-sessions) explains rotation and reuse.
+If two parts of your app refresh with the same token at once, the second call within 10 seconds gets the same new token. Later than that, it looks like a stolen token and ends the session. Refresh from one place anyway, such as a single shared promise. [Tokens and sessions](/guide/tokens-and-sessions) explains rotation and reuse.
 
 To sign out, send the refresh token, the access token, or both:
 

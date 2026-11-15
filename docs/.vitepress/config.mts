@@ -214,6 +214,7 @@ const config = defineConfig({
             { text: "Introduction", link: "/guide/" },
             { text: "Quick start", link: "/guide/quick-start" },
             { text: "Add dopgate to your app", link: "/guide/add-to-your-app" },
+            { text: "Sign-in through your backend", link: "/guide/backend-sessions" },
             { text: "Product status", link: "/guide/product-status" },
           ],
         },
