@@ -12,7 +12,7 @@ Each sign-in starts a session: one signed-in device. A session hands out two kin
 | Access token | An ES256 JWT, `eyJ...` | 15 minutes | Sent to your backend as `Authorization: Bearer <token>` |
 | Refresh token | `dgr_` and 43 random characters | 30 days unused, single use | Traded at `POST /api/v1/auth/refresh` for new tokens |
 
-Admins change the lifetimes in settings under `tokens`: `accessTokenMinutes` (1 to 1440), `refreshTokenIdleDays` (1 to 3650), and `sessionAbsoluteDays` (1 to 3650, at least the idle limit). A session ends at the latest `sessionAbsoluteDays` (90 by default) after sign-in, however often it refreshes. `PATCH /api/v1/admin/settings` replaces the whole `tokens` section, so send all three fields.
+Admins change the lifetimes in settings under `tokens`: `accessTokenMinutes` (1 to 1440), `refreshTokenIdleDays` (1 to 3650), `sessionAbsoluteDays` (1 to 3650, at least the idle limit), and `refreshReuseSeconds` (0 to 60, see [below](#a-repeated-refresh)). A session ends at the latest `sessionAbsoluteDays` (90 by default) after sign-in, however often it refreshes. `PATCH /api/v1/admin/settings` replaces the whole `tokens` section, so send all four fields.
 
 ## Access tokens
 
@@ -131,7 +131,13 @@ curl -X POST https://auth.example.com/api/v1/auth/refresh \
 
 Each refresh pushes the session's idle limit forward, up to its absolute end.
 
-If a spent refresh token comes back, Dopgate takes it as a sign that the token was copied. It ends the whole session, records `session.refresh_reused` in the audit log, and answers `401 TOKEN_INVALID`. The user has to sign in again on that device. Keep one refresh in flight at a time per session, so two tabs or two requests don't race each other with the same token.
+If a spent refresh token comes back after the reuse window, Dopgate takes it as a sign that the token was copied. It ends the whole session, records `session.refresh_reused` in the audit log, and answers `401 TOKEN_INVALID`. The user has to sign in again on that device.
+
+### A repeated refresh
+
+Two tabs, two servers, or a retry after a dropped connection can send the same refresh token at nearly the same moment. Within `refreshReuseSeconds` (10 by default) of the first use, a spent token gets the same answer as the first time: the same new refresh token, with a fresh access token. If the session has refreshed again since, the answer is its newest refresh token, so every tab ends up holding the same one.
+
+Refresh tokens are stored only as hashes. To give the same answer twice, Dopgate stores the new token encrypted with a key derived from the spent one, so only someone holding the spent token can read it, and only inside the window. For those seconds a copied token gets the same answer as the real one instead of ending the session. Set `refreshReuseSeconds` to `0` to end the session on any repeat.
 
 A refresh token that is unknown, expired, used, or belongs to an ended session answers `401 TOKEN_INVALID`. A disabled account answers `403 ACCOUNT_DISABLED`.
 

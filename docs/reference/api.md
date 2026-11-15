@@ -167,7 +167,7 @@ Public. Trades a refresh token for new tokens.
 | --- | --- | --- |
 | `refreshToken` | no | Leave it out to use the `dopgate_refresh` cookie |
 
-Answers `200 TOKENS_REFRESHED` with tokens. The old refresh token is spent; presenting it again ends the session. Errors: `401 TOKEN_INVALID` (no token sent, an unknown, spent, or expired token, or an ended session), `403 ACCOUNT_DISABLED`.
+Answers `200 TOKENS_REFRESHED` with tokens. The old refresh token is spent. Presenting it again within `tokens.refreshReuseSeconds` (10 by default) answers with the session's newest refresh token; later, it ends the session ([details](/guide/tokens-and-sessions#a-repeated-refresh)). Errors: `401 TOKEN_INVALID` (no token sent, an unknown, spent, or expired token, or an ended session), `403 ACCOUNT_DISABLED`.
 
 ### `POST /api/v1/auth/logout`
 
@@ -451,7 +451,7 @@ Admin. Answers `200 SETTINGS_FETCHED` with every section.
 | --- | --- |
 | `signup` | `enabled` (`true`), `requireEmailVerification` (`true`), `passwordlessSignup` (`false`) |
 | `password` | `minLength` (`8`, allowed 8 to 128) |
-| `tokens` | `accessTokenMinutes` (`15`, 1 to 1440), `refreshTokenIdleDays` (`30`, 1 to 3650), `sessionAbsoluteDays` (`90`, 1 to 3650, not less than the idle limit) |
+| `tokens` | `accessTokenMinutes` (`15`, 1 to 1440), `refreshTokenIdleDays` (`30`, 1 to 3650), `sessionAbsoluteDays` (`90`, 1 to 3650, not less than the idle limit), `refreshReuseSeconds` (`10`, 0 to 60, 0 turns it off) |
 | `limits` | `codeMinutes` (`10`), `codeMaxAttempts` (`5`), `codeResendSeconds` (`60`), `codesPerHour` (`5`), `lockoutAttempts` (`5`), `lockoutMinutes` (`15`), `ipRequestsPerMinute` (`20`). Ranges in [Rate limits](/guide/rate-limits). |
 | `selfService` | `agents` (`false`), `maxAgentsPerUser` (`10`, 1 to 1000), `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [Agents](/guide/agents) and [Personal tokens](/guide/personal-tokens). |
 | `branding` | `appName` (`Dopgate`, one line up to 255 characters), `logoUrl` (`null`, an `http(s)` URL) |
