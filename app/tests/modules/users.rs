@@ -67,6 +67,41 @@ async fn admins_list_search_and_page_through_users() {
   assert_eq!(body["data"]["items"].as_array().unwrap().len(), 1);
 }
 
+/// Adding someone by email must find that person, not everyone whose email
+/// contains it.
+#[tokio::test]
+async fn the_email_filter_matches_one_whole_email() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ana@example.com").await;
+  app.create_user(&root, "hana@example.com").await;
+  let find = |query: &'static str| {
+    let (app, root) = (&app, &root);
+    async move {
+      app
+        .request_with(
+          Method::GET,
+          &format!("/api/v1/admin/users?{query}"),
+          None,
+          Some(root),
+        )
+        .await
+    }
+  };
+
+  let (_, body) = find("search=ana@example.com").await;
+  assert_eq!(body["data"]["items"].as_array().unwrap().len(), 2);
+  let (status, body) = find("email=Ana@Example.com").await;
+  assert_eq!(status, StatusCode::OK);
+  let items = body["data"]["items"].as_array().unwrap();
+  assert_eq!(items.len(), 1);
+  assert_eq!(items[0]["email"], "ana@example.com");
+  let (_, body) = find("email=nobody@example.com").await;
+  assert_eq!(body["data"]["items"], json!([]));
+  let (status, _) = find("email=not-an-email").await;
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 #[tokio::test]
 async fn admins_and_users_are_separate_accounts() {
   let app = TestApp::new().await;

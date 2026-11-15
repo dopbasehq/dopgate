@@ -55,10 +55,12 @@ pub async fn list(
     .as_deref()
     .map(str::trim)
     .filter(|search| !search.is_empty());
+  let email = query.email.as_deref().map(validate::email).transpose()?;
   let mut rows = repository::list(
     state.db.pool(),
     &repository::ListFilter {
       search,
+      email: email.as_deref(),
       status: query.status,
       before: cursor.as_ref().map(|(time, id)| (*time, id.as_str())),
       limit: i64::from(limit) + 1,
