@@ -73,6 +73,11 @@ export const TOKEN_FIELDS: NumberField<keyof TokenSettings>[] = [
     label: "Session length (days)",
     hint: "Every session ends after this, used or not.",
   },
+  {
+    key: "refreshReuseSeconds",
+    label: "Repeat refresh window (seconds)",
+    hint: "A refresh sent twice this soon gets the same answer. 0 turns it off.",
+  },
 ];
 
 /** The sender address the server uses when none is set. */
@@ -184,7 +189,13 @@ function draftOf<S extends SectionName>(
   }
 }
 
-/** Reads whole numbers of at least 1; collects an error per bad field. */
+/** Settings where 0 is a real value: it turns the feature off. */
+const ZERO_ALLOWED = new Set<string>(["refreshReuseSeconds"]);
+
+/**
+ * Reads whole numbers of at least 1, or 0 where that turns a feature off;
+ * collects an error per bad field.
+ */
 function numbers<T extends Record<string, string>>(
   draft: T,
   errors: Record<string, string>,
@@ -192,8 +203,9 @@ function numbers<T extends Record<string, string>>(
   const out: Record<string, number> = {};
   for (const [key, text] of Object.entries(draft)) {
     const value = Number(text.trim());
-    if (text.trim() === "" || !Number.isInteger(value) || value < 1) {
-      errors[key] = "Enter a whole number of at least 1.";
+    const min = ZERO_ALLOWED.has(key) ? 0 : 1;
+    if (text.trim() === "" || !Number.isInteger(value) || value < min) {
+      errors[key] = `Enter a whole number of at least ${min}.`;
     }
     out[key] = value;
   }
