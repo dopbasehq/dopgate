@@ -45,6 +45,7 @@ Dopgate records sign-ins, account changes, and admin actions in the `audit_event
 | `user.signed_up` | The new user | `method`: `password` or `otp` |
 | `user.signed_in` | The user | `method`, `sessionId` |
 | `user.sign_in_failed` | The user whose email was given | `reason`: `password` or `locked`; `locked`: whether this attempt locked the account |
+| `user.password_check_failed` | The signed-in user | A wrong current password on a password or email change. `reason`: `password` or `locked`; `locked`: whether this attempt locked the account |
 | `user.signed_out` | The user | `allSessions`, `sessionId` |
 | `user.email_verified` | The user | none |
 | `user.profile_updated` | The user | none |
@@ -52,7 +53,7 @@ Dopgate records sign-ins, account changes, and admin actions in the `audit_event
 | `user.password_reset` | The user | `sessionsEnded` |
 | `user.email_changed` | The user | `from`, `to` |
 
-Admins signing in to the console leave the same events with an `admin.` prefix, such as `admin.signed_in`, `admin.sign_in_failed`, `admin.signed_out`, `admin.password_changed`, `admin.password_reset`, `admin.email_changed`, and `admin.profile_updated`. The actor type is the admin's role.
+Admins signing in to the console leave the same events with an `admin.` prefix, such as `admin.signed_in`, `admin.sign_in_failed`, `admin.password_check_failed`, `admin.signed_out`, `admin.password_changed`, `admin.password_reset`, `admin.email_changed`, and `admin.profile_updated`. The actor type is the admin's role.
 
 A failed sign-in for an email with no account isn't recorded, because there is no account to attach it to.
 

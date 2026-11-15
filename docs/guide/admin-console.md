@@ -29,7 +29,7 @@ The sidebar groups the pages under **People** (Users, Agents), **Email** (Templa
 | Settings | `/settings` | Sign-up rules, the minimum password length, codes and lockout, token lifetimes, whether users can make personal tokens and agents, and branding. The SMTP section is editable unless the server config sets a host (`DOPGATE_SMTP_HOST` or the config file), and has a button that sends a test email. |
 | Signing keys | `/keys` | See the active, retiring, and retired keys. Root can rotate the key here. |
 | Audit log | `/audit` | Page through every recorded event, filter by action or actor, and verify the hash chain. |
-| Account | `/account` | Your own profile, password, email, and signed-in sessions. |
+| Account | `/account` | Your own profile, password, email, and signed-in sessions. An admin without a password asks for an emailed code here to set one. |
 
 The console only shows what your role allows. Every admin manages every user and can turn off or delete any agent. Only an agent's owner edits it or regenerates its token. Only root sees the actions on the Admins page and the rotate button, and nobody can change root from the console.
 
