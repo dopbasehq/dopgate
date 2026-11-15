@@ -22,8 +22,10 @@ fn rejected() -> HttpError {
   HttpError::unauthorized(TOKEN_INVALID, "The token is wrong or was revoked.")
 }
 
-/// Record a token that matched nothing. Only the prefix and the last four
-/// characters are kept, never the token.
+/// Record a token that matched nothing, never the token itself. A `dgp_` or
+/// `dga_` token keeps its last four characters, which match what the token
+/// lists show. Anything else keeps nothing: it may be a password pasted
+/// into the wrong field, and its tail has no business in the audit log.
 async fn record_rejection(
   state: &AppState,
   kind: &str,
@@ -34,18 +36,22 @@ async fn record_rejection(
   } else {
     "token.rejected"
   };
-  let last_four: String = presented
-    .chars()
-    .rev()
-    .take(4)
-    .collect::<Vec<_>>()
-    .into_iter()
-    .rev()
-    .collect();
+  let metadata = if kind == "unknown" {
+    serde_json::json!({ "kind": kind })
+  } else {
+    let last_four: String = presented
+      .chars()
+      .rev()
+      .take(4)
+      .collect::<Vec<_>>()
+      .into_iter()
+      .rev()
+      .collect();
+    serde_json::json!({ "kind": kind, "lastFour": last_four })
+  };
   audit::service::record_now(
     state.db.pool(),
-    audit::service::Event::anonymous("token", action)
-      .metadata(serde_json::json!({ "kind": kind, "lastFour": last_four })),
+    audit::service::Event::anonymous("token", action).metadata(metadata),
   )
   .await;
 }

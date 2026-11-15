@@ -341,5 +341,18 @@ async fn unknown_tokens_are_refused_and_recorded() {
     .await;
   let items = events["data"]["items"].as_array().unwrap();
   assert_eq!(items.len(), 2);
-  assert!(!items[0]["metadata"].to_string().contains("not-a-real"));
+  let recorded = |kind: &str| {
+    items
+      .iter()
+      .find(|item| item["metadata"]["kind"] == kind)
+      .unwrap()["metadata"]
+      .clone()
+  };
+  // A dgp_ token keeps its last four characters and nothing more.
+  let personal = recorded("personal");
+  assert_eq!(personal["lastFour"], "0000");
+  assert!(!personal.to_string().contains("not-a-real"));
+  // Anything else may be a password pasted into the wrong field, so none
+  // of it is kept.
+  assert_eq!(recorded("unknown"), json!({ "kind": "unknown" }));
 }
