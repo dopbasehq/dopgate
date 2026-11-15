@@ -23,6 +23,16 @@ pub const VERIFICATION_ID_PREFIX: &str = "vrf_";
 /// then travels in an HttpOnly cookie instead of the response body.
 pub const SESSION_MODE_HEADER: &str = "x-dopgate-session";
 pub const SESSION_MODE_COOKIE: &str = "cookie";
+/// A backend that signs people in for them sends the service key here.
+/// With it, Dopgate takes the visitor's address and browser from the two
+/// headers below.
+pub const BACKEND_KEY_HEADER: &str = "x-dopgate-backend-key";
+/// The visitor's IP address, as the backend saw it.
+pub const CLIENT_IP_HEADER: &str = "x-dopgate-client-ip";
+/// The visitor's `User-Agent`, as the backend received it.
+pub const CLIENT_AGENT_HEADER: &str = "x-dopgate-client-agent";
+/// A browser name longer than this is cut off.
+pub const USER_AGENT_MAX_CHARS: usize = 512;
 /// The HttpOnly cookie that carries an app's refresh token in cookie mode.
 pub const REFRESH_COOKIE: &str = "dopgate_refresh";
 /// The HttpOnly cookie that carries the console's refresh token.

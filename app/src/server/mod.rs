@@ -184,6 +184,12 @@ pub fn router(state: AppState) -> Router {
   }
   router
     .fallback(assets::static_fallback)
+    // Inside the response layers, so a refused backend key still gets the
+    // request ID and the hardening headers.
+    .layer(middleware::from_fn_with_state(
+      state.clone(),
+      middlewares::client_ip::relay,
+    ))
     .layer(DefaultBodyLimit::max(3 * 1024 * 1024))
     .layer(TimeoutLayer::with_status_code(
       StatusCode::REQUEST_TIMEOUT,

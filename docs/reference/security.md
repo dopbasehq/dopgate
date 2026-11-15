@@ -43,6 +43,8 @@ Sign-up is the exception: it answers `409 EMAIL_TAKEN` for an email that has an 
 
 Per-address limits, per-email code limits, and account lockout slow down guessing and email flooding. See [Rate limits and lockout](/guide/rate-limits). The setup token allows 5 wrong tries per address per 15 minutes.
 
+A backend can name the visitor's address in `X-Dopgate-Client-IP`, but only next to the service key in `X-Dopgate-Backend-Key`. Without the key the header is ignored, and CORS doesn't allow either header, so a page in a browser can't choose the address its limits are counted against.
+
 ## HTTP protections
 
 Every response carries:

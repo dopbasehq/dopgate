@@ -2,6 +2,8 @@
 //!
 //! Only the origins in `DOPGATE_ALLOWED_ORIGINS` pass. Apps send tokens in
 //! the `Authorization` header, never cookies, so credentials stay off.
+//! The backend key and the visitor headers stay off the allowed list: only
+//! servers send them.
 
 use axum::http::{HeaderName, HeaderValue, Method, header};
 use tower_http::cors::{AllowOrigin, CorsLayer};

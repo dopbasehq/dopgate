@@ -32,6 +32,8 @@ These endpoints share one budget per client address:
 
 The address is the connection's peer address. Behind a reverse proxy, every request would seem to come from the proxy and share one budget, so list the proxy in `DOPGATE_TRUSTED_PROXIES`. Dopgate then reads `X-Forwarded-For` from the right, skipping trusted hops. See [Configuration](/self-hosting/configuration#behind-a-reverse-proxy).
 
+When your backend signs people in for them, every request comes from the backend's address. Send the visitor's address in `X-Dopgate-Client-IP` together with the service key in `X-Dopgate-Backend-Key`, and each visitor gets their own budget. See [Passing on the visitor](/guide/admin-api#passing-on-the-visitor).
+
 ## The code limits
 
 Every endpoint that emails a code (verification, sign-in by code, password reset, and email change) checks two limits on the receiving email before it answers: the wait between codes of the same purpose, and the hourly cap. They apply whether or not the email has an account, so the answers never reveal which emails do. An admin sending a reset code from the admin API skips these two limits.

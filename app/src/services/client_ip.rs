@@ -136,6 +136,12 @@ pub fn resolve(
   Some(client)
 }
 
+/// The visitor's address from `X-Dopgate-Client-IP`, which a backend sends
+/// with its backend key. A bare address or one with a port.
+pub fn parse_relayed(value: &str) -> Option<IpAddr> {
+  parse_hop(value)
+}
+
 /// Proxies write either a bare address or one with a port.
 fn parse_hop(hop: &str) -> Option<IpAddr> {
   let hop = hop.trim();

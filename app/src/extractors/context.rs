@@ -11,7 +11,9 @@ use axum::{
 use crate::{
   constants::tokens::{
     CONSOLE_REFRESH_COOKIE, REFRESH_COOKIE, SESSION_MODE_COOKIE, SESSION_MODE_HEADER,
+    USER_AGENT_MAX_CHARS,
   },
+  middlewares::client_ip::RelayedAgent,
   state::AppState,
 };
 
@@ -41,11 +43,15 @@ impl FromRequestParts<AppState> for RequestContext {
     parts: &mut Parts,
     _state: &AppState,
   ) -> Result<Self, Self::Rejection> {
-    let user_agent = parts
-      .headers
-      .get(USER_AGENT)
-      .and_then(|value| value.to_str().ok())
-      .map(|value| value.chars().take(512).collect());
+    // A backend's relayed visitor wins over the backend's own browser name.
+    let user_agent = match parts.extensions.get::<RelayedAgent>() {
+      Some(RelayedAgent(agent)) => Some(agent.clone()),
+      None => parts
+        .headers
+        .get(USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.chars().take(USER_AGENT_MAX_CHARS).collect()),
+    };
     let session_mode = match parts
       .headers
       .get(SESSION_MODE_HEADER)
