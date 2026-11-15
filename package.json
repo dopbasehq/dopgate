@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun ./scripts/dev.ts",
-    "dev:db": "docker start dopgate-dev-pg || docker run -d --name dopgate-dev-pg -e POSTGRES_PASSWORD=dopgate -p 55433:5432 postgres:17-alpine",
+    "dev:db": "docker start dopgate-dev-pg || docker run -d --name dopgate-dev-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55433:5432 postgres:17-alpine",
     "dev:app": "cargo run --manifest-path app/Cargo.toml -- serve",
     "dev:ui": "bun run --cwd ui dev",
     "dev:docs": "vitepress dev docs",
@@ -29,7 +29,7 @@
     "clean:ui": "rm -rf ./ui/dist/",
     "clean:app": "cargo clean --manifest-path app/Cargo.toml",
     "clean:docs": "rm -rf ./docs/.vitepress/dist/ ./docs/.vitepress/cache/",
-    "test:db": "docker start dopgate-test-pg || docker run -d --name dopgate-test-pg -e POSTGRES_PASSWORD=dopgate -p 55432:5432 postgres:17-alpine -c max_connections=400",
+    "test:db": "docker start dopgate-test-pg || docker run -d --name dopgate-test-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55432:5432 postgres:17-alpine -c max_connections=400",
     "docker:build": "docker build -t dopgate ."
   },
   "devDependencies": {

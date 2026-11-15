@@ -5,8 +5,8 @@
 //! Start the database with:
 //!
 //! ```text
-//! docker run -d --name dopgate-test-pg -e POSTGRES_PASSWORD=dopgate \
-//!   -p 55432:5432 postgres:17-alpine -c max_connections=400
+//! docker run -d --name dopgate-test-pg -e POSTGRES_HOST_AUTH_METHOD=trust \
+//!   -p 127.0.0.1:55432:5432 postgres:17-alpine -c max_connections=400
 //! ```
 
 pub mod smtp;
@@ -27,7 +27,7 @@ use axum::{
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-pub const DEFAULT_TEST_DATABASE_URL: &str = "postgres://postgres:dopgate@localhost:55432/postgres";
+pub const DEFAULT_TEST_DATABASE_URL: &str = "postgres://postgres@localhost:55432/postgres";
 
 /// The database tests run against.
 pub fn database_url() -> String {
