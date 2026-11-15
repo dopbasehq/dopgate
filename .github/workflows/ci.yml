@@ -104,7 +104,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install --yes shellcheck
           fi
-          curl --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash -o "$RUNNER_TEMP/download-actionlint.bash"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash -o "$RUNNER_TEMP/download-actionlint.bash"
           bash "$RUNNER_TEMP/download-actionlint.bash" 1.7.12 "$RUNNER_TEMP"
           "$RUNNER_TEMP/actionlint"
           shellcheck scripts/release/*.sh
@@ -138,7 +138,7 @@ jobs:
 
       # The console has its own lockfile, apart from the docs at the root.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Prettier
         run: bun run format:check
@@ -217,7 +217,7 @@ jobs:
       - name: Build admin console
         working-directory: ui
         run: |
-          bun install --frozen-lockfile
+          bun install --frozen-lockfile --ignore-scripts
           bun run build
 
       - name: Format
@@ -266,7 +266,7 @@ jobs:
           restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Build
         run: bun run build:docs

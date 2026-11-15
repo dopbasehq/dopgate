@@ -12,7 +12,7 @@ FROM node:22-bookworm-slim AS console
 COPY --from=oven/bun:1.4 /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /src/ui
 COPY ui/package.json ui/bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --ignore-scripts
 COPY ui/ ./
 RUN bun run build
 
