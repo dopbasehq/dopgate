@@ -223,7 +223,8 @@ function smtpBody(
   if (portText && (!Number.isInteger(port) || port < 1 || port > 65535)) {
     errors.port = "Enter a port from 1 to 65535.";
   }
-  if (/^[a-z]+:\/\/|[/@]/i.test(host)) {
+  // A slash or an @ means a URL or credentials, a scheme included.
+  if (/[/@]/.test(host)) {
     errors.host = "Enter just the host name, like smtp.example.com.";
   } else if (/^[^:]+:\d*$/.test(host)) {
     errors.host = "Put the port in the Port field.";

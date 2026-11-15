@@ -104,7 +104,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install --yes shellcheck
           fi
-          curl --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash -o "$RUNNER_TEMP/download-actionlint.bash"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash -o "$RUNNER_TEMP/download-actionlint.bash"
           bash "$RUNNER_TEMP/download-actionlint.bash" 1.7.12 "$RUNNER_TEMP"
           "$RUNNER_TEMP/actionlint"
           shellcheck scripts/release/*.sh
@@ -138,7 +138,7 @@ jobs:
 
       # The console has its own lockfile, apart from the docs at the root.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Prettier
         run: bun run format:check
@@ -160,7 +160,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      DOPGATE_TEST_DATABASE_URL: postgres://postgres:dopgate@localhost:55432/postgres
+      DOPGATE_TEST_DATABASE_URL: postgres://postgres@localhost:55432/postgres
     defaults:
       run:
         working-directory: app
@@ -171,15 +171,17 @@ jobs:
           persist-credentials: false
 
       # The same container as `bun run test:db`. A service container can't
-      # take the max_connections flag, and each test opens its own pool.
+      # take the max_connections flag, and each test opens its own pool. It
+      # has no password: it trusts connections, and only this machine can
+      # reach the port.
       - name: Start PostgreSQL
         working-directory: .
         shell: bash
         run: |
           set -euo pipefail
           docker run --detach --name dopgate-test-pg \
-            --env POSTGRES_PASSWORD=dopgate \
-            --publish 55432:5432 \
+            --env POSTGRES_HOST_AUTH_METHOD=trust \
+            --publish 127.0.0.1:55432:5432 \
             postgres:17-alpine -c max_connections=400
 
       - name: Install Rust
@@ -215,7 +217,7 @@ jobs:
       - name: Build admin console
         working-directory: ui
         run: |
-          bun install --frozen-lockfile
+          bun install --frozen-lockfile --ignore-scripts
           bun run build
 
       - name: Format
@@ -264,7 +266,7 @@ jobs:
           restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Build
         run: bun run build:docs

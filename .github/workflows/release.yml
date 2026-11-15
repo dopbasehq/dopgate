@@ -85,7 +85,7 @@ jobs:
       - name: Build admin console
         working-directory: ui
         run: |
-          bun install --frozen-lockfile
+          bun install --frozen-lockfile --ignore-scripts
           bun run build
 
       - name: Upload admin console

@@ -1,5 +1,5 @@
 // Local development defaults. `bun run dev:db` starts this database.
-process.env.DOPGATE_DATABASE_URL ??= "postgres://postgres:dopgate@localhost:55433/postgres";
+process.env.DOPGATE_DATABASE_URL ??= "postgres://postgres@localhost:55433/postgres";
 process.env.DOPGATE_ALLOWED_ORIGINS ??= "http://localhost:5174";
 process.env.DOPGATE_ROOT_EMAIL ??= "admin@example.com";
 

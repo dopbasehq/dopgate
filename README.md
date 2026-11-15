@@ -51,6 +51,8 @@ bun run test:db
 bun run test
 ```
 
+Both containers have no password. They trust every connection and publish their port on 127.0.0.1 only, so nothing outside your machine can reach them. A container made by an older `dev:db` or `test:db` still asks for its old password. Remove it with `docker rm -f dopgate-dev-pg dopgate-test-pg` and run the command again.
+
 If you ran a 0.1.0 preview, delete the old `.dev-data` folder. It held SQLite files that nothing reads anymore.
 
 ## Scripts
