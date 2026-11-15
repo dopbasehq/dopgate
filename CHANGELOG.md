@@ -83,6 +83,9 @@ with an admin console and Docker images. Nothing below has shipped before.
   tokens, agents, console tokens, and starting over from a development
   build. The home page links each feature to its guide and walks through the
   four steps from an empty database to a verified token.
+- A guide for web apps with a backend: the backend signs people in through
+  Dopgate and keeps both tokens in an encrypted HttpOnly cookie, so no
+  long-lived token reaches the browser and Dopgate can run on any domain.
 - Single sign-on and MFA routes answer `501 NOT_IMPLEMENTED` until they are
   built. They are hidden from the API docs at `/api/docs` for now.
 

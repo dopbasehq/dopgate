@@ -61,4 +61,5 @@ Dopgate answers "who is this user". Your app decides what they may do. Organizat
 
 - [Quick start](/guide/quick-start) runs Dopgate with Docker Compose and signs you in to the console.
 - [Add Dopgate to your app](/guide/add-to-your-app) wires up a frontend and a backend.
+- [Sign-in through your backend](/guide/backend-sessions) keeps every token on your server, in an encrypted cookie, for web apps with a backend.
 - [Running with your app's stack](/self-hosting/with-your-app) covers a real deployment next to your app.
