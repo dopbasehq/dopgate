@@ -5,6 +5,9 @@ pub const ACCESS_TOKEN_MINUTES: i64 = 15;
 pub const REFRESH_TOKEN_IDLE_DAYS: i64 = 30;
 /// A session ends after this long, however often it refreshes.
 pub const SESSION_ABSOLUTE_DAYS: i64 = 90;
+/// A spent refresh token sent again this soon gets the same answer: two
+/// tabs, two servers, or a retry after a dropped connection.
+pub const REFRESH_REUSE_SECONDS: i64 = 10;
 
 pub const PASSWORD_MIN_LENGTH: usize = 8;
 /// Argon2 work grows with input length, so very long passwords are refused

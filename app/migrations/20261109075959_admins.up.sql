@@ -44,13 +44,15 @@ CREATE TABLE admin_sessions (
 CREATE INDEX admin_sessions_admin_idx ON admin_sessions(admin_id);
 CREATE INDEX admin_sessions_expiry_idx ON admin_sessions(absolute_expires_at);
 
--- Refresh tokens of console sessions, with the same reuse rule.
+-- Refresh tokens of console sessions, with the same reuse rule and the
+-- same sealed next token as `refresh_tokens`.
 CREATE TABLE admin_refresh_tokens (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES admin_sessions(id) ON DELETE CASCADE,
   token_hash BYTEA NOT NULL UNIQUE,
   created_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
+  next_sealed TEXT,
   expires_at TIMESTAMPTZ NOT NULL
 );
 

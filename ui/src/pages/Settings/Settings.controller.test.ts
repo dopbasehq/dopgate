@@ -18,6 +18,7 @@ const settings: Settings = {
     accessTokenMinutes: 15,
     refreshTokenIdleDays: 30,
     sessionAbsoluteDays: 90,
+    refreshReuseSeconds: 10,
   },
   limits: {
     codeMinutes: 10,
@@ -103,6 +104,27 @@ describe("useSettingsController", () => {
       "refreshTokenIdleDays",
     ]);
     expect(adminApi.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("lets the repeat refresh window be 0, which turns it off", async () => {
+    vi.mocked(adminApi.updateSettings).mockResolvedValue(settings);
+    const c = await mount();
+    c.drafts.value!.tokens.refreshReuseSeconds = "0";
+    expect(await c.save("tokens")).toBe(true);
+    expect(adminApi.updateSettings).toHaveBeenCalledWith({
+      tokens: {
+        accessTokenMinutes: 15,
+        refreshTokenIdleDays: 30,
+        sessionAbsoluteDays: 90,
+        refreshReuseSeconds: 0,
+      },
+    });
+
+    c.drafts.value!.tokens.refreshReuseSeconds = "-1";
+    expect(await c.save("tokens")).toBe(false);
+    expect(c.state.tokens.fieldErrors.refreshReuseSeconds).toBe(
+      "Enter a whole number of at least 0.",
+    );
   });
 
   it("saves the self-service switches and limits as numbers", async () => {

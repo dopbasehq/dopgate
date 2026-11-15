@@ -66,6 +66,8 @@ pub async fn insert_refresh_token(
 pub struct RefreshLookup {
   pub token_id: String,
   pub used_at: Option<DateTime<Utc>>,
+  /// The token issued when this one was used, sealed with this one.
+  pub next_sealed: Option<String>,
   pub expires_at: DateTime<Utc>,
   pub session_id: String,
   pub account_id: String,
@@ -79,7 +81,7 @@ pub async fn find_refresh_token(
   token_hash: &[u8],
 ) -> Result<Option<RefreshLookup>, sqlx::Error> {
   sqlx::query_as(&format!(
-    "SELECT r.id AS token_id, r.used_at, r.expires_at, s.id AS session_id, s.{} AS account_id, s.revoked_at, s.absolute_expires_at \
+    "SELECT r.id AS token_id, r.used_at, r.next_sealed, r.expires_at, s.id AS session_id, s.{} AS account_id, s.revoked_at, s.absolute_expires_at \
      FROM {} r JOIN {} s ON s.id = r.session_id WHERE r.token_hash = $1 FOR UPDATE OF r, s",
     realm.owner_column(),
     realm.refresh_tokens(),
@@ -107,16 +109,21 @@ pub async fn session_of_refresh_token(
   .await
 }
 
+/// Spend a refresh token. `next_sealed` is the token that replaces it,
+/// sealed for a repeat inside the reuse window, or `None` with the window
+/// off.
 pub async fn mark_used(
   connection: &mut PgConnection,
   realm: Realm,
   token_id: &str,
+  next_sealed: Option<&str>,
 ) -> Result<(), sqlx::Error> {
   sqlx::query(&format!(
-    "UPDATE {} SET used_at = now() WHERE id = $1",
+    "UPDATE {} SET used_at = now(), next_sealed = $2 WHERE id = $1",
     realm.refresh_tokens()
   ))
   .bind(token_id)
+  .bind(next_sealed)
   .execute(connection)
   .await
   .map(|_| ())

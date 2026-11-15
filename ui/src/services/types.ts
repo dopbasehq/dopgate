@@ -141,6 +141,7 @@ export interface TokenSettings {
   accessTokenMinutes: number;
   refreshTokenIdleDays: number;
   sessionAbsoluteDays: number;
+  refreshReuseSeconds: number;
 }
 
 export interface LimitSettings {

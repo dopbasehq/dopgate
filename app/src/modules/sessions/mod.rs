@@ -9,6 +9,7 @@ pub mod doc;
 pub mod error;
 pub mod model;
 pub(crate) mod repository;
+pub mod reuse;
 pub mod service;
 
 pub fn routes() -> Router<AppState> {

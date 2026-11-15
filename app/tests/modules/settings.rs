@@ -71,6 +71,7 @@ async fn a_new_instance_has_defaults_and_logs_mail() {
   assert_eq!(settings["signup"]["passwordlessSignup"], false);
   assert_eq!(settings["password"]["minLength"], 8);
   assert_eq!(settings["tokens"]["accessTokenMinutes"], 15);
+  assert_eq!(settings["tokens"]["refreshReuseSeconds"], 10);
   assert_eq!(
     settings["limits"],
     json!({
@@ -270,6 +271,7 @@ async fn bad_values_are_refused() {
     json!({ "password": { "minLength": 4 } }),
     json!({ "tokens": { "accessTokenMinutes": 0, "refreshTokenIdleDays": 30, "sessionAbsoluteDays": 90 } }),
     json!({ "tokens": { "accessTokenMinutes": 15, "refreshTokenIdleDays": 100, "sessionAbsoluteDays": 90 } }),
+    json!({ "tokens": { "refreshReuseSeconds": 61 } }),
     json!({ "limits": { "codeMinutes": 0 } }),
     json!({ "selfService": { "personalTokens": true, "maxPersonalTokensPerUser": 0 } }),
     json!({ "selfService": { "maxPersonalTokensPerUser": 1001 } }),

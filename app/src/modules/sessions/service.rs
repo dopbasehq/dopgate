@@ -1,7 +1,8 @@
 //! Sessions: one per sign-in on a device, for admins in the console and for
 //! your app's users alike. A session issues short-lived access tokens and
-//! single-use refresh tokens. Reusing a refresh token ends the session,
-//! because it means someone copied it. The realm picks the tables, the
+//! single-use refresh tokens. Reusing a refresh token after the short reuse
+//! window ends the session, because it means someone copied it. The realm
+//! picks the tables, the
 //! cookie, and the token the caller builds from the grant.
 
 use axum::http::{HeaderValue, StatusCode, header::SET_COOKIE};
@@ -9,7 +10,7 @@ use chrono::{Duration, Utc};
 use serde::Serialize;
 use sqlx::PgConnection;
 
-use super::{model::*, repository};
+use super::{model::*, repository, reuse};
 use crate::{
   constants::{
     api,
@@ -119,6 +120,11 @@ async fn new_refresh_token(
 
 /// Trade a refresh token for a new one. Returns the account, so the caller
 /// can build its access token.
+///
+/// A spent token sent again within `tokens.refreshReuseSeconds` leads to
+/// the token issued for it, and on along the chain to the newest one, which
+/// comes back unchanged: every tab ends up holding the same token. Past the
+/// window, a spent token means it was copied, and the session ends.
 pub async fn refresh(
   state: &AppState,
   realm: Realm,
@@ -126,13 +132,30 @@ pub async fn refresh(
 ) -> Result<(AccountRow, Grant), HttpError> {
   let lifetimes = settings::service::tokens(state.db.pool()).await?;
   let mut tx = state.db.pool().begin().await?;
-  let Some(found) =
+  let Some(mut found) =
     repository::find_refresh_token(&mut tx, realm, &token::hash(refresh_token)).await?
   else {
     return Err(invalid_refresh());
   };
   let now = Utc::now();
-  if found.used_at.is_some() {
+  let mut presented = refresh_token.to_owned();
+  let mut repeated = false;
+  while found.used_at.is_some() {
+    let next = reuse::recover(
+      &presented,
+      found.next_sealed.as_deref(),
+      found.used_at,
+      now,
+      lifetimes.refresh_reuse_seconds,
+    );
+    if let Some(next) = next {
+      found = repository::find_refresh_token(&mut tx, realm, &token::hash(&next))
+        .await?
+        .ok_or_else(invalid_refresh)?;
+      presented = next;
+      repeated = true;
+      continue;
+    }
     if found.revoked_at.is_none() {
       repository::revoke(
         &mut *tx,
@@ -162,11 +185,25 @@ pub async fn refresh(
   if !account.is_active() {
     return Err(disabled());
   }
-  repository::mark_used(&mut tx, realm, &found.token_id).await?;
+  if repeated {
+    // The newest token in the chain is the answer. Rotating it again would
+    // spend the token the first request just handed out.
+    return Ok((
+      account,
+      Grant {
+        session_id: found.session_id,
+        refresh_token: presented,
+        access_minutes: lifetimes.access_token_minutes,
+      },
+    ));
+  }
   let idle = (now + Duration::days(i64::from(lifetimes.refresh_token_idle_days)))
     .min(found.absolute_expires_at);
   repository::touch(&mut tx, realm, &found.session_id, idle).await?;
   let refresh_token = new_refresh_token(&mut tx, realm, &found.session_id, idle).await?;
+  let sealed =
+    (lifetimes.refresh_reuse_seconds > 0).then(|| reuse::seal(&presented, &refresh_token));
+  repository::mark_used(&mut tx, realm, &found.token_id, sealed.as_deref()).await?;
   tx.commit().await?;
   Ok((
     account,
