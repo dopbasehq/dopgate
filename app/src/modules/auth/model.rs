@@ -103,6 +103,9 @@ pub struct UpdateProfileRequest {
 pub struct ChangePasswordRequest {
   /// Required when the account has a password.
   pub current_password: Option<String>,
+  /// Required when the account has no password yet: a password reset code
+  /// from `/auth/password/forgot` (`/console/password/forgot` for admins).
+  pub code: Option<String>,
   pub new_password: String,
 }
 

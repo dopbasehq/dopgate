@@ -264,8 +264,9 @@ pub async fn reset_password(
 
 /// Change the console password
 ///
-/// Set a new password after confirming the current one. Every other console
-/// session ends, and a notice goes to the admin's email.
+/// Set a new password after confirming the current one. An admin without a
+/// password sends a code from `/console/password/forgot` instead. Every
+/// other console session ends, and a notice goes to the admin's email.
 #[utoipa::path(
   post,
   path = crate::constants::api::console::PASSWORD_CHANGE,
@@ -274,8 +275,10 @@ pub async fn reset_password(
   request_body = ChangePasswordRequest,
   responses(
     (status = 200, description = "Password changed", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 400, description = "The account has no password, and the code is missing or wrong", body = crate::http::ErrorBody),
     (status = 401, description = "Authentication is required, or the current password is wrong", body = crate::http::ErrorBody),
     (status = 422, description = "The new password was refused", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many requests from this address", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn change_password(

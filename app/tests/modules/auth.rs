@@ -501,6 +501,119 @@ async fn changing_the_email_needs_the_password_and_a_code_from_the_new_address()
   app.login("new@example.com", PASSWORD).await;
 }
 
+/// A stolen access token can't be used to guess the password without limit:
+/// wrong current passwords lock the account like wrong sign-ins do.
+#[tokio::test]
+async fn wrong_current_passwords_lock_the_account() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let token = app.login("ada@example.com", PASSWORD).await;
+  let guess = |path: &'static str, body: Value| {
+    let (app, token) = (&app, &token);
+    async move {
+      app
+        .request_with(Method::POST, path, Some(body), Some(token))
+        .await
+    }
+  };
+  for _ in 0..4 {
+    let (status, _) = guess(
+      "/api/v1/auth/password/change",
+      json!({ "currentPassword": "wrong", "newPassword": "a brand new password" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+  }
+  // The email change checks the same password and counts the fifth miss.
+  let (status, _) = guess(
+    "/api/v1/auth/email/change",
+    json!({ "newEmail": "new@example.com", "password": "wrong" }),
+  )
+  .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+  // Locked: the right password gets the wrong-password answer, here and at
+  // sign-in.
+  let (status, body) = guess(
+    "/api/v1/auth/password/change",
+    json!({ "currentPassword": PASSWORD, "newPassword": "a brand new password" }),
+  )
+  .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+  let (status, _) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+/// An account made without a password needs an emailed code to add one, so
+/// a stolen access token can't turn into a password the thief keeps.
+#[tokio::test]
+async fn an_account_without_a_password_needs_a_code_to_set_one() {
+  let (app, smtp) = app_with_mail().await;
+  let root = app.root_token().await;
+  let (status, _) = app
+    .request_with(
+      Method::POST,
+      "/api/v1/admin/users",
+      Some(json!({ "email": "ada@example.com", "emailVerified": true })),
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::CREATED);
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/verification/send",
+      Some(json!({ "email": "ada@example.com", "purpose": "login" })),
+    )
+    .await;
+  let code = smtp.code_for("ada@example.com").await;
+  let (status, body) = confirm(&app, "ada@example.com", "login", &code).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  let token = body["data"]["accessToken"].as_str().unwrap().to_owned();
+  let set = |body: Value| {
+    let (app, token) = (&app, &token);
+    async move {
+      app
+        .request_with(
+          Method::POST,
+          "/api/v1/auth/password/change",
+          Some(body),
+          Some(token),
+        )
+        .await
+    }
+  };
+
+  let (status, body) = set(json!({ "newPassword": "a brand new password" })).await;
+  assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+  assert!(body["error"]["CODE_INVALID"].is_string());
+  let (status, _) = set(json!({ "newPassword": "a brand new password", "code": "000000" })).await;
+  assert_eq!(status, StatusCode::BAD_REQUEST);
+
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/password/forgot",
+      Some(json!({ "email": "ada@example.com" })),
+    )
+    .await;
+  assert_eq!(smtp.wait_for("ada@example.com", 2).await, 2);
+  let code = smtp.code_for("ada@example.com").await;
+  let (status, body) = set(json!({ "newPassword": "a brand new password", "code": code })).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  // The session that set it stays signed in.
+  assert_eq!(me(&app, &token).await, StatusCode::OK);
+  app.login("ada@example.com", "a brand new password").await;
+}
+
 #[tokio::test]
 async fn sign_in_methods_describe_the_instance() {
   let app = TestApp::new().await;

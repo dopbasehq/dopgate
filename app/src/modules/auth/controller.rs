@@ -242,8 +242,10 @@ pub async fn update_me(
 
 /// Change password
 ///
-/// Set a new password after confirming the current one. Every other session
-/// of the account ends, and a notice goes to the account's email.
+/// Set a new password after confirming the current one. An account without
+/// a password sends a code from `/auth/password/forgot` instead. Every other
+/// session of the account ends, and a notice goes to the account's email.
+/// Wrong current passwords count toward the address limit and the lockout.
 #[utoipa::path(
   post,
   path = crate::constants::api::auth::PASSWORD_CHANGE,
@@ -252,8 +254,10 @@ pub async fn update_me(
   request_body = ChangePasswordRequest,
   responses(
     (status = 200, description = "Password changed", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 400, description = "The account has no password, and the code is missing or wrong", body = crate::http::ErrorBody),
     (status = 401, description = "Authentication is required, or the current password is wrong", body = crate::http::ErrorBody),
     (status = 422, description = "The new password was refused", body = crate::http::ErrorBody),
+    (status = 429, description = "Too many requests from this address", body = crate::http::ErrorBody),
   ),
 )]
 pub async fn change_password(
