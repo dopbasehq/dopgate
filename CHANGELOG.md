@@ -55,6 +55,10 @@ with an admin console and Docker images. Nothing below has shipped before.
   test, and reset at `/api/v1/admin/email-templates`.
 - Limits: per-address and per-email request limits, code resend waits, and
   account lockout after five wrong passwords, all editable in settings.
+- A backend that signs people in for them can send the service key in
+  `X-Dopgate-Backend-Key` with the visitor's address and browser in
+  `X-Dopgate-Client-IP` and `X-Dopgate-Client-Agent`. Limits, the device
+  list and the audit log then show the visitor instead of the backend.
 - SMTP through `DOPGATE_SMTP_*`, or from the console when `DOPGATE_SMTP_HOST`
   is empty. The environment wins over the console, and with neither, emails
   go to the log. A password saved in the console is encrypted with a key
