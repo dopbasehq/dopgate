@@ -335,12 +335,16 @@ function main() {
   if (command === "previous-version") {
     const currentVersion = option("--version");
     const commit = option("--commit");
-    // A fixed PATH, so a writable directory earlier in the caller's PATH
-    // can't put another program in place of git.
-    const tags = execFileSync("git", ["tag", "--merged", `${commit}^`], {
-      env: { ...process.env, PATH: "/usr/bin:/bin" },
-      encoding: "utf8",
-    }).split("\n");
+    // git by its full path and a fixed PATH, so a writable directory in the
+    // caller's PATH can't put another program in place of git or its helpers.
+    const tags = execFileSync(
+      "/usr/bin/git",
+      ["tag", "--merged", `${commit}^`],
+      {
+        env: { ...process.env, PATH: "/usr/bin:/bin" },
+        encoding: "utf8",
+      },
+    ).split("\n");
     // Prints an empty line for the first release.
     console.log(findPreviousVersion(currentVersion, tags) ?? "");
     return;
