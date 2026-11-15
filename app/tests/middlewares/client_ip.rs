@@ -103,13 +103,16 @@ async fn a_wrong_key_or_a_bad_address_is_refused() {
   let root = app.root_token().await;
   app.create_user(&root, "ada@example.com").await;
 
+  // The right email and password with a wrong key: the answer names the
+  // key, in a code of its own, and not the password.
   let reply = login(&app, &[("x-dopgate-backend-key", "not-the-key")]).await;
   assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
   assert!(
-    reply.json["error"]["AUTHENTICATION_INVALID"].is_string(),
+    reply.json["error"]["BACKEND_KEY_INVALID"].is_string(),
     "{}",
     reply.json
   );
+  assert!(reply.json["error"]["AUTHENTICATION_INVALID"].is_null());
   assert!(reply.headers.contains_key("x-request-id"));
 
   let reply = login(
@@ -127,6 +130,32 @@ async fn a_wrong_key_or_a_bad_address_is_refused() {
   let bare = TestApp::new().await;
   let reply = login(&bare, &[("x-dopgate-backend-key", SERVICE_KEY)]).await;
   assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+  assert!(reply.json["error"]["BACKEND_KEY_INVALID"].is_string());
+}
+
+/// A wrong key is refused on every route, also the ones anyone may call,
+/// so a backend can check its key at startup without signing anyone in.
+#[tokio::test]
+async fn a_wrong_key_is_refused_on_a_public_route_too() {
+  let app = with_service_key().await;
+  let methods = |key: &'static str| {
+    let app = &app;
+    async move {
+      app
+        .call(
+          Method::GET,
+          "/api/v1/auth/methods",
+          None,
+          None,
+          &[("x-dopgate-backend-key", key)],
+        )
+        .await
+    }
+  };
+  let reply = methods("not-the-key").await;
+  assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+  assert!(reply.json["error"]["BACKEND_KEY_INVALID"].is_string());
+  assert_eq!(methods(SERVICE_KEY).await.status, StatusCode::OK);
 }
 
 #[tokio::test]

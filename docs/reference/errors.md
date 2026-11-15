@@ -31,11 +31,12 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | `AUTHENTICATION_INVALID` | 401 | Wrong email or password, a locked account, a wrong current password, an `Authorization` header that isn't `Bearer <token>`, or a bearer token that is neither a JWT nor the service key. |
 | `AUTHENTICATION_REQUIRED` | 401 | No `Authorization` header, or `POST /auth/logout` with neither an access token nor a refresh token. |
 | `AUTHORIZATION_DENIED` | 403 | The caller can't do this: an agent token on any Dopgate endpoint, an admin editing or regenerating an agent they don't own, a user on the admin API, an admin token on a user endpoint or a user token on a console endpoint, anyone but root managing admins or rotating keys, an access token traded from a personal token on an endpoint that needs a password or code sign-in, or the service key on an endpoint for a signed-in account. |
+| `BACKEND_KEY_INVALID` | 401 | A request carried `X-Dopgate-Backend-Key` with a value that isn't this instance's `DOPGATE_SERVICE_KEY`, or the instance has no service key. Any route can answer it. It is a setup error in your backend: never show it to a visitor. |
 | `CAPABILITIES_INVALID` | 422 | An agent's capabilities aren't a flat object of strings, numbers, true or false, and lists of strings, or are over 4 KB. |
 | `CODE_EXPIRED` | 400 | The emailed code is past its lifetime. |
 | `CODE_INVALID` | 400 | The code is wrong, used up after too many wrong tries, or there is no code for this email and purpose. |
 | `EMAIL_INVALID` | 422 | The email isn't valid, an email change names the current address, or the service key sends an SMTP test without `to`. `400` when the service key asks for an email template test, which it has no address for. |
-| `EMAIL_NOT_VERIFIED` | 403 | Sign-in with the right password while the email is unconfirmed and settings require it. |
+| `EMAIL_NOT_VERIFIED` | 403 | Sign-in with the right password while the email is unconfirmed and settings require it. Send a new code with `POST /auth/verification/send` and confirm it to sign in. |
 | `EMAIL_TAKEN` | 409 | Another account already uses this email. |
 | `FEATURE_DISABLED` | 403 | A user tried to make a personal token while `selfService.personalTokens` is off, or to make, edit, or regenerate an agent while `selfService.agents` is off. |
 | `INTERNAL_ERROR` | 500 | Something failed on the server, such as a database error. The log has the details. |

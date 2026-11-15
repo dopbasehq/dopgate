@@ -197,7 +197,7 @@ pub async fn send(
     return Err(HttpError::new(
       StatusCode::UNPROCESSABLE_ENTITY,
       REQUEST_INVALID,
-      "Use /auth/password/forgot for password resets and /auth/email/change for email changes.",
+      "That kind of code can't be sent from here. Password resets and email changes each ask for their own.",
     ));
   }
   check_send_limits(state, Realm::App, request.purpose, &email).await?;
@@ -308,7 +308,7 @@ pub async fn confirm(
     Purpose::PasswordReset => Err(HttpError::new(
       StatusCode::UNPROCESSABLE_ENTITY,
       REQUEST_INVALID,
-      "Reset a password with /auth/password/reset.",
+      "A password reset code can't be confirmed on its own. It is used together with the new password.",
     )),
   }
 }

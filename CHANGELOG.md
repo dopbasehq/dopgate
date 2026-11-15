@@ -62,7 +62,11 @@ with an admin console and Docker images. Nothing below has shipped before.
 - A backend that signs people in for them can send the service key in
   `X-Dopgate-Backend-Key` with the visitor's address and browser in
   `X-Dopgate-Client-IP` and `X-Dopgate-Client-Agent`. Limits, the device
-  list and the audit log then show the visitor instead of the backend.
+  list and the audit log then show the visitor instead of the backend. A
+  wrong key answers `401 BACKEND_KEY_INVALID`, a code of its own, so a
+  backend can tell its setup error from a visitor's wrong password.
+- Error messages say what happened in plain words and name none of
+  Dopgate's routes, so an app can show them to the person as they are.
 - SMTP through `DOPGATE_SMTP_*`, or from the console when `DOPGATE_SMTP_HOST`
   is empty. The environment wins over the console, and with neither, emails
   go to the log. A password saved in the console is encrypted with a key

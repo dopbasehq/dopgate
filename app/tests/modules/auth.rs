@@ -57,7 +57,12 @@ async fn signup_sends_a_code_and_sign_in_waits_for_it() {
     )
     .await;
   assert_eq!(status, StatusCode::FORBIDDEN);
-  assert!(body["error"]["EMAIL_NOT_VERIFIED"].is_string());
+  // An app may show this to the person as it is, so it says what to do and
+  // names no route.
+  assert_eq!(
+    body["error"]["EMAIL_NOT_VERIFIED"],
+    "Confirm your email before signing in. Enter the code we emailed you, or ask for a new one."
+  );
 
   let code = smtp.code_for("ada@example.com").await;
   let (status, body) = confirm(&app, "ada@example.com", "email_verify", &code).await;
