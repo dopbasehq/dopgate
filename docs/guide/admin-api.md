@@ -100,7 +100,7 @@ curl -X POST https://auth.example.com/api/v1/auth/login \
 
 With a valid key, the rate limits, the device list and the audit log record the visitor. The key only vouches for these headers: it doesn't sign the request in as the service, so the call still needs the user's access token where the endpoint asks for one.
 
-Without `X-Dopgate-Backend-Key`, Dopgate ignores the other two headers, so a browser can't pick its own address. A wrong key, or any key on an instance with no `DOPGATE_SERVICE_KEY`, answers `401 AUTHENTICATION_INVALID`. An `X-Dopgate-Client-IP` that isn't an address answers `400 REQUEST_INVALID`. Leaving it out keeps your backend's own address.
+Without `X-Dopgate-Backend-Key`, Dopgate ignores the other two headers, so a browser can't pick its own address. A wrong key, or any key on an instance with no `DOPGATE_SERVICE_KEY`, answers `401 BACKEND_KEY_INVALID` on every route, the public ones included. That code only ever means your backend's own setup is wrong, so check for it before you pass an error on to a visitor: a wrong password is also a `401`. An `X-Dopgate-Client-IP` that isn't an address answers `400 REQUEST_INVALID`. Leaving it out keeps your backend's own address.
 
 ## Endpoints you'll use most
 

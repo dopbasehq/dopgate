@@ -52,6 +52,12 @@ export async function dopgate(method, path, { body, visitor, accessToken } = {})
   const json = await res.json();
   if (!json.success) {
     const [code, message] = Object.entries(json.error)[0];
+    // Your service key is wrong. That is your setup, not the visitor's
+    // password: log it and answer 503, never pass it on.
+    if (code === "BACKEND_KEY_INVALID") {
+      console.error("Dopgate refused the service key:", message);
+      throw Object.assign(new Error("Sign-in is unavailable."), { status: 503 });
+    }
     throw Object.assign(new Error(message), { code, status: res.status });
   }
   return json.data;

@@ -23,7 +23,7 @@ A missing header answers `401 AUTHENTICATION_REQUIRED`. A bad header or an unkno
 
 ### Calls a backend makes for a visitor
 
-Any request can carry `X-Dopgate-Backend-Key: <DOPGATE_SERVICE_KEY>`. With a valid key, Dopgate takes the visitor's address from `X-Dopgate-Client-IP` and browser from `X-Dopgate-Client-Agent`, for limits, sessions and the audit log. Without the key both headers are ignored. A wrong key answers `401 AUTHENTICATION_INVALID`, and an address that doesn't parse answers `400 REQUEST_INVALID`. See [Passing on the visitor](/guide/admin-api#passing-on-the-visitor).
+Any request can carry `X-Dopgate-Backend-Key: <DOPGATE_SERVICE_KEY>`. With a valid key, Dopgate takes the visitor's address from `X-Dopgate-Client-IP` and browser from `X-Dopgate-Client-Agent`, for limits, sessions and the audit log. Without the key both headers are ignored. A wrong key answers `401 BACKEND_KEY_INVALID` on any route, and an address that doesn't parse answers `400 REQUEST_INVALID`. See [Passing on the visitor](/guide/admin-api#passing-on-the-visitor).
 
 ### Envelope
 
