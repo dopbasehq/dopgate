@@ -21,6 +21,10 @@ Every endpoint lives under `/api/v1`, except the key set at `/.well-known/jwks.j
 
 A missing header answers `401 AUTHENTICATION_REQUIRED`. A bad header or an unknown token answers `401 AUTHENTICATION_INVALID` or `401 TOKEN_INVALID`. An access token of a disabled account answers `403 ACCOUNT_DISABLED`. An agent's access token gets `403 AUTHORIZATION_DENIED` from every working endpoint; it is meant for your own backend. These apply to every authenticated endpoint and aren't repeated below.
 
+### Calls a backend makes for a visitor
+
+Any request can carry `X-Dopgate-Backend-Key: <DOPGATE_SERVICE_KEY>`. With a valid key, Dopgate takes the visitor's address from `X-Dopgate-Client-IP` and browser from `X-Dopgate-Client-Agent`, for limits, sessions and the audit log. Without the key both headers are ignored. A wrong key answers `401 AUTHENTICATION_INVALID`, and an address that doesn't parse answers `400 REQUEST_INVALID`. See [Passing on the visitor](/guide/admin-api#passing-on-the-visitor).
+
 ### Envelope
 
 Successful answers have `success`, a `message` code, and `data`:

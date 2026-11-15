@@ -77,6 +77,31 @@ It can't:
 
 Audit records written by the service key have the actor type `service` and the label `service`, so you can tell them apart from changes made in the console.
 
+## Passing on the visitor
+
+If your backend calls sign-in, sign-up, refresh, and the other `/api/v1/auth` endpoints for the people using your app, Dopgate sees your backend's address and `User-Agent` on every call. All your users then share one [per-address limit](/guide/rate-limits#the-per-address-limit), and the device list shows your server instead of their browsers.
+
+Add three headers to those calls:
+
+| Header | Value |
+| --- | --- |
+| `X-Dopgate-Backend-Key` | The service key |
+| `X-Dopgate-Client-IP` | The visitor's IP address, with or without a port |
+| `X-Dopgate-Client-Agent` | The visitor's `User-Agent`, cut to 512 characters |
+
+```bash
+curl -X POST https://auth.example.com/api/v1/auth/login \
+  -H "x-dopgate-backend-key: $DOPGATE_SERVICE_KEY" \
+  -H 'x-dopgate-client-ip: 198.51.100.7' \
+  -H 'x-dopgate-client-agent: Mozilla/5.0 (Macintosh) Firefox/140.0' \
+  -H 'content-type: application/json' \
+  -d '{"email":"ana@example.com","password":"correct horse battery"}'
+```
+
+With a valid key, the rate limits, the device list and the audit log record the visitor. The key only vouches for these headers: it doesn't sign the request in as the service, so the call still needs the user's access token where the endpoint asks for one.
+
+Without `X-Dopgate-Backend-Key`, Dopgate ignores the other two headers, so a browser can't pick its own address. A wrong key, or any key on an instance with no `DOPGATE_SERVICE_KEY`, answers `401 AUTHENTICATION_INVALID`. An `X-Dopgate-Client-IP` that isn't an address answers `400 REQUEST_INVALID`. Leaving it out keeps your backend's own address.
+
 ## Endpoints you'll use most
 
 | Call | What it does |
