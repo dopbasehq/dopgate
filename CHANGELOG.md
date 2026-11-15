@@ -26,6 +26,10 @@ with an admin console and Docker images. Nothing below has shipped before.
 - ES256 access tokens with `/.well-known/jwks.json`, key rotation, and
   single-use refresh tokens that end the session when reused. Tokens carry
   `kind` (`human` or `agent`) and no role.
+- `tokens.refreshReuseSeconds`, 10 by default: a spent refresh token sent
+  again within that many seconds gets the session's newest refresh token
+  instead of ending the session, so two tabs or a retried request don't sign
+  anyone out. `0` turns it off. The console has the field under Settings.
 - Sessions: list devices and sign out one or all at `/api/v1/auth/sessions`.
 - Admins are separate from your app's users. Root and admins have `adm_` IDs
   and their own sessions and codes, and sign in to the console only, at
