@@ -63,7 +63,7 @@ A failed sign-in for an email with no account isn't recorded, because there is n
 | --- | --- | --- |
 | `personal_token.created` | The user | `name`, `expiresAt`; the token is the resource |
 | `personal_token.deleted` | The user, or the admin who revoked it | `name`, and `userId` when an admin revoked it |
-| `token.rejected` | `anonymous`, label `token` | `kind` (`personal` or `unknown`) and `lastFour`. A token traded at `/auth/token` matched nothing. |
+| `token.rejected` | `anonymous`, label `token` | `kind` (`personal` or `unknown`), and `lastFour` for `personal` only. A token traded at `/auth/token` matched nothing. A value without the `dgp_` or `dga_` prefix keeps no characters, since it may be a password pasted into the wrong field. |
 
 ### Agents
 
