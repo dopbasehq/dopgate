@@ -54,7 +54,7 @@ function onKeydown(event: KeyboardEvent): void {
 function focusPanel(): void {
   requestAnimationFrame(() => {
     const autofocusTarget = panel.value?.querySelector<HTMLElement>(
-      "[autofocus]:not([disabled])",
+      "[data-autofocus]:not([disabled])",
     );
     (autofocusTarget ?? panel.value)?.focus();
   });

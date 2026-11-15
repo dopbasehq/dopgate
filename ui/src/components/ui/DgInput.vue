@@ -29,6 +29,7 @@ const props = withDefaults(
     /** Shown and selectable, but not editable. */
     readonly?: boolean;
     required?: boolean;
+    /** Takes focus when the modal it sits in opens. */
     autofocus?: boolean;
     min?: number;
     max?: number;
@@ -115,7 +116,7 @@ function toggleReveal(): void {
           :disabled="disabled"
           :readonly="readonly"
           :required="required"
-          :autofocus="autofocus"
+          :data-autofocus="autofocus ? '' : undefined"
           :min="min"
           :max="max"
           :step="step"
