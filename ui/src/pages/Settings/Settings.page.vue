@@ -154,14 +154,23 @@ const card = "rounded-card border border-line bg-panel";
                   label="Allow signing up with an email code, without a password" />
               </template>
 
-              <div v-else-if="section.name === 'password'" class="max-w-xs">
-                <DgInput
-                  v-model="drafts.password.minLength"
-                  label="Minimum length"
-                  type="number"
-                  :min="1"
-                  :error="state.password.fieldErrors.minLength" />
-              </div>
+              <template v-else-if="section.name === 'password'">
+                <div class="max-w-xs">
+                  <DgInput
+                    v-model="drafts.password.minLength"
+                    label="Minimum length"
+                    type="number"
+                    :min="1"
+                    :error="state.password.fieldErrors.minLength" />
+                </div>
+                <DgSwitch
+                  v-model="drafts.password.rejectLeaked"
+                  label="Refuse passwords found in data breaches" />
+                <p class="text-sm text-ink-muted">
+                  Dopgate asks Pwned Passwords with the first five characters of
+                  the password's hash. The password never leaves this server.
+                </p>
+              </template>
 
               <div
                 v-else-if="section.name === 'limits'"
