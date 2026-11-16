@@ -30,6 +30,23 @@ Console access tokens are HS256 JWTs signed with a secret that never leaves Dopg
 
 Refresh tokens rotate on every use. A spent token presented again ends its session, since it means two parties hold the same token.
 
+## Leaked passwords
+
+Attackers try passwords from other sites' breaches first, so Dopgate refuses a new password that is on a list of them. It checks when a user signs up, resets or changes a password, and when an admin creates a user or an admin with one. It doesn't check at sign-in, and it doesn't check the root password set during setup.
+
+The list is [Pwned Passwords](https://haveibeenpwned.com/Passwords). For each new password, Dopgate makes one request from your server:
+
+```text
+GET https://api.pwnedpasswords.com/range/21BD1
+Add-Padding: true
+```
+
+`21BD1` is the first five characters of the password's SHA-1 hash. The answer holds every listed hash that starts with those five, and Dopgate compares the rest on your server. The password and the full hash never leave it, and `Add-Padding` makes every answer a similar size.
+
+- A listed password answers `422 PASSWORD_LEAKED`.
+- If the list can't be reached within 2 seconds, the password is accepted and the server logs a warning. A server without outbound internet access behaves as if the check were off, 2 seconds slower per new password.
+- To turn it off, set `password.rejectLeaked` to `false` in settings, or use the switch under **Settings**, **Password** in the console.
+
 ## Not revealing accounts
 
 - A sign-in for an unknown email checks the password against a dummy hash, so the answer takes about as long as for a real account, and the error is the same as a wrong password.

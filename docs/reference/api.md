@@ -151,7 +151,7 @@ Public. Creates a user and emails a `verify_email` code.
 | `password` | yes | At least the minimum length, at most 1024 bytes |
 | `displayName` | no | One line, up to 255 characters |
 
-Answers `201 SIGNED_UP` with `user`, `verificationRequired`, `verificationSent`, and `tokens`, which is `null` while verification is required. Errors: `403 SIGNUP_DISABLED`, `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PROFILE_INVALID`, `429 RATE_LIMITED`.
+Answers `201 SIGNED_UP` with `user`, `verificationRequired`, `verificationSent`, and `tokens`, which is `null` while verification is required. Errors: `403 SIGNUP_DISABLED`, `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PASSWORD_LEAKED`, `422 PROFILE_INVALID`, `429 RATE_LIMITED`.
 
 ### `POST /api/v1/auth/login`
 
@@ -206,7 +206,7 @@ User. Sets a new password and ends every other session of the account.
 | `code` | when the account has no password | A `password_reset` code from `/auth/password/forgot` |
 | `newPassword` | yes | |
 
-Answers `200 PASSWORD_CHANGED` and emails `password_changed`. Errors: `400 CODE_INVALID` (no password and no code, or a wrong code), `400 CODE_EXPIRED`, `401 AUTHENTICATION_INVALID` (wrong current password, or a locked account), `422 PASSWORD_INVALID`, `429 RATE_LIMITED`. A wrong current password counts toward the per-address limit and the account lockout.
+Answers `200 PASSWORD_CHANGED` and emails `password_changed`. Errors: `400 CODE_INVALID` (no password and no code, or a wrong code), `400 CODE_EXPIRED`, `401 AUTHENTICATION_INVALID` (wrong current password, or a locked account), `422 PASSWORD_INVALID`, `422 PASSWORD_LEAKED`, `429 RATE_LIMITED`. A wrong current password counts toward the per-address limit and the account lockout.
 
 ### `POST /api/v1/auth/email/change`
 
@@ -310,7 +310,7 @@ Public. Sets a new password with the code.
 | `code` | yes |
 | `newPassword` | yes |
 
-Answers `200 PASSWORD_RESET`. Every session ends, the lockout clears, the email counts as verified, and `password_changed` is emailed. Errors: `400 CODE_INVALID`, `400 CODE_EXPIRED`, `403 ACCOUNT_DISABLED`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `429 RATE_LIMITED`.
+Answers `200 PASSWORD_RESET`. Every session ends, the lockout clears, the email counts as verified, and `password_changed` is emailed. Errors: `400 CODE_INVALID`, `400 CODE_EXPIRED`, `403 ACCOUNT_DISABLED`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PASSWORD_LEAKED`, `429 RATE_LIMITED`.
 
 ## Sessions
 
@@ -405,7 +405,7 @@ Creates a user without sending email. Answers `201 USER_CREATED` with the user.
 | `publicMetadata` | no | JSON object up to 1 KB. It travels in the user's access token. |
 | `privateMetadata` | no | JSON object up to 16 KB |
 
-Errors: `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
+Errors: `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PASSWORD_LEAKED`, `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
 
 ### `GET /api/v1/admin/users/{id}`
 
@@ -457,7 +457,7 @@ Admin. Answers `200 SETTINGS_FETCHED` with every section.
 | Section | Fields and defaults |
 | --- | --- |
 | `signup` | `enabled` (`true`), `requireEmailVerification` (`true`), `passwordlessSignup` (`false`) |
-| `password` | `minLength` (`8`, allowed 8 to 128) |
+| `password` | `minLength` (`8`, allowed 8 to 128), `rejectLeaked` (`true`). See [leaked passwords](/reference/security#leaked-passwords). |
 | `tokens` | `accessTokenMinutes` (`15`, 1 to 1440), `refreshTokenIdleDays` (`30`, 1 to 3650), `sessionAbsoluteDays` (`90`, 1 to 3650, not less than the idle limit), `refreshReuseSeconds` (`10`, 0 to 60, 0 turns it off) |
 | `limits` | `codeMinutes` (`10`), `codeMaxAttempts` (`5`), `codeResendSeconds` (`60`), `codesPerHour` (`5`), `lockoutAttempts` (`5`), `lockoutMinutes` (`15`), `ipRequestsPerMinute` (`20`). Ranges in [Rate limits](/guide/rate-limits). |
 | `selfService` | `agents` (`false`), `maxAgentsPerUser` (`10`, 1 to 1000), `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [Agents](/guide/agents) and [Personal tokens](/guide/personal-tokens). |

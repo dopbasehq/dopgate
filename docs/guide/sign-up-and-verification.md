@@ -36,7 +36,7 @@ The answer is `201` with:
 }
 ```
 
-The password must have at least 8 characters, or the minimum length in settings if an admin raised it, and at most 1024 bytes. `displayName` is optional, one line, up to 255 characters.
+The password must have at least 8 characters, or the minimum length in settings if an admin raised it, and at most 1024 bytes. A password known from a data breach answers `422 PASSWORD_LEAKED`, with a message you can show as it is. See [leaked passwords](/reference/security#leaked-passwords). `displayName` is optional, one line, up to 255 characters.
 
 When `requireEmailVerification` is on, `tokens` is `null`. Show a code field and confirm the code to sign the user in. When it is off, `tokens` holds an access token and a refresh token straight away. The code still works later: confirming it marks the email verified and returns a new set of tokens.
 

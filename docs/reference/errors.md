@@ -45,6 +45,7 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | `NOT_FOUND` | 404 | No such user, admin, session, agent, personal token, or email template, or the signed-in account was deleted. |
 | `NOT_IMPLEMENTED` | 501 | A planned endpoint: single sign-on or multi-factor authentication. |
 | `PASSWORD_INVALID` | 422 | The new password is shorter than the minimum length or longer than 1024 bytes. |
+| `PASSWORD_LEAKED` | 422 | The new password is on a list of passwords known from data breaches. The user has to choose another. |
 | `PROFILE_INVALID` | 422 | The display name is longer than 255 characters or has a line break, or the avatar URL isn't an `http(s)` URL of at most 2048 characters. |
 | `RATE_LIMITED` | 429 | Too many requests from this address, too many codes for this email, or too many wrong setup tokens. |
 | `REQUEST_INVALID` | 400, 404, 422, and others | A malformed request: bad JSON, a missing field, an invalid pagination cursor, an incomplete audit anchor, a code purpose the endpoint doesn't take (`422`), a personal token name or expiry out of range (`422`), or an unknown API route (`404`). |
