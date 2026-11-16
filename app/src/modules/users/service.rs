@@ -102,8 +102,7 @@ pub async fn create(
 ) -> Result<AdminUser, HttpError> {
   let email = validate::email(&request.email)?;
   let display_name = validate::display_name(request.display_name)?.flatten();
-  let public_metadata = validate::metadata(
-    "publicMetadata",
+  let public_metadata = validate::public_metadata(
     request
       .public_metadata
       .unwrap_or_else(|| serde_json::json!({})),
@@ -174,7 +173,7 @@ pub async fn update(
     user_metadata: None,
     public_metadata: request
       .public_metadata
-      .map(|value| validate::metadata("publicMetadata", value))
+      .map(validate::public_metadata)
       .transpose()?,
     private_metadata: request
       .private_metadata
