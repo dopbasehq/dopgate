@@ -30,7 +30,9 @@ fn verify_offline(
     DecodingKey::from_ec_components(key["x"].as_str().unwrap(), key["y"].as_str().unwrap())?;
   let mut rules = Validation::new(Algorithm::ES256);
   rules.set_issuer(&[issuer]);
-  rules.validate_aud = false;
+  // The audience is the same URL as the issuer.
+  rules.set_audience(&[issuer]);
+  rules.set_required_spec_claims(&["exp", "iss", "sub", "aud"]);
   Ok(decode::<Value>(token, &decoding, &rules)?.claims)
 }
 
@@ -48,6 +50,9 @@ async fn a_backend_verifies_tokens_with_the_key_set() {
   let claims = verify_offline(&token, &jwks(&app).await, app.state.config.issuer()).unwrap();
   assert!(claims["sub"].as_str().unwrap().starts_with("usr_"));
   assert!(claims["sid"].as_str().unwrap().starts_with("ses_"));
+  assert_eq!(claims["iss"], app.state.config.issuer());
+  assert_eq!(claims["aud"], app.state.config.issuer());
+  assert!(claims["jti"].as_str().unwrap().starts_with("jti_"));
   assert_eq!(claims["kind"], "human");
   assert!(claims.get("role").is_none());
   // Nothing was recorded about this person, so the claim is left out.
@@ -95,6 +100,45 @@ async fn a_token_carries_what_the_backend_recorded() {
   let everything = claims.to_string();
   assert!(!everything.contains("private-marker"), "{everything}");
   assert!(!everything.contains("user-marker"), "{everything}");
+}
+
+#[tokio::test]
+async fn every_token_has_its_own_id() {
+  let app = TestApp::new().await;
+  let first = user_token(&app).await;
+  let second = app.login("ada@example.com", crate::support::PASSWORD).await;
+  let set = jwks(&app).await;
+  let issuer = app.state.config.issuer();
+  let first = verify_offline(&first, &set, issuer).unwrap();
+  let second = verify_offline(&second, &set, issuer).unwrap();
+  assert_ne!(first["jti"], second["jti"]);
+}
+
+#[tokio::test]
+async fn a_token_for_another_audience_is_refused() {
+  let app = TestApp::new().await;
+  let token = user_token(&app).await;
+  let payload = URL_SAFE_NO_PAD
+    .decode(token.split('.').nth(1).unwrap())
+    .unwrap();
+  let mut claims: app::models::AccessClaims = serde_json::from_slice(&payload).unwrap();
+
+  // Signed again with the real key and nothing changed, it still works.
+  let same = app::services::jwt::sign(&app.state, &claims).await.unwrap();
+  let (status, _) = app
+    .request_with(Method::GET, "/api/v1/auth/me", None, Some(&same))
+    .await;
+  assert_eq!(status, StatusCode::OK);
+
+  // The same token made out to someone else does not, here or in a backend.
+  claims.aud = "https://another.example.com".into();
+  let other = app::services::jwt::sign(&app.state, &claims).await.unwrap();
+  let (status, body) = app
+    .request_with(Method::GET, "/api/v1/auth/me", None, Some(&other))
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["TOKEN_INVALID"].is_string());
+  assert!(verify_offline(&other, &jwks(&app).await, app.state.config.issuer()).is_err());
 }
 
 #[tokio::test]

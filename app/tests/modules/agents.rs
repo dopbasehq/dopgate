@@ -97,6 +97,8 @@ async fn a_users_agent_signs_in_with_its_owner_and_capabilities() {
   assert_eq!(claims["owner"], user_id.as_str());
   assert_eq!(claims["capabilities"]["repo"], "dopgate");
   assert_eq!(claims["capabilities"]["labels"], json!(["bot"]));
+  assert_eq!(claims["aud"], app.state.config.issuer());
+  assert!(claims["jti"].as_str().unwrap().starts_with("jti_"));
   // An agent carries its own capabilities, never its owner's metadata.
   for absent in ["email", "sid", "name", "role", "public_metadata"] {
     assert!(claims.get(absent).is_none(), "{absent}");
