@@ -3,7 +3,7 @@
 use axum::http::{Method, StatusCode};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::support::TestApp;
 
@@ -50,8 +50,51 @@ async fn a_backend_verifies_tokens_with_the_key_set() {
   assert!(claims["sid"].as_str().unwrap().starts_with("ses_"));
   assert_eq!(claims["kind"], "human");
   assert!(claims.get("role").is_none());
+  // Nothing was recorded about this person, so the claim is left out.
+  assert!(claims.get("public_metadata").is_none());
   assert_eq!(claims["email_verified"], true);
   assert!(claims["exp"].as_i64().unwrap() > claims["iat"].as_i64().unwrap());
+}
+
+#[tokio::test]
+async fn a_token_carries_what_the_backend_recorded() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  let id = app.create_user(&root, "ada@example.com").await;
+  let (status, body) = app
+    .request_with(
+      Method::PATCH,
+      &format!("/api/v1/admin/users/{id}"),
+      Some(json!({
+        "publicMetadata": { "role": "manager", "plan": "pro" },
+        "privateMetadata": { "note": "private-marker" },
+      })),
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  let session = app.login("ada@example.com", crate::support::PASSWORD).await;
+  let (status, body) = app
+    .request_with(
+      Method::PATCH,
+      "/api/v1/auth/me",
+      Some(json!({ "userMetadata": { "theme": "user-marker" } })),
+      Some(&session),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+
+  let token = app.login("ada@example.com", crate::support::PASSWORD).await;
+  let claims = verify_offline(&token, &jwks(&app).await, app.state.config.issuer()).unwrap();
+  // A backend reads the role without calling Dopgate.
+  assert_eq!(
+    claims["public_metadata"],
+    json!({ "role": "manager", "plan": "pro" })
+  );
+  // What only admins see, and what the user wrote, stay out of the token.
+  let everything = claims.to_string();
+  assert!(!everything.contains("private-marker"), "{everything}");
+  assert!(!everything.contains("user-marker"), "{everything}");
 }
 
 #[tokio::test]

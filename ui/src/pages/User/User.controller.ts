@@ -19,7 +19,12 @@ import {
   userTokensQuery,
 } from "~/queries/admin";
 import { useInvalidate } from "~/queries/invalidate";
-import { formatJson, parseJsonObject } from "~/utils/json";
+import {
+  PUBLIC_METADATA_MAX_BYTES,
+  formatJson,
+  jsonBytes,
+  parseJsonObject,
+} from "~/utils/json";
 
 /** Actions that ask before they run. */
 export type ConfirmKind = "disable" | "delete" | "sign-out-all";
@@ -193,13 +198,19 @@ export function useUserController() {
     const priv = parseJsonObject(privateMetadata.value);
     if (!pub.ok) return "Fix the public metadata first.";
     if (!priv.ok) return "Fix the private metadata first.";
+    // It travels in every access token, so the server refuses more.
+    if (jsonBytes(pub.value) > PUBLIC_METADATA_MAX_BYTES) {
+      return "Public metadata is over 1 KB. Shorten it first.";
+    }
     return null;
   });
 
   function saveMetadata(): Promise<boolean> {
     const pub = parseJsonObject(publicMetadata.value);
     const priv = parseJsonObject(privateMetadata.value);
-    if (!pub.ok || !priv.ok) return Promise.resolve(false);
+    if (!pub.ok || !priv.ok || metadataError.value !== null) {
+      return Promise.resolve(false);
+    }
     return run(
       "metadata",
       async () => {

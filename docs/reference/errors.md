@@ -41,7 +41,7 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | `FEATURE_DISABLED` | 403 | A user tried to make a personal token while `selfService.personalTokens` is off, or to make, edit, or regenerate an agent while `selfService.agents` is off. |
 | `INTERNAL_ERROR` | 500 | Something failed on the server, such as a database error. The log has the details. |
 | `LIMIT_REACHED` | 409 | The user already has `selfService.maxPersonalTokensPerUser` personal tokens, or `selfService.maxAgentsPerUser` agents. |
-| `METADATA_INVALID` | 422 | A metadata value isn't a JSON object, or is larger than 16 KB. |
+| `METADATA_INVALID` | 422 | A metadata value isn't a JSON object, or is too large: 1 KB for `publicMetadata`, 16 KB for the other two. |
 | `NOT_FOUND` | 404 | No such user, admin, session, agent, personal token, or email template, or the signed-in account was deleted. |
 | `NOT_IMPLEMENTED` | 501 | A planned endpoint: single sign-on or multi-factor authentication. |
 | `PASSWORD_INVALID` | 422 | The new password is shorter than the minimum length or longer than 1024 bytes. |

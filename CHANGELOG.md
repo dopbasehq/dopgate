@@ -39,6 +39,12 @@ with an admin console and Docker images. Nothing below has shipped before.
   once.
 - Admin API for users: search, create, update metadata, disable, delete, send
   reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it.
+- `publicMetadata` travels in a person's access token as the
+  `public_metadata` claim, so your backend can read a role or a plan without
+  calling Dopgate. The claim is left out when the object is empty, and a
+  change reaches the token on the next refresh. `publicMetadata` is limited
+  to 1 KB; `userMetadata` and `privateMetadata` keep 16 KB and stay out of
+  the token.
 - Root manages admins at `/api/v1/admin/admins`; admins and the service key
   can read the list.
 - Personal tokens (`dgp_`) let a user sign in as themselves from a script.

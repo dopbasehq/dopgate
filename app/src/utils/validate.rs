@@ -9,7 +9,7 @@ use crate::{
     errors::{
       EMAIL_INVALID, EMAIL_INVALID_MESSAGE, METADATA_INVALID, PASSWORD_INVALID, PROFILE_INVALID,
     },
-    limits::{METADATA_MAX_BYTES, TEXT_MAX_CHARS, URL_MAX_CHARS},
+    limits::{METADATA_MAX_BYTES, PUBLIC_METADATA_MAX_BYTES, TEXT_MAX_CHARS, URL_MAX_CHARS},
   },
   http::HttpError,
   services::password,
@@ -80,16 +80,31 @@ pub fn metadata(
   name: &str,
   value: Value,
 ) -> Result<Value, HttpError> {
+  metadata_within(name, value, METADATA_MAX_BYTES)
+}
+
+/// `publicMetadata`: an object of at most 1 KB, because it travels in every
+/// access token.
+pub fn public_metadata(value: Value) -> Result<Value, HttpError> {
+  metadata_within("publicMetadata", value, PUBLIC_METADATA_MAX_BYTES)
+}
+
+/// A JSON object of at most `max_bytes` when serialized.
+fn metadata_within(
+  name: &str,
+  value: Value,
+  max_bytes: usize,
+) -> Result<Value, HttpError> {
   if !value.is_object() {
     return Err(unprocessable(
       METADATA_INVALID,
       format!("{name} must be a JSON object."),
     ));
   }
-  if value.to_string().len() > METADATA_MAX_BYTES {
+  if value.to_string().len() > max_bytes {
     return Err(unprocessable(
       METADATA_INVALID,
-      format!("{name} must be at most 16 KB."),
+      format!("{name} must be at most {} KB.", max_bytes / 1024),
     ));
   }
   Ok(value)

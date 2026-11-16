@@ -59,7 +59,15 @@ fn claims(access_token: &str) -> Value {
 
 #[tokio::test]
 async fn a_users_agent_signs_in_with_its_owner_and_capabilities() {
-  let (app, _, user_id, user) = app_with_user().await;
+  let (app, root, user_id, user) = app_with_user().await;
+  app
+    .request_with(
+      Method::PATCH,
+      &format!("/api/v1/admin/users/{user_id}"),
+      Some(json!({ "publicMetadata": { "role": "manager" } })),
+      Some(&root),
+    )
+    .await;
   let (status, body) = post(
     &app,
     "/api/v1/auth/agents",
@@ -89,7 +97,8 @@ async fn a_users_agent_signs_in_with_its_owner_and_capabilities() {
   assert_eq!(claims["owner"], user_id.as_str());
   assert_eq!(claims["capabilities"]["repo"], "dopgate");
   assert_eq!(claims["capabilities"]["labels"], json!(["bot"]));
-  for absent in ["email", "sid", "name", "role"] {
+  // An agent carries its own capabilities, never its owner's metadata.
+  for absent in ["email", "sid", "name", "role", "public_metadata"] {
     assert!(claims.get(absent).is_none(), "{absent}");
   }
 

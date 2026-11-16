@@ -136,6 +136,11 @@ pub struct AccessClaims {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   #[schema(value_type = Option<Object>)]
   pub capabilities: Option<serde_json::Value>,
+  /// What the app's backend recorded about a person in `publicMetadata`,
+  /// such as a role or a plan. Left out when it is empty. People only.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  #[schema(value_type = Option<Object>)]
+  pub public_metadata: Option<serde_json::Value>,
 }
 
 /// The claims inside a console access token. These are signed with HS256

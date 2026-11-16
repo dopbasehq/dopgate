@@ -40,6 +40,9 @@ pub const MAX_PENDING_SSO_FLOWS: i64 = 1_000;
 
 /// Largest metadata object accepted, serialized.
 pub const METADATA_MAX_BYTES: usize = 16 * 1024;
+/// Largest `publicMetadata`, serialized. It travels in every access token,
+/// and some backends keep that token in a cookie of at most 4 KB.
+pub const PUBLIC_METADATA_MAX_BYTES: usize = 1024;
 /// Longest display name, avatar URL, and other short text.
 pub const TEXT_MAX_CHARS: usize = 255;
 pub const URL_MAX_CHARS: usize = 2048;

@@ -366,8 +366,8 @@ const card = "rounded-card border border-line bg-panel";
           <header class="border-b border-line-soft px-5 py-3.5">
             <h2 id="metadata-heading" class="text-[15px]">Metadata</h2>
             <p class="mt-0.5 text-sm text-ink-muted">
-              The user can read public metadata but not change it. Only admins
-              see private metadata.
+              The user can read public metadata but not change it, and it goes
+              in their access token. Only admins see private metadata.
             </p>
           </header>
           <form
@@ -378,6 +378,7 @@ const card = "rounded-card border border-line bg-panel";
               <DgJsonEditor
                 v-model="publicMetadata"
                 label="Public metadata"
+                hint="1 KB at most. Don't put secrets here."
                 :readonly="!canManage" />
               <DgJsonEditor
                 v-model="privateMetadata"

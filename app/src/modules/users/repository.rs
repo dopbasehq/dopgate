@@ -38,6 +38,16 @@ impl UserRow {
     self.email_verified_at.is_some()
   }
 
+  /// The `public_metadata` claim for this person's access token: the stored
+  /// object, or nothing when it is empty.
+  pub fn public_claim(&self) -> Option<Value> {
+    self
+      .public_metadata
+      .as_object()
+      .is_some_and(|fields| !fields.is_empty())
+      .then(|| self.public_metadata.clone())
+  }
+
   /// The account as the user sees it.
   pub fn to_user(&self) -> User {
     User {

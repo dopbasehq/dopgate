@@ -261,6 +261,10 @@ async fn bad_input_is_refused_with_a_reason() {
       json!({ "email": "b@example.com", "publicMetadata": "x" }),
       StatusCode::UNPROCESSABLE_ENTITY,
     ),
+    (
+      json!({ "email": "b@example.com", "publicMetadata": { "note": "x".repeat(1024) } }),
+      StatusCode::UNPROCESSABLE_ENTITY,
+    ),
   ] {
     let (status, reply) = app
       .request_with(
@@ -272,4 +276,42 @@ async fn bad_input_is_refused_with_a_reason() {
       .await;
     assert_eq!(status, expected, "{body}: {reply}");
   }
+}
+
+#[tokio::test]
+async fn public_metadata_is_limited_to_1_kb() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  let id = app.create_user(&root, "ada@example.com").await;
+  let path = format!("/api/v1/admin/users/{id}");
+
+  // It travels in every access token, so it has to stay small.
+  let (status, body) = app
+    .request_with(
+      Method::PATCH,
+      &path,
+      Some(json!({ "publicMetadata": { "note": "x".repeat(1024) } })),
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+  assert_eq!(
+    body["error"]["METADATA_INVALID"],
+    "publicMetadata must be at most 1 KB."
+  );
+
+  // Private metadata never leaves Dopgate and keeps the larger limit.
+  let (status, body) = app
+    .request_with(
+      Method::PATCH,
+      &path,
+      Some(json!({
+        "publicMetadata": { "role": "manager" },
+        "privateMetadata": { "note": "x".repeat(2048) },
+      })),
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["publicMetadata"]["role"], "manager");
 }
