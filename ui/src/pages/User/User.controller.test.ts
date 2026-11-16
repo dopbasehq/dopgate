@@ -97,6 +97,23 @@ describe("useUserController", () => {
       expect(adminApi.updateUser).not.toHaveBeenCalled();
     });
 
+    it("won't save public metadata over 1 KB", async () => {
+      const c = await mountAs();
+      // {"note":"..."} is 11 bytes of JSON around the text.
+      c.publicMetadata.value = JSON.stringify({ note: "x".repeat(1013) });
+      expect(c.metadataError.value).toBeNull();
+      c.publicMetadata.value = JSON.stringify({ note: "x".repeat(1014) });
+      expect(c.metadataError.value).toBe(
+        "Public metadata is over 1 KB. Shorten it first.",
+      );
+      expect(await c.saveMetadata()).toBe(false);
+      expect(adminApi.updateUser).not.toHaveBeenCalled();
+      // Private metadata keeps the larger limit.
+      c.publicMetadata.value = "{}";
+      c.privateMetadata.value = JSON.stringify({ note: "x".repeat(2048) });
+      expect(c.metadataError.value).toBeNull();
+    });
+
     it("saves both objects and keeps the server's copy", async () => {
       const saved = {
         ...maya,

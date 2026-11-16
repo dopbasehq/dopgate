@@ -31,3 +31,11 @@ export function parseJsonObject(text: string): JsonParse {
 export function formatJson(value: unknown): string {
   return JSON.stringify(value ?? {}, null, 2);
 }
+
+/** The most public metadata Dopgate accepts, in bytes of compact JSON. */
+export const PUBLIC_METADATA_MAX_BYTES = 1024;
+
+/** The size the server measures: the object as compact JSON, in bytes. */
+export function jsonBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value ?? {})).length;
+}
