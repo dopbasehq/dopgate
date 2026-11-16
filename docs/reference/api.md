@@ -52,7 +52,7 @@ A user, as `/auth/*` endpoints return it:
 | `avatarUrl` | string or null | |
 | `status` | string | `active` or `disabled` |
 | `userMetadata` | object | Written by the user |
-| `publicMetadata` | object | Written by admins and the service key |
+| `publicMetadata` | object | Written by admins and the service key. Also in the access token as `public_metadata`. |
 | `hasPassword` | boolean | False for accounts that sign in with codes only |
 | `lastSignInAt` | string or null | RFC 3339 time |
 | `createdAt`, `updatedAt` | string | RFC 3339 time |
@@ -398,7 +398,7 @@ Creates a user without sending email. Answers `201 USER_CREATED` with the user.
 | `password` | no | Leave out for an account that signs in with codes |
 | `displayName` | no | |
 | `emailVerified` | no | Default `false` |
-| `publicMetadata` | no | JSON object up to 16 KB |
+| `publicMetadata` | no | JSON object up to 1 KB. It travels in the user's access token. |
 | `privateMetadata` | no | JSON object up to 16 KB |
 
 Errors: `409 EMAIL_TAKEN`, `422 EMAIL_INVALID`, `422 PASSWORD_INVALID`, `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
@@ -415,7 +415,8 @@ Updates an account. Fields you leave out stay as they are. Answers `200 USER_UPD
 | --- | --- |
 | `displayName`, `avatarUrl` | Empty string clears |
 | `emailVerified` | `true` or `false` |
-| `publicMetadata`, `privateMetadata` | Replace the whole object |
+| `publicMetadata` | JSON object up to 1 KB. Replaces the whole object. The user's next access token carries it. |
+| `privateMetadata` | JSON object up to 16 KB. Replaces the whole object. |
 
 Errors: `422 PROFILE_INVALID`, `422 METADATA_INVALID`.
 

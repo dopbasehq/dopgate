@@ -53,7 +53,7 @@ export async function setPlan(userId, plan) {
 }
 ```
 
-`publicMetadata` replaces the whole object, so merge with the current value first if it holds other keys.
+`publicMetadata` replaces the whole object, so merge with the current value first if it holds other keys. It holds 1 KB at most, and the user's next access token carries it as the `public_metadata` claim, so your other services can [read the plan from the token](/guide/profile-and-metadata#reading-publicmetadata-from-the-token).
 
 ## What the service key can do
 

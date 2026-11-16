@@ -1,6 +1,6 @@
 ---
 title: "Profile and metadata"
-description: "The profile fields every account has, the three metadata objects and who can read and write each, and how users change their email."
+description: "The profile fields every account has, the three metadata objects and who can read and write each, which one travels in the access token, and how users change their email."
 ---
 
 # Profile and metadata
@@ -12,7 +12,7 @@ Every account has a small profile and three JSON objects for your own data.
 | `displayName` | The user, admins | The user, admins |
 | `avatarUrl` | The user, admins | The user, admins |
 | `userMetadata` | The user | The user, admins |
-| `publicMetadata` | Admins, your backend | The user, admins |
+| `publicMetadata` | Admins, your backend | The user, admins, and anyone who holds the user's access token |
 | `privateMetadata` | Admins, your backend | Admins and your backend only |
 
 "Your backend" means calls made with the [service key](/guide/admin-api).
@@ -21,13 +21,31 @@ Every account has a small profile and three JSON objects for your own data.
 
 Use `userMetadata` for things the user is allowed to change, such as a theme or a language. Anything the user sends through `PATCH /api/v1/auth/me` lands here, so never trust it for decisions.
 
-Use `publicMetadata` for facts your app decides and the user may see, such as `{"plan": "pro"}`. The user reads it in their own account but can't change it.
+Use `publicMetadata` for facts your app decides and the user may see, such as `{"role": "manager"}` or `{"plan": "pro"}`. The user reads it in their own account but can't change it. It also travels in the user's access token, so your backend can read it without calling Dopgate.
 
 Use `privateMetadata` for facts the user should never see, such as a billing customer ID or an internal note. It only appears in admin API responses.
 
-None of the three are in the access token. Your backend reads them with `GET /api/v1/admin/users/{id}`, or your frontend reads `userMetadata` and `publicMetadata` from `GET /api/v1/auth/me`.
+`userMetadata` and `privateMetadata` are never in the access token. Your backend reads them with `GET /api/v1/admin/users/{id}`, and your frontend reads `userMetadata` and `publicMetadata` from `GET /api/v1/auth/me`.
 
-Each object must be a JSON object, at most 16 KB when serialized. A wrong type or a larger object answers `422 METADATA_INVALID`. An update replaces the whole object, so read it, change it, and write all of it back.
+Each must be a JSON object. `publicMetadata` holds at most 1 KB when serialized, because it is sent with every request. The other two hold at most 16 KB. A wrong type or a larger object answers `422 METADATA_INVALID`. An update replaces the whole object, so read it, change it, and write all of it back.
+
+## Reading publicMetadata from the token
+
+A person's access token carries their `publicMetadata` in the `public_metadata` claim. When the object is empty, the claim is left out.
+
+```js
+const { payload } = await jwtVerify(token, jwks, { issuer, algorithms: ["ES256"] });
+if (payload.kind !== "human") throw new Error("Not a person's token");
+const role = payload.public_metadata?.role ?? "customer";
+```
+
+Three things to know before you rely on it:
+
+- The claim is a copy made when the token was issued. A change reaches the token on the next refresh, 15 minutes later at most with the default `accessTokenMinutes`. To take something away at once, also sign the user out with `DELETE /api/v1/admin/users/{id}/sessions`.
+- A token issued before you set the value doesn't have it. After a sign-up, set the metadata and have your app call `POST /api/v1/auth/refresh` once, or create the user through the admin API with `publicMetadata` already filled in.
+- Anyone who holds the token can decode it. Keep secrets in `privateMetadata`.
+
+Tokens traded from a [personal token](/guide/personal-tokens) carry the claim too. An [agent's](/guide/agents) token never does.
 
 ## The user's own profile
 

@@ -26,7 +26,8 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
   "sid": "ses_01JC8Z3V7QK2N4R6T8W0Y2A4C7",
   "kind": "human",
   "email": "ana@example.com",
-  "email_verified": true
+  "email_verified": true,
+  "public_metadata": { "role": "manager" }
 }
 ```
 
@@ -44,8 +45,9 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | `capabilities` | object | An agent's flat key-value capabilities. Agents only. |
 | `email` | string | The account's email, lowercased, when the token was issued. People only. |
 | `email_verified` | boolean | Whether the email was confirmed when the token was issued. People only. |
+| `public_metadata` | object | The account's [`publicMetadata`](/guide/profile-and-metadata) when the token was issued, 1 KB at most. Absent when the object is empty. People only. |
 
-There is no `aud`, `nbf`, or `jti` claim. Profile fields and metadata are not in the token; read them from `GET /api/v1/auth/me` or the admin API.
+There is no `aud`, `nbf`, or `jti` claim. Profile fields, `userMetadata`, and `privateMetadata` are not in the token; read them from `GET /api/v1/auth/me` or the admin API.
 
 ## Checks to run
 
