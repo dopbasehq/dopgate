@@ -142,6 +142,40 @@ async fn a_token_for_another_audience_is_refused() {
 }
 
 #[tokio::test]
+async fn the_discovery_document_points_at_the_key_set() {
+  let app = TestApp::new().await;
+  let reply = app
+    .send(Method::GET, "/.well-known/openid-configuration", &[], "")
+    .await;
+  assert_eq!(reply.status, StatusCode::OK);
+  assert_eq!(reply.headers["cache-control"], "public, max-age=300");
+  let issuer = app.state.config.issuer();
+  assert_eq!(
+    reply.json,
+    json!({
+      "issuer": issuer,
+      "jwks_uri": format!("{issuer}/.well-known/jwks.json"),
+      "response_types_supported": ["id_token"],
+      "subject_types_supported": ["public"],
+      "id_token_signing_alg_values_supported": ["ES256"],
+    }),
+    "five fields and nothing that claims a sign-in page"
+  );
+
+  // A tool that starts from the issuer of a token ends up at the keys that
+  // verify it.
+  let token = user_token(&app).await;
+  let path = reply.json["jwks_uri"]
+    .as_str()
+    .unwrap()
+    .strip_prefix(issuer)
+    .unwrap();
+  let set = app.send(Method::GET, path, &[], "").await.json;
+  let claims = verify_offline(&token, &set, reply.json["issuer"].as_str().unwrap()).unwrap();
+  assert_eq!(claims["iss"], reply.json["issuer"]);
+}
+
+#[tokio::test]
 async fn no_backend_can_verify_a_console_token() {
   let app = TestApp::new().await;
   let console = app.root_token().await;

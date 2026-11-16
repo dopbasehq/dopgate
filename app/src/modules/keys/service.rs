@@ -12,6 +12,18 @@ pub async fn jwks(state: &AppState) -> Jwks {
   }
 }
 
+/// The discovery document for this instance.
+pub fn discovery(state: &AppState) -> Discovery {
+  let issuer = state.config.issuer();
+  Discovery {
+    issuer: issuer.to_owned(),
+    jwks_uri: format!("{issuer}{}", crate::constants::api::keys::JWKS),
+    response_types_supported: vec!["id_token"],
+    subject_types_supported: vec!["public"],
+    id_token_signing_alg_values_supported: vec!["ES256"],
+  }
+}
+
 pub async fn list(state: &AppState) -> Result<Vec<SigningKeyResponse>, HttpError> {
   Ok(repository::list(state.db.pool()).await?)
 }

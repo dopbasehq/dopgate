@@ -30,6 +30,28 @@ pub async fn jwks(State(state): State<AppState>) -> Result<Response, KeysError> 
   Ok(response)
 }
 
+/// Discovery document
+///
+/// Tells a tool that only knows the issuer URL, such as an API gateway,
+/// where the key set is. Dopgate is not an OpenID Connect provider: there
+/// is no authorization endpoint, and the document says nothing else.
+#[utoipa::path(
+  get,
+  path = crate::constants::api::keys::DISCOVERY,
+  tag = "keys",
+  responses(
+    (status = 200, description = "Discovery document", body = Discovery),
+  ),
+)]
+pub async fn discovery(State(state): State<AppState>) -> Response {
+  let mut response = Json(service::discovery(&state)).into_response();
+  response.headers_mut().insert(
+    axum::http::header::CACHE_CONTROL,
+    axum::http::HeaderValue::from_static("public, max-age=300"),
+  );
+  response
+}
+
 /// List signing keys
 #[utoipa::path(
   get,

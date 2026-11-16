@@ -134,6 +134,8 @@ pub mod email_templates {
 
 pub mod keys {
   pub const JWKS: &str = "/.well-known/jwks.json";
+  /// Where tools that only know the issuer URL look for the key set.
+  pub const DISCOVERY: &str = "/.well-known/openid-configuration";
   pub const COLLECTION: &str = api_path!("/admin/keys");
   pub const ROTATE: &str = api_path!("/admin/keys/rotate");
 }
