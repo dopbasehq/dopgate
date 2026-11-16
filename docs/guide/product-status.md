@@ -18,7 +18,7 @@ This page lists what works in Dopgate {{version}}. Planned endpoints are already
 | Password reset and change | `/api/v1/auth/password/forgot`, `/reset`, `/change` |
 | Profile, metadata, and email change | `/api/v1/auth/me`, `/api/v1/auth/email/change` |
 | Sessions | `/api/v1/auth/sessions`, `/api/v1/auth/sessions/{id}` |
-| ES256 access tokens and the key set | `/.well-known/jwks.json`, `/api/v1/admin/keys`, `/api/v1/admin/keys/rotate`, `dopgate keys rotate` |
+| ES256 access tokens, the key set, and the discovery document | `/.well-known/jwks.json`, `/.well-known/openid-configuration`, `/api/v1/admin/keys`, `/api/v1/admin/keys/rotate`, `dopgate keys rotate` |
 | Console sign-in for admins | `/api/v1/console` and everything under it |
 | User management | `/api/v1/admin/users` and everything under it |
 | Admin management | `/api/v1/admin/admins` and everything under it |
@@ -45,4 +45,4 @@ The [roadmap](/about/roadmap) has the order these come in.
 
 ## Not planned
 
-These were in early previews of 0.1.0 and are gone: SQLite storage and the data directory, the master key, registered clients with publishable and secret keys, built-in backup, export, and import commands, Dopgate acting as an OpenID Connect provider, and email links. Use PostgreSQL's own tools for [backups](/self-hosting/backups), the service key for your backend, and 6-digit codes for every email flow.
+These were in early previews of 0.1.0 and are gone: SQLite storage and the data directory, the master key, registered clients with publishable and secret keys, built-in backup, export, and import commands, Dopgate acting as an OpenID Connect provider, and email links. The discovery document at `/.well-known/openid-configuration` only points at the key set; there is still no authorization endpoint. Use PostgreSQL's own tools for [backups](/self-hosting/backups), the service key for your backend, and 6-digit codes for every email flow.

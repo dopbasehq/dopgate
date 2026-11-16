@@ -365,6 +365,10 @@ The console's own sign-in and the signed-in admin's account. These mirror the ac
 
 Public. The JSON Web Key Set: `{ "keys": [...] }` with the active key and any retiring key, which stays for 24 hours after a rotation. Not wrapped in the envelope. Cached for 5 minutes. See [Token claims](/reference/token-claims#the-key-set).
 
+### `GET /.well-known/openid-configuration`
+
+Public. The [discovery document](/reference/token-claims#the-discovery-document): `issuer`, `jwks_uri`, and the three fixed fields the format requires. Not wrapped in the envelope. Cached for 5 minutes.
+
 ### `GET /api/v1/admin/keys`
 
 Admin. Every signing key, with `id`, `algorithm` (`ES256`), `status` (`active`, `retiring`, or `retired`), `createdAt`, `rotatedAt`, and `retiredAt`. Answers `200 SIGNING_KEYS_FETCHED`.

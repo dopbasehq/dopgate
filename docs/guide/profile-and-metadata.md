@@ -34,7 +34,11 @@ Each must be a JSON object. `publicMetadata` holds at most 1 KB when serialized,
 A person's access token carries their `publicMetadata` in the `public_metadata` claim. When the object is empty, the claim is left out.
 
 ```js
-const { payload } = await jwtVerify(token, jwks, { issuer, algorithms: ["ES256"] });
+const { payload } = await jwtVerify(token, jwks, {
+  issuer,
+  audience: issuer,
+  algorithms: ["ES256"],
+});
 if (payload.kind !== "human") throw new Error("Not a person's token");
 const role = payload.public_metadata?.role ?? "customer";
 ```

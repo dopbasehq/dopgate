@@ -132,7 +132,8 @@ import { createRemoteJWKSet, errors, jwtVerify } from "jose";
 
 const issuer = process.env.DOPGATE_PUBLIC_URL;
 const jwks = createRemoteJWKSet(new URL(`${DOPGATE}/.well-known/jwks.json`));
-const check = (token) => jwtVerify(token, jwks, { issuer, algorithms: ["ES256"] });
+const check = (token) =>
+  jwtVerify(token, jwks, { issuer, audience: issuer, algorithms: ["ES256"] });
 
 export async function signedIn(req, res) {
   const tokens = open(req.cookies.session ?? "");

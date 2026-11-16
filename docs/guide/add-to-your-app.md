@@ -130,7 +130,7 @@ Add `"allSessions": true` to sign out of every device.
 
 ## Backend: verify the token
 
-Your backend verifies the access token offline. Fetch the key set from `/.well-known/jwks.json`, cache it, and check the signature (ES256), the issuer (your public URL), and the expiry. In Node with [jose](https://github.com/panva/jose):
+Your backend verifies the access token offline. Fetch the key set from `/.well-known/jwks.json`, cache it, and check the signature (ES256), the issuer and the audience (both your public URL), and the expiry. In Node with [jose](https://github.com/panva/jose):
 
 ```js
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -141,7 +141,11 @@ const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
 export async function currentUserId(authorizationHeader) {
   const token = authorizationHeader?.replace(/^Bearer /i, "");
   if (!token) return null;
-  const { payload } = await jwtVerify(token, jwks, { issuer, algorithms: ["ES256"] });
+  const { payload } = await jwtVerify(token, jwks, {
+    issuer,
+    audience: issuer,
+    algorithms: ["ES256"],
+  });
   return payload.sub; // "usr_01JC8...", the key for your own tables
 }
 ```
