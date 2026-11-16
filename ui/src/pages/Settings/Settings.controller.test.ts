@@ -13,7 +13,7 @@ const settings: Settings = {
     requireEmailVerification: true,
     passwordlessSignup: false,
   },
-  password: { minLength: 10 },
+  password: { minLength: 10, rejectLeaked: true },
   tokens: {
     accessTokenMinutes: 15,
     refreshTokenIdleDays: 30,
@@ -182,6 +182,22 @@ describe("useSettingsController", () => {
     c.drafts.value!.password.minLength = "4";
     await c.save("password");
     expect(c.state.password.error).toBe("Minimum length must be at least 8.");
+  });
+
+  it("saves the leaked password switch with the minimum length", async () => {
+    vi.mocked(adminApi.updateSettings).mockResolvedValue({
+      ...settings,
+      password: { minLength: 10, rejectLeaked: false },
+    });
+    const c = await mount();
+    expect(c.drafts.value!.password.rejectLeaked).toBe(true);
+    c.drafts.value!.password.rejectLeaked = false;
+    expect(c.dirty.value.password).toBe(true);
+    await c.save("password");
+    // The section is saved whole, so the length goes with the switch.
+    expect(adminApi.updateSettings).toHaveBeenCalledWith({
+      password: { minLength: 10, rejectLeaked: false },
+    });
   });
 
   it("puts a section back with Discard", async () => {

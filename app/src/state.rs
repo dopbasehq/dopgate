@@ -5,7 +5,8 @@ use tokio::sync::RwLock;
 use crate::{
   config::ServerConfig,
   services::{
-    db::DbClient, keys::KeyStore, limits::Limits, oidc::OidcCache, rate_limit::RateLimiter,
+    db::DbClient, keys::KeyStore, leaked_passwords::LeakedPasswords, limits::Limits,
+    oidc::OidcCache, rate_limit::RateLimiter,
   },
 };
 
@@ -22,6 +23,8 @@ pub struct AppState {
   /// The keys that sign and verify access tokens.
   pub keys: KeyStore,
   pub oidc: OidcCache,
+  /// Looks new passwords up in a list of passwords known from breaches.
+  pub leaked_passwords: LeakedPasswords,
   pub started_at: std::time::Instant,
 }
 

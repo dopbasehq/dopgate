@@ -117,10 +117,15 @@ interface SelfServiceDraft {
   maxPersonalTokensPerUser: string;
 }
 
+interface PasswordDraft {
+  minLength: string;
+  rejectLeaked: boolean;
+}
+
 interface Drafts {
   signup: Settings["signup"];
   selfService: SelfServiceDraft;
-  password: Strings<Settings["password"]>;
+  password: PasswordDraft;
   limits: Strings<LimitSettings>;
   tokens: Strings<TokenSettings>;
   branding: { appName: string; logoUrl: string };
@@ -166,6 +171,11 @@ function draftOf<S extends SectionName>(
         maxPersonalTokensPerUser: String(rules.maxPersonalTokensPerUser),
       } as Drafts[S];
     }
+    case "password":
+      return {
+        minLength: String(settings.password.minLength),
+        rejectLeaked: settings.password.rejectLeaked,
+      } as Drafts[S];
     case "branding":
       return {
         appName: settings.branding.appName,
@@ -344,7 +354,12 @@ export function useSettingsController() {
         body = { signup: { ...draft.signup } };
         break;
       case "password":
-        body = { password: numbers(draft.password, errors) };
+        body = {
+          password: {
+            ...numbers({ minLength: draft.password.minLength }, errors),
+            rejectLeaked: draft.password.rejectLeaked,
+          },
+        };
         break;
       case "limits":
         body = { limits: numbers(draft.limits, errors) };

@@ -9,6 +9,7 @@
 //!   -p 127.0.0.1:55432:5432 postgres:17-alpine -c max_connections=400
 //! ```
 
+pub mod breaches;
 pub mod smtp;
 
 use std::time::Duration;
@@ -116,6 +117,9 @@ impl TestApp {
   pub async fn with(customize: impl FnOnce(&mut ServerConfig)) -> Self {
     let schema = unique_schema();
     let mut config = config_for(&schema);
+    // No test asks the real leaked password list. One that wants the check
+    // points this at a `FakeBreachList`.
+    config.leaked_passwords_url = None;
     customize(&mut config);
     let state = server::build_state(config).await.unwrap();
     let router = server::router(state.clone());

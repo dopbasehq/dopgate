@@ -73,7 +73,13 @@ pub async fn signup(
   }
   let email = validate::email(&request.email)?;
   let policy = settings::service::password(pool).await?;
-  validate::new_password(&request.password, policy.min_length)?;
+  validate::new_password_checked(
+    state,
+    &request.password,
+    policy.min_length,
+    policy.reject_leaked,
+  )
+  .await?;
   let display_name = validate::display_name(request.display_name)?.flatten();
   let hash = password::hash_async(request.password)
     .await
@@ -456,7 +462,13 @@ pub async fn change_password(
   }
   confirm_password(state, realm, &account, request.current_password).await?;
   let policy = settings::service::password(state.db.pool()).await?;
-  validate::new_password(&request.new_password, policy.min_length)?;
+  validate::new_password_checked(
+    state,
+    &request.new_password,
+    policy.min_length,
+    policy.reject_leaked,
+  )
+  .await?;
   let hash = password::hash_async(request.new_password)
     .await
     .map_err(|error| {

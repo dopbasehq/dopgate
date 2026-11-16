@@ -68,6 +68,13 @@ with an admin console and Docker images. Nothing below has shipped before.
   removes their agents.
 - Six email templates with built-in defaults that admins can edit, preview,
   test, and reset at `/api/v1/admin/email-templates`.
+- New passwords are checked against passwords known from data breaches, the
+  way NIST 800-63B asks. Dopgate sends the first five characters of the
+  password's SHA-1 hash to Pwned Passwords and compares the answer itself, so
+  the password never leaves your server. A listed password answers
+  `422 PASSWORD_LEAKED`. A list that can't be reached never blocks a
+  password. `password.rejectLeaked` turns it off, and the console has the
+  switch under Settings.
 - Limits: per-address and per-email request limits, code resend waits, and
   account lockout after five wrong passwords, all editable in settings.
 - `GET /api/v1/admin/users?email=` finds the one user with that email.

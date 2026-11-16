@@ -52,7 +52,13 @@ pub async fn reset(
   limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
   let policy = settings::service::password(state.db.pool()).await?;
-  validate::new_password(&request.new_password, policy.min_length)?;
+  validate::new_password_checked(
+    state,
+    &request.new_password,
+    policy.min_length,
+    policy.reject_leaked,
+  )
+  .await?;
   let (mut tx, row) =
     verification::consume(state, realm, Purpose::PasswordReset, &email, &request.code).await?;
   let user = match row.account_id.as_deref() {

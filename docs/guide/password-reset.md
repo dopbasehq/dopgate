@@ -43,6 +43,7 @@ The reset does not sign the user in. Send them to your sign-in screen.
 | `400 CODE_EXPIRED` | The code is older than 10 minutes, or the lifetime set under `limits` in settings. |
 | `403 ACCOUNT_DISABLED` | The account was disabled after the code went out. |
 | `422 PASSWORD_INVALID` | The new password is too short or longer than 1024 bytes. |
+| `422 PASSWORD_LEAKED` | The new password is known from a data breach. |
 | `429 RATE_LIMITED` | Too many requests from this address. |
 
 ## Changing a password while signed in

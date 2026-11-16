@@ -114,6 +114,8 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
     RootSetup::SetupToken(token) => Some(token.clone()),
     _ => None,
   };
+  let leaked_passwords =
+    crate::services::leaked_passwords::LeakedPasswords::new(config.leaked_passwords_url.as_deref());
   let state = AppState {
     config: Arc::new(config),
     db,
@@ -122,6 +124,7 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
     limits: Limits::default(),
     keys,
     oidc: Default::default(),
+    leaked_passwords,
     started_at: std::time::Instant::now(),
   };
   Ok((state, root))

@@ -71,7 +71,8 @@ pub async fn create(
   let password_hash = match request.password {
     Some(password) if !password.is_empty() => {
       let policy = settings::service::password(state.db.pool()).await?;
-      validate::new_password(&password, policy.min_length)?;
+      validate::new_password_checked(state, &password, policy.min_length, policy.reject_leaked)
+        .await?;
       Some(password::hash_async(password).await.map_err(|error| {
         tracing::error!(%error, "failed to hash a password");
         HttpError::internal()

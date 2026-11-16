@@ -135,6 +135,8 @@ export interface SignupSettings {
 
 export interface PasswordSettings {
   minLength: number;
+  /** Refuse a new password that is known from a data breach. */
+  rejectLeaked: boolean;
 }
 
 export interface TokenSettings {
