@@ -77,6 +77,11 @@ pub struct ServerConfig {
   /// Records whether the public URL was configured or derived at startup.
   #[serde(skip)]
   pub public_url_source: PublicUrlSource,
+  /// Where the leaked password list is asked. `None` turns the lookup off
+  /// whatever the settings say, which is how the tests run without a
+  /// network.
+  #[serde(skip)]
+  pub leaked_passwords_url: Option<String>,
 }
 
 impl std::fmt::Debug for ServerConfig {
@@ -277,6 +282,7 @@ impl Default for ServerConfig {
       web_ui_enabled: true,
       public_url_source: PublicUrlSource::LoopbackDefault,
       smtp: SmtpServerConfig::default(),
+      leaked_passwords_url: Some(crate::services::leaked_passwords::DEFAULT_URL.into()),
     }
   }
 }

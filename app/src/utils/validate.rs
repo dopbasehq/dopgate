@@ -7,12 +7,14 @@ use serde_json::Value;
 use crate::{
   constants::{
     errors::{
-      EMAIL_INVALID, EMAIL_INVALID_MESSAGE, METADATA_INVALID, PASSWORD_INVALID, PROFILE_INVALID,
+      EMAIL_INVALID, EMAIL_INVALID_MESSAGE, METADATA_INVALID, PASSWORD_INVALID, PASSWORD_LEAKED,
+      PASSWORD_LEAKED_MESSAGE, PROFILE_INVALID,
     },
     limits::{METADATA_MAX_BYTES, PUBLIC_METADATA_MAX_BYTES, TEXT_MAX_CHARS, URL_MAX_CHARS},
   },
   http::HttpError,
   services::password,
+  state::AppState,
   utils::email as email_utils,
 };
 
@@ -35,6 +37,21 @@ pub fn new_password(
 ) -> Result<(), HttpError> {
   password::check_policy_with(raw, min_length as usize)
     .map_err(|violation| unprocessable(PASSWORD_INVALID, violation.0))
+}
+
+/// A new password against the policy, and then, when `reject_leaked` is on,
+/// against the list of passwords known from data breaches.
+pub async fn new_password_checked(
+  state: &AppState,
+  raw: &str,
+  min_length: u32,
+  reject_leaked: bool,
+) -> Result<(), HttpError> {
+  new_password(raw, min_length)?;
+  if reject_leaked && state.leaked_passwords.contains(raw).await {
+    return Err(unprocessable(PASSWORD_LEAKED, PASSWORD_LEAKED_MESSAGE));
+  }
+  Ok(())
 }
 
 /// `Some(None)` clears the name; text is trimmed and kept to one line.

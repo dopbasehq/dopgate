@@ -22,6 +22,7 @@ pub const METADATA_INVALID: &str = "METADATA_INVALID";
 pub const NOT_FOUND: &str = "NOT_FOUND";
 pub const NOT_IMPLEMENTED: &str = "NOT_IMPLEMENTED";
 pub const PASSWORD_INVALID: &str = "PASSWORD_INVALID";
+pub const PASSWORD_LEAKED: &str = "PASSWORD_LEAKED";
 pub const PROFILE_INVALID: &str = "PROFILE_INVALID";
 pub const RATE_LIMITED: &str = "RATE_LIMITED";
 pub const REQUEST_INVALID: &str = "REQUEST_INVALID";
@@ -38,4 +39,6 @@ pub const TOKEN_INVALID: &str = "TOKEN_INVALID";
 pub const TOKEN_NAME_TAKEN: &str = "TOKEN_NAME_TAKEN";
 
 pub const EMAIL_INVALID_MESSAGE: &str = "Enter a valid email address.";
+pub const PASSWORD_LEAKED_MESSAGE: &str =
+  "This password has appeared in a data breach. Choose a different one.";
 pub const NOT_IMPLEMENTED_MESSAGE: &str = "This endpoint is planned but not built yet.";

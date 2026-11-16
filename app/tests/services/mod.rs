@@ -3,6 +3,7 @@ mod authz;
 mod client_ip;
 mod db;
 mod jwt;
+mod leaked_passwords;
 mod limits;
 mod mailer;
 mod migrations;

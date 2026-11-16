@@ -79,12 +79,15 @@ impl Default for SignupSettings {
 #[serde(rename_all = "camelCase", default)]
 pub struct PasswordSettings {
   pub min_length: u32,
+  /// Refuse a new password that is known from a data breach.
+  pub reject_leaked: bool,
 }
 
 impl Default for PasswordSettings {
   fn default() -> Self {
     Self {
       min_length: PASSWORD_MIN_LENGTH as u32,
+      reject_leaked: true,
     }
   }
 }
