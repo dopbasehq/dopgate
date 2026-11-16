@@ -4,9 +4,15 @@ use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(
-  paths(controller::jwks, controller::list, controller::rotate),
+  paths(
+    controller::jwks,
+    controller::discovery,
+    controller::list,
+    controller::rotate
+  ),
   components(schemas(
     Jwks,
+    Discovery,
     SigningKeyResponse,
     ErrorBody,
     HttpResponseFormat<Vec<SigningKeyResponse>>,

@@ -13,6 +13,7 @@ pub fn routes() -> Router<AppState> {
   use crate::constants::api::keys;
   Router::new()
     .route(keys::JWKS, get(controller::jwks))
+    .route(keys::DISCOVERY, get(controller::discovery))
     .route(keys::COLLECTION, get(controller::list))
     .route(keys::ROTATE, post(controller::rotate))
 }

@@ -68,7 +68,10 @@ There is no email, session, or refresh token. When the access token expires, the
 In your backend, check `kind` before anything else. A `human` token has `email`; an `agent` token has `owner` and `capabilities` instead.
 
 ```js
-const { payload } = await jwtVerify(token, jwks, { issuer: DOPGATE_URL });
+const { payload } = await jwtVerify(token, jwks, {
+  issuer: DOPGATE_URL,
+  audience: DOPGATE_URL,
+});
 if (payload.kind === "agent") {
   if (payload.capabilities?.can_merge !== true) throw new Error("This agent can't merge.");
 }

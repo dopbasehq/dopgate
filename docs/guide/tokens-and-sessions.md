@@ -21,6 +21,7 @@ An access token is a JWT signed with ES256. Its header names the signing key in 
 | Claim | Example | Meaning |
 | --- | --- | --- |
 | `iss` | `https://auth.example.com` | Dopgate's public URL, without a trailing slash |
+| `aud` | `https://auth.example.com` | Who the token is for. The same URL as `iss`. |
 | `sub` | `usr_01JC8Z...` | The user ID. Use it as the foreign key in your tables. |
 | `sid` | `ses_01JC8Z...` | The session ID |
 | `email` | `ana@example.com` | The email when the token was issued |
@@ -28,18 +29,21 @@ An access token is a JWT signed with ES256. Its header names the signing key in 
 | `kind` | `human` | `human` for a person who signed in |
 | `public_metadata` | `{"role": "manager"}` | The user's [`publicMetadata`](/guide/profile-and-metadata#reading-publicmetadata-from-the-token) when the token was issued. Left out when it is empty. |
 | `iat`, `exp` | `1762700000` | Issued at and expiry, in Unix seconds |
+| `jti` | `jti_01JC8Z...` | This token's own ID, different for every token |
 
 A token traded from a [personal token](/guide/personal-tokens) carries `via: "pat"` and `tid`, the token's ID, in place of `sid`. An [agent's](/guide/agents) token has `kind: "agent"`, with `owner` and `capabilities` in place of the email claims.
 
-There is no `aud` claim. Admins never get one of these tokens: the console signs them in with tokens that only Dopgate can verify. [Token claims](/reference/token-claims) has the full reference.
+Admins never get one of these tokens: the console signs them in with tokens that only Dopgate can verify. [Token claims](/reference/token-claims) has the full reference.
 
 ## Verifying a token in your backend
 
 Fetch the key set from `{public URL}/.well-known/jwks.json`, cache it, and check:
 
 - the signature, with the key whose `kid` matches the token header, using ES256 only,
-- `iss` equals your `DOPGATE_PUBLIC_URL` without a trailing slash,
+- `iss` and `aud` both equal your `DOPGATE_PUBLIC_URL` without a trailing slash,
 - `exp` is in the future.
+
+A tool that configures itself from the issuer URL, such as an API gateway, finds the key set through `{public URL}/.well-known/openid-configuration`. See [the discovery document](/reference/token-claims#the-discovery-document).
 
 Dopgate serves the key set with `Cache-Control: public, max-age=300`. When a token names a `kid` you haven't seen, fetch the set again: a key was rotated. The libraries below do that for you.
 
@@ -54,6 +58,7 @@ const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
 export async function verify(token) {
   const { payload } = await jwtVerify(token, jwks, {
     issuer,
+    audience: issuer,
     algorithms: ["ES256"],
   });
   return payload; // payload.sub is the user ID
@@ -81,6 +86,7 @@ func NewVerifier(ctx context.Context) (func(string) (string, error), error) {
 		token, err := jwt.Parse(raw, jwks.Keyfunc,
 			jwt.WithValidMethods([]string{"ES256"}),
 			jwt.WithIssuer(issuer),
+			jwt.WithAudience(issuer),
 			jwt.WithExpirationRequired(),
 		)
 		if err != nil {
@@ -105,6 +111,7 @@ def verify(token: str) -> dict:
         key.key,
         algorithms=["ES256"],
         issuer=ISSUER,
+        audience=ISSUER,
         options={"require": ["exp", "iat", "sub"]},
     )
     return claims  # claims["sub"] is the user ID

@@ -6,7 +6,7 @@ use super::model::*;
 use crate::{
   constants::{
     errors::{ACCOUNT_DISABLED, AGENT_DISABLED, TOKEN_EXPIRED, TOKEN_INVALID},
-    tokens::{AGENT_TOKEN_PREFIX, PERSONAL_TOKEN_PREFIX},
+    tokens::{ACCESS_TOKEN_ID_PREFIX, AGENT_TOKEN_PREFIX, PERSONAL_TOKEN_PREFIX},
   },
   http::HttpError,
   models::{AccessClaims, TokenKind},
@@ -103,8 +103,10 @@ async fn personal(
   let claims = AccessClaims {
     iss: state.config.issuer().to_owned(),
     sub: user.id.clone(),
+    aud: state.config.issuer().to_owned(),
     exp: now.timestamp() + expires_in,
     iat: now.timestamp(),
+    jti: token::public_id(ACCESS_TOKEN_ID_PREFIX),
     sid: None,
     kind: TokenKind::Human,
     via: Some("pat".into()),
@@ -146,8 +148,10 @@ async fn agent(
   let claims = AccessClaims {
     iss: state.config.issuer().to_owned(),
     sub: row.id.clone(),
+    aud: state.config.issuer().to_owned(),
     exp: now.timestamp() + expires_in,
     iat: now.timestamp(),
+    jti: token::public_id(ACCESS_TOKEN_ID_PREFIX),
     sid: None,
     kind: TokenKind::Agent,
     via: None,

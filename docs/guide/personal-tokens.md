@@ -69,7 +69,7 @@ curl -X POST https://auth.example.com/api/v1/auth/token \
 { "accessToken": "eyJhbGciOiJFUzI1NiIs...", "tokenType": "Bearer", "expiresIn": 900 }
 ```
 
-The access token is an ordinary ES256 user token, verified against the JWKS like any other. Its claims carry the user's `sub`, `email`, `email_verified`, and `kind: "human"`, plus `via: "pat"` and `tid`, the token's ID, in place of `sid`. There is no refresh token and no session: trade the token again when the access token expires. See [Token claims](/reference/token-claims).
+The access token is an ordinary ES256 user token, verified against the JWKS like any other. Its claims carry the user's `sub`, `email`, `email_verified`, `public_metadata`, and `kind: "human"`, plus `via: "pat"` and `tid`, the token's ID, in place of `sid`. There is no refresh token and no session: trade the token again when the access token expires. See [Token claims](/reference/token-claims).
 
 On Dopgate itself, this access token can read and update the profile at `/api/v1/auth/me`. Changing the password or email, and managing sessions, personal tokens, or agents, all need a password or code sign-in.
 

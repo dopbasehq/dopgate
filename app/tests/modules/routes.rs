@@ -23,6 +23,7 @@ fn public_routes() -> Vec<(&'static str, &'static str, Option<Value>, u16)> {
       401,
     ),
     ("GET", "/.well-known/jwks.json", None, 200),
+    ("GET", "/.well-known/openid-configuration", None, 200),
     ("GET", "/api/v1/auth/methods", None, 200),
     (
       "POST",
@@ -262,7 +263,9 @@ async fn removed_routes_are_gone() {
     "/api/v1/admin/clients",
     "/api/v1/admin/backups",
     "/api/v1/admin/export",
-    "/.well-known/openid-configuration",
+    // Dopgate still isn't an OpenID Connect provider.
+    "/api/v1/oauth/authorize",
+    "/.well-known/oauth-authorization-server",
   ] {
     let reply = app.send(Method::GET, path, &[], "").await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND, "{path}");

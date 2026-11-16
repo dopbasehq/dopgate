@@ -114,7 +114,9 @@ async fn verify_app(
     .ok_or_else(invalid)?;
   let mut rules = Validation::new(Algorithm::ES256);
   rules.set_issuer(&[state.config.issuer()]);
-  rules.validate_aud = false;
+  // A token names this Dopgate as its audience, the same URL as its issuer.
+  rules.set_audience(&[state.config.issuer()]);
+  rules.set_required_spec_claims(&["exp", "iss", "sub", "aud"]);
   rules.leeway = 30;
   let mut claims = decode::<AccessClaims>(token, &key, &rules)
     .map_err(|_| invalid())?

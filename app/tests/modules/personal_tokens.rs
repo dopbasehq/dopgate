@@ -87,6 +87,8 @@ async fn a_personal_token_signs_in_as_its_user() {
   assert_eq!(claims["via"], "pat");
   assert!(claims["tid"].as_str().unwrap().starts_with("pat_"));
   assert!(claims.get("sid").is_none());
+  assert_eq!(claims["aud"], app.state.config.issuer());
+  assert!(claims["jti"].as_str().unwrap().starts_with("jti_"));
   // A script signed in as the person sees what a browser session sees.
   assert_eq!(claims["public_metadata"]["role"], "manager");
 

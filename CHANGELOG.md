@@ -26,6 +26,13 @@ with an admin console and Docker images. Nothing below has shipped before.
 - ES256 access tokens with `/.well-known/jwks.json`, key rotation, and
   single-use refresh tokens that end the session when reused. Tokens carry
   `kind` (`human` or `agent`) and no role.
+- Access tokens carry `aud`, the same public URL as `iss`, and `jti`, an ID
+  of their own. Check `aud` in your backend next to `iss`; some JWT libraries
+  refuse a token with an audience unless you name the one you expect.
+- `GET /.well-known/openid-configuration` returns a discovery document with
+  `issuer` and `jwks_uri`, so an API gateway or a JWT library can find the
+  key set from the issuer URL alone. Dopgate is still not an OpenID Connect
+  provider.
 - `tokens.refreshReuseSeconds`, 10 by default: a spent refresh token sent
   again within that many seconds gets the session's newest refresh token
   instead of ending the session, so two tabs or a retried request don't sign

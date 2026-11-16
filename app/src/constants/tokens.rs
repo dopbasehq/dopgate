@@ -1,3 +1,5 @@
+/// The prefix of an access token's own ID, its `jti` claim.
+pub const ACCESS_TOKEN_ID_PREFIX: &str = "jti_";
 pub const ADMIN_ID_PREFIX: &str = "adm_";
 pub const AGENT_ID_PREFIX: &str = "agt_";
 /// What an agent token starts with.

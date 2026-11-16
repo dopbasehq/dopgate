@@ -21,8 +21,10 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 {
   "iss": "https://auth.example.com",
   "sub": "usr_01JC8Z3V7QK2N4R6T8W0Y2A4C6",
+  "aud": "https://auth.example.com",
   "exp": 1762700900,
   "iat": 1762700000,
+  "jti": "jti_01JC8Z3V7QK2N4R6T8W0Y2A4C8",
   "sid": "ses_01JC8Z3V7QK2N4R6T8W0Y2A4C7",
   "kind": "human",
   "email": "ana@example.com",
@@ -35,8 +37,10 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | --- | --- | --- |
 | `iss` | string | Dopgate's `DOPGATE_PUBLIC_URL` without a trailing slash |
 | `sub` | string | The user ID, `usr_` followed by a ULID, or an agent's `agt_` ID. It never changes for the life of the account. |
+| `aud` | string | Who the token is for: the same URL as `iss`. One Dopgate serves one app, so the public URL names both. |
 | `exp` | number | Expiry, in Unix seconds. `iat` plus `accessTokenMinutes` (15 by default), for a sign-in, a refresh, and a traded personal or agent token alike. |
 | `iat` | number | When the token was issued, in Unix seconds |
+| `jti` | string | The token's own ID, `jti_` followed by a ULID. Every token gets a new one, on a refresh too. Dopgate doesn't store it. |
 | `sid` | string | The session ID, `ses_` followed by a ULID. It matches the `id` in the session list. Absent on a token from a personal token. |
 | `kind` | string | `human` for a person who signed in, `agent` for an [agent](/guide/agents). Check it first. |
 | `via` | string | `pat` when the token came from a [personal token](/guide/personal-tokens). Absent after a password or code sign-in. |
@@ -47,7 +51,7 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | `email_verified` | boolean | Whether the email was confirmed when the token was issued. People only. |
 | `public_metadata` | object | The account's [`publicMetadata`](/guide/profile-and-metadata) when the token was issued, 1 KB at most. Absent when the object is empty. People only. |
 
-There is no `aud`, `nbf`, or `jti` claim. Profile fields, `userMetadata`, and `privateMetadata` are not in the token; read them from `GET /api/v1/auth/me` or the admin API.
+There is no `nbf` or `client_id` claim, and the header's `typ` is `JWT`. Profile fields, `userMetadata`, and `privateMetadata` are not in the token; read them from `GET /api/v1/auth/me` or the admin API.
 
 ## Checks to run
 
@@ -55,6 +59,7 @@ There is no `aud`, `nbf`, or `jti` claim. Profile fields, `userMetadata`, and `p
 | --- | --- |
 | Signature | ES256 only, with the JWKS key whose `kid` matches. Refuse any other `alg`. |
 | Issuer | `iss` equals your public URL without a trailing slash. |
+| Audience | `aud` equals the same URL. Some libraries refuse a token that has an audience unless you name the one you expect. |
 | Expiry | `exp` is in the future. A few seconds of leeway for clock skew is fine. |
 | Subject | `sub` is present. Use it as the user ID, or as the agent ID when `kind` is `agent`. |
 
@@ -81,6 +86,24 @@ Inside Dopgate, a token also has to belong to a session that hasn't ended (or a 
 ```
 
 It is served with `Cache-Control: public, max-age=300`. A rotated-out key stays in the set for 24 hours, the longest an access token can live.
+
+## The discovery document
+
+`GET /.well-known/openid-configuration` tells a tool that only knows the issuer URL where the key set is:
+
+```json
+{
+  "issuer": "https://auth.example.com",
+  "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
+  "response_types_supported": ["id_token"],
+  "subject_types_supported": ["public"],
+  "id_token_signing_alg_values_supported": ["ES256"]
+}
+```
+
+API gateways and some JWT libraries fetch this address to configure themselves, so you give them the issuer and nothing else. It is served with `Cache-Control: public, max-age=300`.
+
+Dopgate is not an OpenID Connect provider. There is no authorization endpoint and no sign-in page to send people to, and the document holds only the five fields the format requires. `response_types_supported` is there because the format asks for it.
 
 ## Console tokens
 

@@ -110,8 +110,14 @@ pub struct AccessClaims {
   /// The user ID (`usr_`), or the agent ID (`agt_`). Use it as the foreign
   /// key in your own tables.
   pub sub: String,
+  /// Who the token is for: the same public URL as `iss`. A backend checks
+  /// it so a token from another Dopgate is never taken for one of its own.
+  pub aud: String,
   pub exp: i64,
   pub iat: i64,
+  /// This token's own ID (`jti_`), different for every token issued. Useful
+  /// in logs, and for refusing one token before it expires.
+  pub jti: String,
   /// The session ID, for a password or code sign-in. Ending the session
   /// stops it refreshing.
   #[serde(default, skip_serializing_if = "Option::is_none")]
