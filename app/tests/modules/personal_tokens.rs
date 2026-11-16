@@ -57,7 +57,15 @@ fn claims(access_token: &str) -> Value {
 
 #[tokio::test]
 async fn a_personal_token_signs_in_as_its_user() {
-  let (app, _, id, user) = app_with_user().await;
+  let (app, root, id, user) = app_with_user().await;
+  app
+    .request_with(
+      Method::PATCH,
+      &format!("/api/v1/admin/users/{id}"),
+      Some(json!({ "publicMetadata": { "role": "manager" } })),
+      Some(&root),
+    )
+    .await;
   let (status, body) = create(&app, &user, json!({ "name": "laptop-cli" })).await;
   assert_eq!(status, StatusCode::CREATED, "{body}");
   let token = body["data"]["token"].as_str().unwrap().to_owned();
@@ -79,6 +87,8 @@ async fn a_personal_token_signs_in_as_its_user() {
   assert_eq!(claims["via"], "pat");
   assert!(claims["tid"].as_str().unwrap().starts_with("pat_"));
   assert!(claims.get("sid").is_none());
+  // A script signed in as the person sees what a browser session sees.
+  assert_eq!(claims["public_metadata"]["role"], "manager");
 
   // It reads the profile but can't make more tokens.
   let (status, me) = app

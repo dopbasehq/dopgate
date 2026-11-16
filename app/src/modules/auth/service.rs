@@ -182,6 +182,7 @@ pub async fn app_tokens(
     email_verified: Some(user.is_verified()),
     owner: None,
     capabilities: None,
+    public_metadata: user.public_claim(),
   };
   Ok(AuthTokens {
     access_token: jwt::sign(state, &claims).await?,

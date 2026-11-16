@@ -113,6 +113,7 @@ async fn personal(
     email_verified: Some(user.is_verified()),
     owner: None,
     capabilities: None,
+    public_metadata: user.public_claim(),
   };
   Ok(TradedToken {
     access_token: jwt::sign(state, &claims).await?,
@@ -155,6 +156,7 @@ async fn agent(
     email_verified: None,
     owner: Some(row.owner_id().to_owned()),
     capabilities: Some(row.capabilities.clone()),
+    public_metadata: None,
   };
   Ok(TradedToken {
     access_token: jwt::sign(state, &claims).await?,

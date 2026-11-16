@@ -3,7 +3,7 @@
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 
-use crate::support::{PASSWORD, TestApp, smtp::FakeSmtp, use_smtp};
+use crate::support::{PASSWORD, ROOT_EMAIL, TestApp, smtp::FakeSmtp, use_smtp};
 
 async fn app_with_mail() -> (TestApp, FakeSmtp) {
   let smtp = FakeSmtp::start().await;
@@ -237,6 +237,76 @@ async fn a_refresh_repeated_within_the_window_gets_the_same_token() {
   );
   assert_eq!(me(&app, &access).await, StatusCode::OK);
   assert_eq!(refresh(&app, &third).await.0, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_metadata_change_reaches_the_token_on_the_next_refresh() {
+  fn claims(access_token: &str) -> Value {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    let payload = access_token.split('.').nth(1).unwrap();
+    serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).unwrap()).unwrap()
+  }
+  async fn refreshed(
+    app: &TestApp,
+    token: &str,
+  ) -> (String, String) {
+    let (status, body) = app
+      .request(
+        Method::POST,
+        "/api/v1/auth/refresh",
+        Some(json!({ "refreshToken": token })),
+      )
+      .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    (
+      body["data"]["accessToken"].as_str().unwrap().to_owned(),
+      body["data"]["refreshToken"].as_str().unwrap().to_owned(),
+    )
+  }
+
+  let app = TestApp::new().await;
+  let (access, first) = signed_in_ada(&app).await;
+  assert!(claims(&access).get("public_metadata").is_none());
+
+  // `signed_in_ada` already set root up, so sign in to the console again.
+  let root = app.console_login(ROOT_EMAIL, PASSWORD).await;
+  let (_, found) = app
+    .request_with(
+      Method::GET,
+      "/api/v1/admin/users?email=ada@example.com",
+      None,
+      Some(&root),
+    )
+    .await;
+  let path = format!(
+    "/api/v1/admin/users/{}",
+    found["data"]["items"][0]["id"].as_str().unwrap()
+  );
+  let (status, body) = app
+    .request_with(
+      Method::PATCH,
+      &path,
+      Some(json!({ "publicMetadata": { "role": "manager" } })),
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+
+  // The token already handed out is a snapshot. The next one has the role.
+  let (access, second) = refreshed(&app, &first).await;
+  assert_eq!(claims(&access)["public_metadata"]["role"], "manager");
+
+  // Emptying the object takes the claim out again.
+  app
+    .request_with(
+      Method::PATCH,
+      &path,
+      Some(json!({ "publicMetadata": {} })),
+      Some(&root),
+    )
+    .await;
+  let (access, _) = refreshed(&app, &second).await;
+  assert!(claims(&access).get("public_metadata").is_none());
 }
 
 #[tokio::test]
