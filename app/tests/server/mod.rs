@@ -67,10 +67,18 @@ async fn pages_are_not_served_while_the_web_ui_is_off() {
 #[tokio::test]
 async fn missing_assets_are_404_not_the_page() {
   let app = TestApp::new().await;
-  let reply = app
-    .send(Method::GET, "/assets/missing-file.js", &[], "")
-    .await;
-  assert_eq!(reply.status, StatusCode::NOT_FOUND);
+  // Names with more than one dot are assets too, by their last extension.
+  for path in [
+    "/assets/missing-file.js",
+    "/assets/missing-file.js.map",
+    "/assets/vendor.min.js",
+  ] {
+    let reply = app.send(Method::GET, path, &[], "").await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND, "{path}");
+  }
+  // A page address with a dot in it is still a page.
+  let page = app.send(Method::GET, "/users/usr_1.2", &[], "").await;
+  assert_eq!(page.status, StatusCode::OK);
 }
 
 #[tokio::test]

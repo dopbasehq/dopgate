@@ -46,8 +46,9 @@ fn looks_like_asset(path: &str) -> bool {
     "js", "mjs", "css", "map", "woff", "woff2", "ttf", "otf", "svg", "png", "jpg", "ico",
   ];
   let name = path.rsplit('/').next().unwrap_or(path);
+  // The last dot, so `app.js.map` and `vendor.min.js` count too.
   name
-    .split_once('.')
+    .rsplit_once('.')
     .is_some_and(|(_, ext)| ASSET_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
 }
 
