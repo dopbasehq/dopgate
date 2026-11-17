@@ -37,7 +37,7 @@ export const LIMIT_FIELDS: NumberField<keyof LimitSettings>[] = [
   {
     key: "codeResendSeconds",
     label: "Resend wait (seconds)",
-    hint: "Time before another code can be sent.",
+    hint: "Time before another code can be sent. 0 turns the wait off.",
   },
   { key: "codesPerHour", label: "Codes per hour", hint: "Per email address." },
   {
@@ -200,7 +200,10 @@ function draftOf<S extends SectionName>(
 }
 
 /** Settings where 0 is a real value: it turns the feature off. */
-const ZERO_ALLOWED = new Set<string>(["refreshReuseSeconds"]);
+export const ZERO_ALLOWED = new Set<string>([
+  "refreshReuseSeconds",
+  "codeResendSeconds",
+]);
 
 /**
  * Reads whole numbers of at least 1, or 0 where that turns a feature off;

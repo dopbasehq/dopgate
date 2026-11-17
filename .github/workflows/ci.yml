@@ -3,7 +3,10 @@ name: CI
 # Every pull request runs the checks for the areas it changed, whatever its
 # base, so a pull request stacked on a feature branch is checked too. A push
 # to main or a release branch runs the Rust job only, so new pull requests
-# have a Cargo cache to start from. There are no e2e suites yet.
+# have a Cargo cache to start from. A pull request into main or a release
+# branch also runs the e2e suites once those checks pass. A pull request
+# stacked on another branch runs them when it is retargeted at the release
+# branch.
 on:
   pull_request:
   push:
@@ -34,6 +37,8 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       docs: ${{ steps.filter.outputs.docs }}
       repo: ${{ steps.filter.outputs.repo }}
+      e2e_types: ${{ steps.filter.outputs.e2e_types }}
+      suites: ${{ steps.filter.outputs.suites }}
     steps:
       # A pull request run checks out the merge commit. Its first parent is
       # the base branch, so two commits are enough to list what changed.
@@ -47,10 +52,11 @@ jobs:
         id: filter
         env:
           EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         shell: bash
         run: |
           set -euo pipefail
-          app=false ui=false docs=false repo=false
+          app=false ui=false docs=false repo=false e2e_types=false suites=false
 
           case "$EVENT_NAME" in
             pull_request)
@@ -65,12 +71,16 @@ jobs:
               ui=$(hit "^ui/|$shared")
               docs=$(hit "^docs/|$shared")
               repo=$(hit '^(\.github|scripts)/')
+              e2e_types=$(hit "^e2e/|$shared")
+              if [[ "$BASE_REF" == main || "$BASE_REF" == release/* ]]; then
+                suites=true
+              fi
               ;;
             push)
               app=true
               ;;
             *)
-              app=true ui=true docs=true repo=true
+              app=true ui=true docs=true repo=true e2e_types=true suites=true
               ;;
           esac
 
@@ -79,6 +89,8 @@ jobs:
             echo "ui=$ui"
             echo "docs=$docs"
             echo "repo=$repo"
+            echo "e2e_types=$e2e_types"
+            echo "suites=$suites"
           } | tee -a "$GITHUB_OUTPUT"
 
   repo:
@@ -271,11 +283,123 @@ jobs:
       - name: Build
         run: bun run build:docs
 
+  e2e_types:
+    name: E2E typecheck
+    needs: changes
+    if: needs.changes.outputs.e2e_types == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        working-directory: e2e
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck the e2e suites
+        run: bun run typecheck:e2e
+
+  # Format, lint, typecheck and unit tests ran in the jobs above on this same
+  # commit, so this job only builds the release binary and runs the suites.
+  # A job is skipped when one it needs was skipped, hence the explicit
+  # condition: run unless a check failed or the run was cancelled.
+  e2e:
+    name: E2E suites
+    needs: [changes, repo, ui, app, e2e_types]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && needs.changes.outputs.suites == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The same container as `bun run test:db`. Each spec file's server
+      # keeps its tables in its own schema there.
+      - name: Start PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name dopgate-test-pg \
+            --env POSTGRES_HOST_AUTH_METHOD=trust \
+            --publish 127.0.0.1:55432:5432 \
+            postgres:17-alpine -c max_connections=400
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install "${RUST_VERSION}" --profile minimal
+          rustup default "${RUST_VERSION}"
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: app -> target
+          key: e2e
+          cache-workspace-crates: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-${{ hashFiles('ui/bun.lock', 'e2e/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ env.BUN_VERSION }}-
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile --ignore-scripts --cwd ui
+          bun install --frozen-lockfile --ignore-scripts --cwd e2e
+          bun run --cwd e2e install:browsers --with-deps
+
+      - name: Wait for PostgreSQL
+        shell: bash
+        run: |
+          for _ in $(seq 1 30); do
+            if docker exec dopgate-test-pg pg_isready --username postgres >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs dopgate-test-pg
+          exit 1
+
+      # Builds the console and the release binary, then runs every suite.
+      - name: Run e2e suites
+        env:
+          GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
+          GIT_COMMIT: ${{ github.sha }}
+        run: bun run test:e2e --agent
+
+      # The HTML report plus traces, screenshots and videos of failed tests.
+      - name: Upload e2e report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-report
+          path: .e2e/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
   # One result for the whole run. It always runs, so a branch rule can require
   # it even when the jobs above were skipped for an unchanged area.
   passed:
     name: CI passed
-    needs: [changes, repo, ui, app, docs]
+    needs: [changes, repo, ui, app, docs, e2e_types, e2e]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

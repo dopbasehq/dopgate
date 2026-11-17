@@ -7,6 +7,9 @@ app/target
 # Local data for `bun run dev`
 .dev-data
 
+# End-to-end test output
+.e2e/
+
 # Docs build output
 docs/.vitepress/cache
 docs/.vitepress/dist

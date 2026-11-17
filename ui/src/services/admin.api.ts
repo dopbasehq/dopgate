@@ -70,8 +70,10 @@ export function fetchUser(
 }
 
 export interface UserChanges {
-  displayName?: string | null;
-  avatarUrl?: string | null;
+  /** An empty string clears it. */
+  displayName?: string;
+  /** An empty string clears it. */
+  avatarUrl?: string;
   emailVerified?: boolean;
   publicMetadata?: Metadata;
   privateMetadata?: Metadata;

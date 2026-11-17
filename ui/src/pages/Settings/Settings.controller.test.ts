@@ -127,6 +127,22 @@ describe("useSettingsController", () => {
     );
   });
 
+  it("lets the resend wait be 0, and no other limit", async () => {
+    vi.mocked(adminApi.updateSettings).mockResolvedValue(settings);
+    const c = await mount();
+    c.drafts.value!.limits.codeResendSeconds = "0";
+    expect(await c.save("limits")).toBe(true);
+    expect(adminApi.updateSettings).toHaveBeenCalledWith({
+      limits: { ...settings.limits, codeResendSeconds: 0 },
+    });
+
+    c.drafts.value!.limits.codesPerHour = "0";
+    expect(await c.save("limits")).toBe(false);
+    expect(c.state.limits.fieldErrors).toEqual({
+      codesPerHour: "Enter a whole number of at least 1.",
+    });
+  });
+
   it("saves the self-service switches and limits as numbers", async () => {
     vi.mocked(adminApi.updateSettings).mockResolvedValue(settings);
     const c = await mount();

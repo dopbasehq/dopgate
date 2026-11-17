@@ -180,9 +180,10 @@ export function useUserController() {
     return run(
       "profile",
       async () => {
-        const name = displayName.value.trim();
+        // An empty string clears the name. The server reads null as "leave
+        // it as it is".
         const next = await updateUser(id.value, {
-          displayName: name === "" ? null : name,
+          displayName: displayName.value.trim(),
         });
         displayName.value = next.displayName ?? "";
         await changed(next);

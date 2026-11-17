@@ -46,6 +46,7 @@ Add-Padding: true
 - A listed password answers `422 PASSWORD_LEAKED`.
 - If the list can't be reached within 2 seconds, the password is accepted and the server logs a warning. A server without outbound internet access behaves as if the check were off, 2 seconds slower per new password.
 - To turn it off, set `password.rejectLeaked` to `false` in settings, or use the switch under **Settings**, **Password** in the console.
+- To ask a copy of the list on your own network instead, set `DOPGATE_LEAKED_PASSWORDS_URL` to its address. Dopgate then sends the same `GET /range/<prefix>` request there.
 
 ## Not revealing accounts
 

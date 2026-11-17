@@ -16,6 +16,7 @@ import {
   LIMIT_FIELDS,
   SECURITY_OPTIONS,
   TOKEN_FIELDS,
+  ZERO_ALLOWED,
   useSettingsController,
   type SectionName,
 } from "./Settings.controller";
@@ -191,7 +192,7 @@ const card = "rounded-card border border-line bg-panel";
                   :label="field.label"
                   :hint="field.hint"
                   type="number"
-                  :min="1"
+                  :min="ZERO_ALLOWED.has(field.key) ? 0 : 1"
                   :error="state.limits.fieldErrors[field.key]" />
               </div>
 
@@ -205,7 +206,7 @@ const card = "rounded-card border border-line bg-panel";
                   :label="field.label"
                   :hint="field.hint"
                   type="number"
-                  :min="1"
+                  :min="ZERO_ALLOWED.has(field.key) ? 0 : 1"
                   :error="state.tokens.fieldErrors[field.key]" />
               </div>
 
