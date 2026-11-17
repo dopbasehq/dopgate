@@ -12,8 +12,8 @@ use url::{Host, Url};
 use crate::constants::config::{
   DEFAULT_AUDIT_RETENTION_DAYS, DEFAULT_DATABASE_SCHEMA, DEFAULT_PORT, DEFAULT_SMTP_FROM_EMAIL,
   ENV_ALLOWED_ORIGINS, ENV_AUDIT_RETENTION_DAYS, ENV_CONFIG, ENV_DATABASE_MAX_CONNECTIONS,
-  ENV_DATABASE_SCHEMA, ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_PORT, ENV_PUBLIC_URL,
-  ENV_ROOT_EMAIL, ENV_SERVICE_KEY, ENV_SHUTDOWN_GRACE_SECONDS, ENV_SMTP_FROM_EMAIL,
+  ENV_DATABASE_SCHEMA, ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_LEAKED_PASSWORDS_URL, ENV_PORT,
+  ENV_PUBLIC_URL, ENV_ROOT_EMAIL, ENV_SERVICE_KEY, ENV_SHUTDOWN_GRACE_SECONDS, ENV_SMTP_FROM_EMAIL,
   ENV_SMTP_FROM_NAME, ENV_SMTP_HOST, ENV_SMTP_PASSWORD, ENV_SMTP_PORT, ENV_SMTP_SECURITY,
   ENV_SMTP_USERNAME, ENV_TRUSTED_PROXIES, ENV_WEB_UI, SERVER_HOST_PLACEHOLDER,
   SERVICE_KEY_MIN_LENGTH,
@@ -77,8 +77,9 @@ pub struct ServerConfig {
   /// Records whether the public URL was configured or derived at startup.
   #[serde(skip)]
   pub public_url_source: PublicUrlSource,
-  /// Where the leaked password list is asked. `None` turns the lookup off
-  /// whatever the settings say, which is how the tests run without a
+  /// Where the leaked password list is asked: Pwned Passwords, or the
+  /// mirror named by `DOPGATE_LEAKED_PASSWORDS_URL`. `None` turns the lookup
+  /// off whatever the settings say, which is how the tests run without a
   /// network.
   #[serde(skip)]
   pub leaked_passwords_url: Option<String>,
@@ -231,6 +232,7 @@ pub struct EnvironmentOverrides {
   pub smtp_password: Option<String>,
   pub smtp_from_email: Option<String>,
   pub smtp_from_name: Option<String>,
+  pub leaked_passwords_url: Option<String>,
 }
 
 impl EnvironmentOverrides {
@@ -258,6 +260,7 @@ impl EnvironmentOverrides {
       smtp_password: env::var(ENV_SMTP_PASSWORD).ok(),
       smtp_from_email: env::var(ENV_SMTP_FROM_EMAIL).ok(),
       smtp_from_name: env::var(ENV_SMTP_FROM_NAME).ok(),
+      leaked_passwords_url: env::var(ENV_LEAKED_PASSWORDS_URL).ok(),
     }
   }
 }
@@ -486,6 +489,15 @@ impl ServerConfig {
     }
     if let Some(value) = environment.smtp_from_name {
       smtp.from_name = Some(value);
+    }
+    // Empty counts as unset, like the other optional addresses.
+    if let Some(value) = environment
+      .leaked_passwords_url
+      .filter(|value| !value.trim().is_empty())
+    {
+      let url = Url::parse(value.trim()).context("invalid DOPGATE_LEAKED_PASSWORDS_URL")?;
+      validate_endpoint_transport(&url).context("invalid DOPGATE_LEAKED_PASSWORDS_URL")?;
+      self.leaked_passwords_url = Some(value.trim().to_owned());
     }
     Ok(())
   }

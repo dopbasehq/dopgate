@@ -187,6 +187,32 @@ fn service_key_origins_schema_and_root_email_are_read_and_checked() {
   assert_eq!(config.audit_retention_days, None);
 }
 
+/// The leaked password list is Pwned Passwords unless the environment
+/// names a mirror. An empty value changes nothing.
+#[test]
+fn the_leaked_password_list_can_be_a_mirror() {
+  let default = load(EnvironmentOverrides::default()).unwrap();
+  assert_eq!(
+    default.leaked_passwords_url.as_deref(),
+    Some("https://api.pwnedpasswords.com")
+  );
+  let mirror = load(EnvironmentOverrides {
+    leaked_passwords_url: Some(" http://10.0.0.5:8080 ".into()),
+    ..Default::default()
+  })
+  .unwrap();
+  assert_eq!(
+    mirror.leaked_passwords_url.as_deref(),
+    Some("http://10.0.0.5:8080")
+  );
+  let empty = load(EnvironmentOverrides {
+    leaked_passwords_url: Some(String::new()),
+    ..Default::default()
+  })
+  .unwrap();
+  assert_eq!(empty.leaked_passwords_url, default.leaked_passwords_url);
+}
+
 #[test]
 fn invalid_values_are_refused() {
   let refused = |environment: EnvironmentOverrides| assert!(load(environment).is_err());
@@ -196,6 +222,14 @@ fn invalid_values_are_refused() {
   });
   refused(EnvironmentOverrides {
     public_url: Some("ftp://auth.example.com".into()),
+    ..Default::default()
+  });
+  refused(EnvironmentOverrides {
+    leaked_passwords_url: Some("ftp://mirror.example.com".into()),
+    ..Default::default()
+  });
+  refused(EnvironmentOverrides {
+    leaked_passwords_url: Some("not a url".into()),
     ..Default::default()
   });
   refused(EnvironmentOverrides {
