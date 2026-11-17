@@ -302,7 +302,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: e2e
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Typecheck the e2e suites
         run: bun run typecheck:e2e
@@ -362,7 +362,7 @@ jobs:
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile --ignore-scripts --cwd ui
-          bun install --frozen-lockfile --cwd e2e
+          bun install --frozen-lockfile --ignore-scripts --cwd e2e
           bun run --cwd e2e install:browsers --with-deps
 
       - name: Wait for PostgreSQL
