@@ -6,3 +6,5 @@ docs
 .dev-data
 .git
 .env
+e2e
+.e2e
