@@ -74,7 +74,8 @@ with an admin console and Docker images. Nothing below has shipped before.
   the password never leaves your server. A listed password answers
   `422 PASSWORD_LEAKED`. A list that can't be reached never blocks a
   password. `password.rejectLeaked` turns it off, and the console has the
-  switch under Settings.
+  switch under Settings. `DOPGATE_LEAKED_PASSWORDS_URL` points the check at a
+  mirror of the list.
 - Limits: per-address and per-email request limits, code resend waits, and
   account lockout after five wrong passwords, all editable in settings.
 - `GET /api/v1/admin/users?email=` finds the one user with that email.
