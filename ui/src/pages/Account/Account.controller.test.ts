@@ -39,6 +39,17 @@ describe("useAccountController", () => {
     expect(authApi.updateMe).toHaveBeenCalledWith({ displayName: "Ada L" });
     expect(useAuthStore().admin?.displayName).toBe("Ada L");
     expect(c.profileSaved.value).toBe(true);
+
+    // Emptying the field clears the name: the server only clears on "".
+    vi.mocked(authApi.updateMe).mockResolvedValue({
+      ...admin,
+      displayName: null,
+    });
+    c.displayName.value = "  ";
+    await c.saveProfile();
+    expect(authApi.updateMe).toHaveBeenLastCalledWith({ displayName: "" });
+    expect(useAuthStore().admin?.displayName).toBeNull();
+    expect(c.displayName.value).toBe("");
   });
 
   describe("password", () => {

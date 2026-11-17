@@ -48,8 +48,9 @@ export function useAccountController() {
     profileError.value = null;
     profileSaved.value = false;
     try {
-      const name = displayName.value.trim();
-      const next = await updateMe({ displayName: name === "" ? null : name });
+      // An empty string clears the name. The server reads null as "leave it
+      // as it is".
+      const next = await updateMe({ displayName: displayName.value.trim() });
       displayName.value = next.displayName ?? "";
       auth.setAdmin(next);
       profileSaved.value = true;

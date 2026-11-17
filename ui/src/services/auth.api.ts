@@ -91,8 +91,10 @@ export function fetchMe(signal?: AbortSignal): Promise<Admin> {
 }
 
 export function updateMe(body: {
-  displayName?: string | null;
-  avatarUrl?: string | null;
+  /** An empty string clears it. */
+  displayName?: string;
+  /** An empty string clears it. */
+  avatarUrl?: string;
 }): Promise<Admin> {
   return api("/console/me", { method: "PATCH", body });
 }

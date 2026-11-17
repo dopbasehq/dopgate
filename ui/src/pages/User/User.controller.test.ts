@@ -84,6 +84,18 @@ describe("useUserController", () => {
     });
     expect(c.user.value?.displayName).toBe("Maya B");
     expect(c.notice.value).toBe("Profile saved.");
+
+    // Emptying the field clears the name: the server only clears on "".
+    vi.mocked(adminApi.updateUser).mockResolvedValue({
+      ...maya,
+      displayName: null,
+    });
+    c.displayName.value = "";
+    await c.saveProfile();
+    expect(adminApi.updateUser).toHaveBeenLastCalledWith(maya.id, {
+      displayName: "",
+    });
+    expect(c.user.value?.displayName).toBeNull();
   });
 
   describe("metadata", () => {
