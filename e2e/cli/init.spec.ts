@@ -309,7 +309,7 @@ test(
   {
     tag: ["@setup"],
     annotation: about(
-      "A missing database URL, one that isn't PostgreSQL, a bad schema name and a database that refuses the login each exit 1 with a CLI_ERROR under --json. The password in the URL is never printed.",
+      "A missing database URL, one that isn't PostgreSQL, a bad schema name and a login the database refuses each exit 1 with a CLI_ERROR under --json. The password in the URL is never printed.",
     ),
   },
   async () => {
@@ -350,9 +350,13 @@ test(
         expect(refused.stderr).toContain('database schema "Bad-Schema" must use lowercase letters');
       });
     });
-    await step("A wrong database password, which stays out of the message", async () => {
+    await step("A login the database refuses, whose password stays out of the message", async () => {
       await withSchema(async (_schema, env) => {
+        // A role that doesn't exist is refused whether the test database
+        // asks for passwords or trusts every connection, as the one in CI
+        // does. A wrong password alone would get in there.
         const url = new URL(env.DOPGATE_DATABASE_URL!);
+        url.username = "e2e_no_such_login";
         url.password = "wrong-secret-pw";
         const refused = await app
           .cli(["--json", "init", "--email", "ok@example.com"], {

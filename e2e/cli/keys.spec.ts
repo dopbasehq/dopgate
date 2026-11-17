@@ -233,9 +233,12 @@ test(
       change(url);
       return url.toString();
     };
-    await step("A wrong password", async () => {
+    await step("A login the database refuses", async () => {
+      // A role that doesn't exist is refused whether the test database asks
+      // for passwords or trusts every connection, as the one in CI does.
+      const noSuchLogin = withPassword((url) => (url.username = "e2e_no_such_login"));
       const refused = await app
-        .cliRaw(["--json", "keys", "rotate", "--database-url", withPassword(() => {})], {
+        .cliRaw(["--json", "keys", "rotate", "--database-url", noSuchLogin], {
           env: { DOPGATE_DATABASE_SCHEMA: app.server.schema, RUST_LOG: "off" },
         })
         .fails(1);
