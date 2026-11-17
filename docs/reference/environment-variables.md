@@ -70,5 +70,7 @@ Booleans take `true` or `false`.
 | `POSTGRES_PASSWORD`, `POSTGRES_PORT` | `docker-compose.yml` | Password and published port of the bundled PostgreSQL |
 | `DOPGATE_HOST_PORT` | `docker-compose.yml` | Host port that Dopgate's 8850 is published on. Default `8850`. |
 | `DOPGATE_TEST_DATABASE_URL` | `bun run test:app` | PostgreSQL for the backend tests. Default `postgres://postgres@localhost:55432/postgres`, the container `bun run test:db` starts. |
+| `DOPGATE_E2E_DATABASE_URL` | `bun run test:e2e` | PostgreSQL for the end-to-end suites. Default: `DOPGATE_TEST_DATABASE_URL`, or the container `bun run test:db` starts. |
+| `DOPGATE_BIN` | `bun run test:e2e` | A Dopgate binary to test instead of building `app/target/release/dopgate` |
 | `DOPGATE_API_URL` | the console's Vite dev server | Where `/api` is proxied during development. Default `http://localhost:8850`. |
 | `DOPGATE_DOCS_URL` | `bun run build:docs` | Published address of this site, for canonical links and the sitemap |

@@ -53,6 +53,16 @@ bun run test
 
 Both containers have no password. They trust every connection and publish their port on 127.0.0.1 only, so nothing outside your machine can reach them. A container made by an older `dev:db` or `test:db` still asks for its old password. Remove it with `docker rm -f dopgate-dev-pg dopgate-test-pg` and run the command again.
 
+The end-to-end suites run the release binary through its CLI, its API, and the console in Chromium. They use the same test database:
+
+```bash
+bun install --cwd e2e
+bun run --cwd e2e install:browsers   # once
+bun run test:e2e
+```
+
+[`e2e/README.md`](e2e/README.md) covers running one suite, the report, and writing a spec.
+
 If you ran a 0.1.0 preview, delete the old `.dev-data` folder. It held SQLite files that nothing reads anymore.
 
 ## Scripts
@@ -73,10 +83,16 @@ If you ran a 0.1.0 preview, delete the old `.dev-data` folder. It held SQLite fi
 | `bun run test` | Console tests, then backend tests |
 | `bun run test:ui` | Console tests (Vitest) |
 | `bun run test:app` | Backend tests (`cargo test`) |
+| `bun run test:e2e` | Every end-to-end suite, the coverage check, and the HTML report |
+| `bun run test:e2e:cli`, `:api`, `:ui`, `:journeys` | One end-to-end suite |
+| `bun run test:e2e:sandbox` | Start a server with sample accounts to click through by hand |
+| `bun run test:e2e:help` | Every test script, flag, and tag |
+| `bun run clean:test` | Delete test output, leftover test servers, and their schemas |
 | `bun run lint` | ESLint for the console, Clippy for the backend |
 | `bun run lint:ui` | ESLint for the console |
 | `bun run lint:app` | Clippy with warnings as errors |
 | `bun run typecheck:ui` | `vue-tsc` for the console |
+| `bun run typecheck:e2e` | `tsc` for the end-to-end suites |
 | `bun run format:app` | `rustfmt` |
 | `bun run format:app:check` | Check formatting without changing files |
 | `bun run clean` | Remove build output of the backend, the console, and the docs |
@@ -88,8 +104,9 @@ If you ran a 0.1.0 preview, delete the old `.dev-data` folder. It held SQLite fi
 | --- | --- |
 | `app/` | The Rust backend: the `dopgate` binary, its migrations, and tests |
 | `ui/` | The admin console (Vue 3, Vite, Tailwind), embedded into the binary at build time |
+| `e2e/` | End-to-end suites that run the release binary: CLI, API, console, and journeys |
 | `docs/` | The VitePress documentation site |
-| `scripts/` | `dev.ts`, which starts the API, console, and docs together |
+| `scripts/` | `dev.ts`, which starts the API, console, and docs together, `clean-test.ts`, and the release scripts |
 | `public/` | The logo and favicon the docs use |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | The image and the smallest PostgreSQL plus Dopgate stack |
 
