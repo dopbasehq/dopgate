@@ -45,7 +45,9 @@ with an admin console and Docker images. Nothing below has shipped before.
   admin and a user. Rotating keys retires the console key on every server at
   once.
 - Admin API for users: search, create, update metadata, disable, delete, send
-  reset codes, and sign out. Admins and `DOPGATE_SERVICE_KEY` can use it.
+  reset codes, and sign out of every device or of one
+  (`DELETE /api/v1/admin/users/{id}/sessions/{sessionId}`). Admins and
+  `DOPGATE_SERVICE_KEY` can use it.
 - `publicMetadata` travels in a person's access token as the
   `public_metadata` claim, so your backend can read a role or a plan without
   calling Dopgate. The claim is left out when the object is empty, and a
@@ -100,7 +102,11 @@ with an admin console and Docker images. Nothing below has shipped before.
   365 days by default) and a verify endpoint.
 - The admin console at `/`: users, agents, admins, email templates,
   settings, signing keys, audit log, and your account. Admins sign in to it at
-  `/api/v1/console`; your app's users can't.
+  `/api/v1/console`; your app's users can't. Every page works on a phone and
+  a tablet: lists become cards below 640px, and Settings has a list of its
+  sections that marks the ones with unsaved edits. An audit event opens in a
+  drawer with its UTC time, metadata and place in the hash chain, and user and
+  agent pages link to what they did in the audit log.
 - The Dopgate brand: the Hash D logo, Gate Red, and the Geist wordmark across
   the console, docs, README, and favicons.
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.

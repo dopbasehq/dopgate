@@ -114,6 +114,7 @@ Without `X-Dopgate-Backend-Key`, Dopgate ignores the other two headers, so a bro
 | `PATCH /api/v1/admin/users/{id}` | Change the profile, metadata, or `emailVerified` |
 | `POST /api/v1/admin/users/{id}/disable` | Refuse sign-in and end every session |
 | `DELETE /api/v1/admin/users/{id}/sessions` | Sign the user out everywhere |
+| `DELETE /api/v1/admin/users/{id}/sessions/{sessionId}` | Sign the user out of one device |
 | `DELETE /api/v1/admin/users/{id}` | Delete the account |
 
 The [REST API reference](/reference/api#users) has every field and answer.
