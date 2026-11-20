@@ -266,3 +266,32 @@ pub async fn revoke_sessions(
   service::revoke_sessions(&state, &actor, &id).await?;
   Ok(HttpResponse::done("SESSIONS_REVOKED"))
 }
+
+/// Sign a user out of one device
+///
+/// End one session of the account. Its refresh token stops working at once,
+/// and Dopgate refuses its access token. Backends that verify offline accept
+/// that token until it expires.
+#[utoipa::path(
+  delete,
+  path = crate::constants::api::users::SESSION,
+  tag = "users",
+  security(("bearerAuth" = [])),
+  params(
+    ("id" = String, Path, description = "User ID with the usr_ prefix"),
+    ("session_id" = String, Path, description = "Session ID with the ses_ prefix"),
+  ),
+  responses(
+    (status = 200, description = "Session ended", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 403, description = "Only admins and the service key", body = crate::http::ErrorBody),
+    (status = 404, description = "No such user, or no such session on this user", body = crate::http::ErrorBody),
+  ),
+)]
+pub async fn revoke_session(
+  State(state): State<AppState>,
+  AdminIdentity(actor): AdminIdentity,
+  Path((id, session_id)): Path<(String, String)>,
+) -> Result<HttpResponse<serde_json::Value>, UsersError> {
+  service::revoke_session(&state, &actor, &id, &session_id).await?;
+  Ok(HttpResponse::done("SESSION_REVOKED"))
+}

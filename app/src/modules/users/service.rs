@@ -309,3 +309,31 @@ pub async fn revoke_sessions(
   tx.commit().await?;
   Ok(())
 }
+
+/// End one session of a user. A session that belongs to someone else, or
+/// has already ended, is not found.
+pub async fn revoke_session(
+  state: &AppState,
+  actor: &AuthIdentity,
+  id: &str,
+  session_id: &str,
+) -> Result<(), HttpError> {
+  find(state, id).await?;
+  let mut tx = state.db.pool().begin().await?;
+  if !sessions::service::revoke_one(&mut tx, Realm::App, id, session_id, "revoked_by_admin").await?
+  {
+    return Err(HttpError::not_found(
+      NOT_FOUND,
+      "This user has no such session.",
+    ));
+  }
+  audit::service::record(
+    &mut tx,
+    audit::service::Event::by(actor, "user.session_revoked")
+      .resource("user", Some(id))
+      .metadata(serde_json::json!({ "sessionId": session_id })),
+  )
+  .await?;
+  tx.commit().await?;
+  Ok(())
+}

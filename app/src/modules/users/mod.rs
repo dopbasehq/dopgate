@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use axum::{
   Router,
-  routing::{get, post},
+  routing::{delete, get, post},
 };
 
 pub mod controller;
@@ -28,6 +28,7 @@ pub fn routes() -> Router<AppState> {
       users::SESSIONS,
       get(controller::sessions).delete(controller::revoke_sessions),
     )
+    .route(users::SESSION, delete(controller::revoke_session))
     .route(users::DISABLE, post(controller::disable))
     .route(users::ENABLE, post(controller::enable))
     .route(users::PASSWORD_RESET, post(controller::password_reset))

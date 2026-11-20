@@ -113,6 +113,7 @@ pub mod users {
   pub const COLLECTION: &str = api_path!("/admin/users");
   pub const ITEM: &str = api_path!("/admin/users/{id}");
   pub const SESSIONS: &str = api_path!("/admin/users/{id}/sessions");
+  pub const SESSION: &str = api_path!("/admin/users/{id}/sessions/{session_id}");
   pub const DISABLE: &str = api_path!("/admin/users/{id}/disable");
   pub const ENABLE: &str = api_path!("/admin/users/{id}/enable");
   pub const PASSWORD_RESET: &str = api_path!("/admin/users/{id}/password-reset");

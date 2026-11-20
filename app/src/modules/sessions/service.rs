@@ -315,6 +315,17 @@ pub async fn revoke_all(
   Ok(repository::revoke_all(tx, realm, account_id, keep, reason).await?)
 }
 
+/// End one live session of an account. Returns whether one was ended.
+pub async fn revoke_one(
+  tx: &mut PgConnection,
+  realm: Realm,
+  account_id: &str,
+  session_id: &str,
+  reason: &str,
+) -> Result<bool, HttpError> {
+  Ok(repository::revoke(tx, realm, session_id, account_id, reason).await?)
+}
+
 /// End the session of a signed-in account.
 pub async fn revoke_current(
   tx: &mut PgConnection,

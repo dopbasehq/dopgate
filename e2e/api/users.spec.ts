@@ -377,6 +377,7 @@ test(
         ["POST", `/admin/users/${unknown}/password-reset`],
         ["GET", `/admin/users/${unknown}/sessions`],
         ["DELETE", `/admin/users/${unknown}/sessions`],
+        ["DELETE", `/admin/users/${unknown}/sessions/ses_00000000000000000000000000`],
       ];
       for (const [method, path, body] of calls) {
         const result = await app.service.send(method, path, body);
@@ -882,6 +883,55 @@ test(
 );
 
 test(
+  "an admin signs a user out of one device",
+  {
+    tag: ["@users", "@auth"],
+    annotation: about(
+      "DELETE /admin/users/{id}/sessions/{sessionId} ends that one session. The user's other session keeps working, the audit log records user.session_revoked, and a session that isn't theirs or has already ended is 404.",
+    ),
+  },
+  async () => {
+    const user = await app.user("onedevice");
+    const other = await app.userSession(user.email, PASSWORD, "kept");
+    const sid = claims(user.tokens!.accessToken).sid;
+    const revoked = await step("DELETE /admin/users/{id}/sessions/{sessionId}", () =>
+      app.service.delete(`/admin/users/${user.id}/sessions/${sid}`),
+    );
+    await step("It answers 200 SESSION_REVOKED", async () => {
+      expect(revoked.status).toBe(200);
+      expect(revoked.message).toBe("SESSION_REVOKED");
+    });
+    await step("That session's tokens are refused and the other one still works", async () => {
+      const me = await user.api.get("/auth/me");
+      expect(me.status).toBe(401);
+      expect(me.code).toBe("TOKEN_INVALID");
+      expect((await other.api.get("/auth/me")).status).toBe(200);
+      const left = await app.service.get(`/admin/users/${user.id}/sessions`);
+      expect(left.data.map((s: any) => s.id)).toEqual([claims(other.tokens.accessToken).sid]);
+    });
+    await step("The audit log records user.session_revoked with the session", async () => {
+      const event = (await eventsOf(app.service, "user.session_revoked")).find(
+        (e) => e.resourceId === user.id,
+      );
+      expect(event.metadata.sessionId).toBe(sid);
+    });
+    await step("The same session again is 404 NOT_FOUND", async () => {
+      const again = await app.service.delete(`/admin/users/${user.id}/sessions/${sid}`);
+      expect(again.status).toBe(404);
+      expect(again.code).toBe("NOT_FOUND");
+    });
+    await step("Another user's session is 404 and stays signed in", async () => {
+      const stranger = await app.user("stranger");
+      const theirs = claims(stranger.tokens!.accessToken).sid;
+      const result = await app.service.delete(`/admin/users/${user.id}/sessions/${theirs}`);
+      expect(result.status).toBe(404);
+      expect(result.code).toBe("NOT_FOUND");
+      expect((await stranger.api.get("/auth/me")).status).toBe(200);
+    });
+  },
+);
+
+test(
   "only admins and the service key may use the users routes",
   {
     tag: ["@users", "@security"],
@@ -903,6 +953,7 @@ test(
       ["POST", `/admin/users/${target.id}/password-reset`],
       ["GET", `/admin/users/${target.id}/sessions`],
       ["DELETE", `/admin/users/${target.id}/sessions`],
+      ["DELETE", `/admin/users/${target.id}/sessions/${claims(target.tokens!.accessToken).sid}`],
     ];
     await step("With no token each route answers 401 AUTHENTICATION_REQUIRED", async () => {
       for (const [method, path, body] of routes) {

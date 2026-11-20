@@ -246,6 +246,91 @@ async fn admins_see_and_end_a_users_sessions() {
 }
 
 #[tokio::test]
+async fn admins_end_one_session_of_a_user() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  let id = app.create_user(&root, "ada@example.com").await;
+  let first = app.login("ada@example.com", PASSWORD).await;
+  let second = app.login("ada@example.com", PASSWORD).await;
+  let path = format!("/api/v1/admin/users/{id}/sessions");
+  let (_, body) = app
+    .request_with(Method::GET, &path, None, Some(&root))
+    .await;
+  let ended = body["data"][0]["id"].as_str().unwrap().to_owned();
+  let one = format!("{path}/{ended}");
+  let (status, body) = app
+    .request_with(Method::DELETE, &one, None, Some(&root))
+    .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["message"], "SESSION_REVOKED");
+  let (_, body) = app
+    .request_with(Method::GET, &path, None, Some(&root))
+    .await;
+  let left = body["data"].as_array().unwrap();
+  assert_eq!(left.len(), 1);
+  assert_ne!(left[0]["id"], ended.as_str());
+  let mut refused = 0;
+  for token in [&first, &second] {
+    let (status, _) = app
+      .request_with(Method::GET, "/api/v1/auth/me", None, Some(token))
+      .await;
+    if status == StatusCode::UNAUTHORIZED {
+      refused += 1;
+    }
+  }
+  assert_eq!(refused, 1);
+  let (_, events) = app
+    .request_with(
+      Method::GET,
+      "/api/v1/admin/audit-events?action=user.session_revoked",
+      None,
+      Some(&root),
+    )
+    .await;
+  assert_eq!(events["data"]["items"][0]["resourceId"], id.as_str());
+  assert_eq!(
+    events["data"]["items"][0]["metadata"]["sessionId"],
+    ended.as_str()
+  );
+  let (status, _) = app
+    .request_with(Method::DELETE, &one, None, Some(&root))
+    .await;
+  assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn a_session_of_another_user_is_not_found() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  let ada = app.create_user(&root, "ada@example.com").await;
+  let bob = app.create_user(&root, "bob@example.com").await;
+  let session = app.login("bob@example.com", PASSWORD).await;
+  let (_, body) = app
+    .request_with(
+      Method::GET,
+      &format!("/api/v1/admin/users/{bob}/sessions"),
+      None,
+      Some(&root),
+    )
+    .await;
+  let theirs = body["data"][0]["id"].as_str().unwrap().to_owned();
+  let (status, body) = app
+    .request_with(
+      Method::DELETE,
+      &format!("/api/v1/admin/users/{ada}/sessions/{theirs}"),
+      None,
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::NOT_FOUND);
+  assert!(body["error"]["NOT_FOUND"].is_string());
+  let (status, _) = app
+    .request_with(Method::GET, "/api/v1/auth/me", None, Some(&session))
+    .await;
+  assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
 async fn bad_input_is_refused_with_a_reason() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
