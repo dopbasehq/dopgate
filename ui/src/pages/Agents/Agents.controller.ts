@@ -175,6 +175,11 @@ export function useAgentsController() {
     }
   }
 
+  /** Opens an agent's page, for a click anywhere on its row. */
+  function open(row: AgentRow): Promise<unknown> {
+    return router.push({ name: "agent", params: { id: row.agent.id } });
+  }
+
   /** After the token is copied, open the new agent. */
   async function closeCreated(): Promise<void> {
     const id = created.value?.id;
@@ -193,6 +198,7 @@ export function useAgentsController() {
     loadingMore,
     reload: () => feed.refetch(),
     loadMore,
+    open,
     createOpen,
     draft,
     createErrors,

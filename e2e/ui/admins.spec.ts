@@ -9,9 +9,16 @@ const dialog = (page: Page) => page.getByRole("dialog", { name: "Add admin" });
 const rowOf = (page: Page, email: string) =>
   page.getByTestId("admin-row").filter({ hasText: email });
 
-/** Opens one row's Actions menu and picks an item. */
+/** The ⋯ menu button on one admin's row. */
+const actionsOf = (page: Page, email: string) =>
+  rowOf(page, email).getByRole("button", { name: `Actions for ${email}` });
+/** Any row's ⋯ menu button. */
+const anyActions = (page: Page) =>
+  page.getByRole("button", { name: /^Actions for / });
+
+/** Opens one row's ⋯ menu and picks an item. */
 async function pickAction(page: Page, email: string, item: string) {
-  await rowOf(page, email).getByTestId("admin-actions").click();
+  await actionsOf(page, email).click();
   await page.getByRole("menuitem", { name: item }).click();
 }
 
@@ -38,14 +45,14 @@ test(
       await expect(first).toContainText("Active");
     });
     await step("Root's row has no Actions menu", async () => {
-      await expect(rowOf(page, ROOT_EMAIL).getByTestId("admin-actions")).toHaveCount(0);
+      await expect(actionsOf(page, ROOT_EMAIL)).toHaveCount(0);
     });
     await step("Another admin shows name, role and an Actions menu", async () => {
       const row = rowOf(page, sam.email);
       await expect(row).toContainText("Sam Rivers");
       await expect(row).toContainText("Admin");
       await expect(row).not.toContainText("you");
-      await expect(row.getByTestId("admin-actions")).toBeVisible();
+      await expect(actionsOf(page, sam.email)).toBeVisible();
     });
     await step("The server protects root too", async () => {
       const root = await app.root();
@@ -119,7 +126,6 @@ test(
       ).toBeVisible();
       await dialog(page).getByRole("button", { name: "Add admin" }).click();
       await expect(rowOf(page, email)).toBeVisible();
-      await expect(rowOf(page, email)).toContainText("None");
     });
     const anonymous = await app.anonymousApi();
     await step("A password sign-in fails", async () => {
@@ -328,7 +334,7 @@ test(
     });
     await step("There is no Add admin button and no Actions menu", async () => {
       await expect(page.getByTestId("new-admin")).toHaveCount(0);
-      await expect(page.getByTestId("admin-actions")).toHaveCount(0);
+      await expect(anyActions(page)).toHaveCount(0);
       await expect(rowOf(page, sam.email)).toContainText("you");
     });
     await step("The server refuses Sam's calls", async () => {

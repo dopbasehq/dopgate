@@ -12,10 +12,15 @@ import {
   DgModal,
   DgSearchField,
   DgSkeleton,
+  DgStatus,
   DgTextarea,
 } from "~/components/ui";
-import { PlusIcon } from "~/assets/icons";
-import { STATUS_FILTERS, useAgentsController } from "./Agents.controller";
+import { ChevronRightIcon, PlusIcon } from "~/assets/icons";
+import {
+  STATUS_FILTERS,
+  useAgentsController,
+  type AgentRow,
+} from "./Agents.controller";
 
 const {
   search,
@@ -28,6 +33,7 @@ const {
   loadingMore,
   reload,
   loadMore,
+  open,
   createOpen,
   draft,
   createErrors,
@@ -40,6 +46,18 @@ const {
   submitCreate,
   closeCreated,
 } = useAgentsController();
+
+const off = (row: AgentRow) => row.agent.status !== "active";
+
+/**
+ * A click anywhere on a row opens the agent. The name is a real link, so
+ * keyboard users, middle clicks and "open in new tab" go through it.
+ */
+function onRowClick(event: MouseEvent, row: AgentRow): void {
+  if ((event.target as Element).closest("a, button")) return;
+  if (window.getSelection()?.toString()) return;
+  void open(row);
+}
 </script>
 
 <template>
@@ -86,17 +104,25 @@ const {
 
       <template v-else>
         <div class="overflow-x-auto rounded-card border border-line bg-panel">
+          <!-- Table from 640px; Last used shows from 1024px. -->
           <table
-            class="min-w-full text-left text-sm"
+            class="hidden min-w-full text-left text-sm sm:table"
             data-testid="agents-table">
             <thead>
               <tr class="border-b border-line-soft bg-raised/50">
-                <th class="h-11 px-4 font-medium text-ink-muted">Name</th>
-                <th class="h-11 px-4 font-medium text-ink-muted">Owner</th>
+                <th class="h-11 w-[35%] px-4 font-medium text-ink-muted">
+                  Name
+                </th>
+                <th class="h-11 w-[35%] px-4 font-medium text-ink-muted">
+                  Owner
+                </th>
                 <th class="h-11 px-4 font-medium text-ink-muted">Status</th>
                 <th
-                  class="h-11 whitespace-nowrap px-4 font-medium text-ink-muted">
+                  class="hidden h-11 whitespace-nowrap px-4 font-medium text-ink-muted lg:table-cell">
                   Last used
+                </th>
+                <th class="h-11 w-10 px-2">
+                  <span class="sr-only">Open</span>
                 </th>
               </tr>
             </thead>
@@ -104,43 +130,82 @@ const {
               <tr
                 v-for="row in rows"
                 :key="row.agent.id"
-                class="border-b border-line-soft last:border-b-0 hover:bg-raised/40"
-                data-testid="agent-row">
+                class="cursor-pointer border-b border-line-soft last:border-b-0 hover:bg-raised/40"
+                data-testid="agent-row"
+                @click="onRowClick($event, row)">
                 <td class="h-[52px] px-4">
                   <RouterLink
                     :to="{ name: 'agent', params: { id: row.agent.id } }"
-                    class="font-mono text-ink-strong hover:underline">
+                    class="font-mono hover:underline"
+                    :class="off(row) ? 'text-ink-faint' : 'text-ink-strong'">
                     {{ row.agent.name }}
                   </RouterLink>
                 </td>
-                <td class="px-4">
-                  <div class="flex min-w-0 items-center gap-2">
+                <td class="max-w-0 px-4">
+                  <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate font-mono text-ink">{{
                       row.agent.owner.email
                     }}</span>
-                    <DgBadge
-                      :tone="
-                        row.agent.owner.kind === 'admin' ? 'accent' : 'neutral'
-                      ">
-                      {{ row.agent.owner.kind === "admin" ? "Admin" : "User" }}
-                    </DgBadge>
-                    <span v-if="row.yours" class="text-xs text-ink-faint"
-                      >you</span
+                    <span class="shrink-0 whitespace-nowrap text-ink-faint"
+                      >{{ row.agent.owner.kind
+                      }}<template v-if="row.yours"> · you</template></span
                     >
-                  </div>
+                  </span>
                 </td>
-                <td class="px-4">
-                  <DgBadge
-                    :tone="row.agent.status === 'active' ? 'ok' : 'crit'">
-                    {{ row.agent.status === "active" ? "On" : "Turned off" }}
-                  </DgBadge>
+                <td class="whitespace-nowrap px-4">
+                  <DgBadge v-if="off(row)" tone="crit">Turned off</DgBadge>
+                  <DgStatus v-else>On</DgStatus>
                 </td>
-                <td class="whitespace-nowrap px-4 text-ink-muted">
+                <td
+                  class="hidden whitespace-nowrap px-4 text-ink-muted lg:table-cell">
                   {{ row.lastUsed }}
+                </td>
+                <td class="px-2 text-ink-muted">
+                  <ChevronRightIcon
+                    class="ml-auto h-4 w-4"
+                    aria-hidden="true" />
                 </td>
               </tr>
             </tbody>
           </table>
+
+          <!-- Cards below 640px -->
+          <ul class="divide-y divide-line-soft sm:hidden">
+            <li
+              v-for="row in rows"
+              :key="row.agent.id"
+              data-testid="agent-card">
+              <RouterLink
+                :to="{ name: 'agent', params: { id: row.agent.id } }"
+                class="flex items-center gap-3 px-4 py-3 hover:bg-raised/40">
+                <span class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                  <span
+                    class="font-mono [overflow-wrap:anywhere]"
+                    :class="off(row) ? 'text-ink-faint' : 'text-ink-strong'">
+                    {{ row.agent.name }}
+                  </span>
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="truncate font-mono text-ink">{{
+                      row.agent.owner.email
+                    }}</span>
+                    <span class="shrink-0 whitespace-nowrap text-ink-faint"
+                      >{{ row.agent.owner.kind
+                      }}<template v-if="row.yours"> · you</template></span
+                    >
+                  </span>
+                  <span class="mt-0.5 flex flex-wrap items-center gap-3">
+                    <DgBadge v-if="off(row)" tone="crit">Turned off</DgBadge>
+                    <DgStatus v-else>On</DgStatus>
+                    <span class="text-ink-muted">{{ row.lastUsed }}</span>
+                  </span>
+                </span>
+                <ChevronRightIcon
+                  class="h-4 w-4 shrink-0 text-ink-muted"
+                  aria-hidden="true" />
+              </RouterLink>
+            </li>
+          </ul>
+
           <p
             v-if="rows.length === 0"
             class="px-4 py-8 text-center text-sm text-ink-muted">

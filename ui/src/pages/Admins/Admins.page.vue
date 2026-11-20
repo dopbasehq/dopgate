@@ -2,19 +2,20 @@
 import { computed } from "vue";
 import { DashboardLayout } from "~/layouts";
 import PageHeader from "~/components/app/PageHeader.vue";
+import PersonCell from "~/components/app/PersonCell.vue";
 import {
   DgAlert,
   DgBadge,
   DgButton,
   DgConfirmDialog,
   DgInput,
-  DgMenu,
-  DgMenuItem,
   DgModal,
   DgSkeleton,
+  DgStatus,
 } from "~/components/ui";
-import { LockIcon, PlusIcon, TrashIcon } from "~/assets/icons";
-import { useAdminsController } from "./Admins.controller";
+import { PlusIcon } from "~/assets/icons";
+import AdminActions from "./AdminActions.vue";
+import { useAdminsController, type AdminRow } from "./Admins.controller";
 
 const {
   rows,
@@ -38,6 +39,8 @@ const {
   confirmAction,
   enable,
 } = useAdminsController();
+
+const off = (row: AdminRow) => row.admin.status !== "active";
 
 const confirmCopy = computed(() => {
   const pending = confirm.value;
@@ -96,18 +99,20 @@ const confirmCopy = computed(() => {
       <div
         v-else
         class="overflow-x-auto rounded-card border border-line bg-panel">
-        <table class="min-w-full text-left text-sm" data-testid="admins-table">
+        <!-- Table from 640px; Last sign-in shows from 1024px. -->
+        <table
+          class="hidden min-w-full text-left text-sm sm:table"
+          data-testid="admins-table">
           <thead>
             <tr class="border-b border-line-soft bg-raised/50">
-              <th class="h-11 px-4 font-medium text-ink-muted">Email</th>
-              <th class="h-11 px-4 font-medium text-ink-muted">Name</th>
+              <th class="h-11 w-1/2 px-4 font-medium text-ink-muted">Person</th>
               <th class="h-11 px-4 font-medium text-ink-muted">Role</th>
               <th class="h-11 px-4 font-medium text-ink-muted">Status</th>
               <th
-                class="h-11 whitespace-nowrap px-4 font-medium text-ink-muted">
+                class="hidden h-11 whitespace-nowrap px-4 font-medium text-ink-muted lg:table-cell">
                 Last sign-in
               </th>
-              <th class="h-11 w-12 px-4">
+              <th class="h-11 w-12 px-2">
                 <span class="sr-only">Actions</span>
               </th>
             </tr>
@@ -118,19 +123,15 @@ const confirmCopy = computed(() => {
               :key="row.admin.id"
               class="border-b border-line-soft last:border-b-0"
               data-testid="admin-row">
-              <td class="h-[52px] px-4">
-                <div class="flex min-w-0 items-center gap-2">
-                  <span class="truncate font-mono text-ink-strong">{{
-                    row.admin.email
-                  }}</span>
-                  <span v-if="row.isYou" class="text-xs text-ink-faint"
+              <td class="h-[60px] max-w-0 px-4">
+                <PersonCell
+                  :email="row.admin.email"
+                  :name="row.name"
+                  :muted="off(row)">
+                  <span v-if="row.isYou" class="shrink-0 text-xs text-ink-faint"
                     >you</span
                   >
-                </div>
-              </td>
-              <td class="px-4 text-ink">
-                <span v-if="row.name">{{ row.name }}</span>
-                <span v-else class="text-ink-faint">None</span>
+                </PersonCell>
               </td>
               <td class="px-4">
                 <DgBadge
@@ -138,52 +139,63 @@ const confirmCopy = computed(() => {
                   {{ row.roleLabel }}
                 </DgBadge>
               </td>
-              <td class="px-4">
-                <DgBadge :tone="row.admin.status === 'active' ? 'ok' : 'crit'">
-                  {{ row.admin.status === "active" ? "Active" : "Turned off" }}
-                </DgBadge>
+              <td class="whitespace-nowrap px-4">
+                <DgBadge v-if="off(row)" tone="crit">Turned off</DgBadge>
+                <DgStatus v-else>Active</DgStatus>
               </td>
-              <td class="whitespace-nowrap px-4 text-ink-muted">
+              <td
+                class="hidden whitespace-nowrap px-4 text-ink-muted lg:table-cell">
                 {{ row.lastSignIn }}
               </td>
-              <td class="px-4 text-right">
-                <DgMenu
+              <td class="px-2 text-right">
+                <AdminActions
                   v-if="row.canManage"
-                  :label="`Actions for ${row.admin.email}`">
-                  <template #trigger="{ toggle, attrs }">
-                    <DgButton
-                      v-bind="attrs"
-                      size="sm"
-                      variant="ghost"
-                      data-testid="admin-actions"
-                      @click="toggle">
-                      Actions
-                    </DgButton>
-                  </template>
-                  <DgMenuItem
-                    v-if="row.admin.status === 'disabled'"
-                    :disabled="busy"
-                    @select="enable(row.admin)">
-                    <template #icon><LockIcon class="h-4 w-4" /></template>
-                    Turn back on
-                  </DgMenuItem>
-                  <DgMenuItem
-                    v-else
-                    :disabled="busy"
-                    @select="ask('disable', row.admin)">
-                    <template #icon><LockIcon class="h-4 w-4" /></template>
-                    Turn off
-                  </DgMenuItem>
-                  <div class="my-0.5 h-px bg-line-soft" role="separator" />
-                  <DgMenuItem tone="danger" @select="ask('delete', row.admin)">
-                    <template #icon><TrashIcon class="h-4 w-4" /></template>
-                    Remove admin
-                  </DgMenuItem>
-                </DgMenu>
+                  :admin="row.admin"
+                  :busy="busy"
+                  @enable="enable(row.admin)"
+                  @disable="ask('disable', row.admin)"
+                  @remove="ask('delete', row.admin)" />
               </td>
             </tr>
           </tbody>
         </table>
+
+        <!-- Cards below 640px -->
+        <ul class="divide-y divide-line-soft sm:hidden">
+          <li
+            v-for="row in rows"
+            :key="row.admin.id"
+            class="flex items-start gap-2 px-4 py-3"
+            data-testid="admin-card">
+            <div class="flex min-w-0 flex-1 flex-col gap-2">
+              <PersonCell
+                :email="row.admin.email"
+                :name="row.name"
+                :muted="off(row)">
+                <span v-if="row.isYou" class="shrink-0 text-xs text-ink-faint"
+                  >you</span
+                >
+              </PersonCell>
+              <div
+                class="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[38px] text-sm">
+                <DgBadge
+                  :tone="row.admin.role === 'root' ? 'accent' : 'neutral'">
+                  {{ row.roleLabel }}
+                </DgBadge>
+                <DgBadge v-if="off(row)" tone="crit">Turned off</DgBadge>
+                <DgStatus v-else>Active</DgStatus>
+                <span class="text-ink-muted">{{ row.lastSignIn }}</span>
+              </div>
+            </div>
+            <AdminActions
+              v-if="row.canManage"
+              :admin="row.admin"
+              :busy="busy"
+              @enable="enable(row.admin)"
+              @disable="ask('disable', row.admin)"
+              @remove="ask('delete', row.admin)" />
+          </li>
+        </ul>
       </div>
     </div>
 

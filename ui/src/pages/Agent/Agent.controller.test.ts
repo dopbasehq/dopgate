@@ -79,6 +79,32 @@ describe("useAgentController", () => {
     expect(c.notice.value).toMatch(/next access token/);
   });
 
+  it("discards unsaved edits back to the saved agent", async () => {
+    const c = await mountAs(root);
+    c.name.value = "Not Valid";
+    c.description.value = "Something else";
+    await c.saveDetails();
+    expect(c.nameError.value).toMatch(/lowercase/);
+    c.discardDetails();
+    expect(c.name.value).toBe("invoice-bot");
+    expect(c.description.value).toBe("Posts invoices");
+    expect(c.nameError.value).toBeNull();
+    expect(c.detailsDirty.value).toBe(false);
+
+    c.capabilities.value = [{ key: "bad key", type: "text", value: "x" }];
+    await c.saveCapabilities();
+    expect(c.capabilityErrors.value[0]).toBeTruthy();
+    c.discardCapabilities();
+    expect(c.capabilities.value).toEqual([
+      { key: "invoices", type: "text", value: "read" },
+      { key: "max_amount", type: "number", value: "500" },
+    ]);
+    expect(c.capabilityErrors.value).toEqual({});
+    expect(c.error.value).toBeNull();
+    expect(c.capabilitiesDirty.value).toBe(false);
+    expect(adminApi.updateAgent).not.toHaveBeenCalled();
+  });
+
   it("regenerates the token after asking and reveals it once", async () => {
     vi.mocked(adminApi.regenerateAgent).mockResolvedValue({
       token: "dga_new",

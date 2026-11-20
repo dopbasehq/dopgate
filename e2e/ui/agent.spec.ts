@@ -11,6 +11,10 @@ async function pickAction(page: Page, item: string): Promise<void> {
   await page.getByRole("menuitem", { name: item }).click();
 }
 
+/** The Save button at the foot of one card, named by its heading. */
+const saveIn = (page: Page, card: string) =>
+  page.getByRole("form", { name: card }).getByRole("button", { name: "Save", exact: true });
+
 test(
   "the agent page shows its details, token tail and capabilities",
   {
@@ -32,15 +36,14 @@ test(
       await openAs(page, root, `/agents/${agent.id}`);
       await seeHeading(page, name);
     });
-    await step("The header shows description, status and ownership", async () => {
+    await step("The header shows description, status and that it's yours", async () => {
       await expect(page.getByText("Opens pull requests")).toBeVisible();
       await expect(page.getByText("On", { exact: true }).first()).toBeVisible();
-      await expect(page.getByText("Owned by an admin")).toBeVisible();
       await expect(page.getByText("Yours", { exact: true })).toBeVisible();
     });
-    await step("Details show the ID, owner and that it was never used", async () => {
+    await step("The facts show the ID, owner and that it was never used", async () => {
       await expect(page.getByText(agent.id, { exact: true })).toBeVisible();
-      await expect(page.getByText(ROOT_EMAIL, { exact: true }).first()).toBeVisible();
+      await expect(page.getByText(`${ROOT_EMAIL} (admin)`, { exact: true })).toBeVisible();
       await expect(page.getByText("Never")).toBeVisible();
       await expect(page.getByText(`dga_••••${agent.token.slice(-4)}`)).toBeVisible();
     });
@@ -59,10 +62,8 @@ test(
       await expect(rows.nth(3).getByLabel("Value")).toHaveValue("dopgate");
     });
     await step("Save buttons stay off until something changes", async () => {
-      await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
-      await expect(
-        page.getByRole("button", { name: "Save capabilities" }),
-      ).toBeDisabled();
+      await expect(saveIn(page, "Details")).toBeDisabled();
+      await expect(saveIn(page, "Capabilities")).toBeDisabled();
     });
     await step("The Agents link goes back to the list", async () => {
       await page.getByRole("link", { name: "Agents", exact: true }).first().click();
@@ -84,7 +85,7 @@ test(
     const root = await app.root();
     const first = await makeAgent(root, app.uniq("first"), {}, "Old words");
     const other = await makeAgent(root, app.uniq("other"));
-    const save = page.getByRole("button", { name: "Save", exact: true });
+    const save = saveIn(page, "Details");
     await step("Open the agent page", async () => {
       await openAs(page, root, `/agents/${first.id}`);
       await seeHeading(page, first.name);
@@ -146,7 +147,7 @@ test(
       repo: "dopgate",
       old_flag: true,
     });
-    const saveCaps = page.getByRole("button", { name: "Save capabilities" });
+    const saveCaps = saveIn(page, "Capabilities");
     const rows = page.getByTestId("capability-row");
     await step("Open the agent page", async () => {
       await openAs(page, root, `/agents/${agent.id}`);
@@ -381,7 +382,7 @@ test(
       await expect(page.getByLabel("Name")).toHaveCount(0);
       await expect(page.getByLabel("Description")).toHaveCount(0);
       await expect(page.getByTestId("regenerate-token")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Save capabilities" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
       await expect(page.getByTestId("add-capability")).toHaveCount(0);
     });
     await step("Capabilities show as plain text", async () => {
@@ -436,7 +437,7 @@ test(
     });
     await step("The note names the user", async () => {
       await expect(page.getByTestId("owner-note")).toContainText(user.email);
-      await expect(page.getByText("Owned by a user")).toBeVisible();
+      await expect(page.getByText(`${user.email} (user)`)).toBeVisible();
       await expect(page.getByTestId("regenerate-token")).toHaveCount(0);
     });
     await step("Turning it off ends the token for the user too", async () => {
