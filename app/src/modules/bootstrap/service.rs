@@ -40,7 +40,9 @@ pub async fn bootstrap_root(
     error.retry_after = Some(15 * 60);
     return Err(error);
   }
-  let mut setup = state.setup.write().await;
+  // Held until root exists and the token is cleared, on purpose: see
+  // `AppState::setup`.
+  let mut setup = state.setup.lock().await;
   let Some(expected) = setup.token.as_deref() else {
     return Err(already_initialized());
   };

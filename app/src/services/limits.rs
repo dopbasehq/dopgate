@@ -17,6 +17,9 @@ const SWEEP_AT: usize = 50_000;
 
 #[derive(Clone, Default)]
 pub struct Limits {
+  // One map for every request handler: each sign-in, sign-up and code
+  // request counts itself here. A request reads and writes its bucket in
+  // one step, so a mutex. Nothing waits while the guard is held.
   buckets: Arc<Mutex<HashMap<String, Bucket>>>,
 }
 

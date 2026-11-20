@@ -165,7 +165,7 @@ async fn refused_request_keeps_the_setup_token() {
     )
     .await;
   assert_eq!(status, StatusCode::CREATED);
-  assert!(app.state.setup.read().await.token.is_none());
+  assert!(app.state.setup.lock().await.token.is_none());
 }
 
 /// An instance that already has root starts without a setup token.
@@ -180,7 +180,7 @@ async fn initialized_instance_has_no_setup_token() {
     .unwrap();
   db.close().await;
   let state = app::server::build_state(config).await.unwrap();
-  assert!(state.setup.read().await.token.is_none());
+  assert!(state.setup.lock().await.token.is_none());
 }
 
 /// `DOPGATE_ROOT_EMAIL` on a fresh database creates root with a generated
@@ -199,7 +199,7 @@ async fn root_email_creates_root_with_a_generated_password_once() {
   };
   assert_eq!(email, "owner@example.com");
   assert!(password.len() >= 24);
-  assert!(state.setup.read().await.token.is_none());
+  assert!(state.setup.lock().await.token.is_none());
 
   let router = app::server::router(state.clone());
   let app = crate::support::TestApp {

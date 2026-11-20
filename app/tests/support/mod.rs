@@ -132,7 +132,7 @@ impl TestApp {
 
   /// The setup token a new instance prints at startup.
   pub async fn setup_token(&self) -> String {
-    self.state.setup.read().await.token.clone().unwrap()
+    self.state.setup.lock().await.token.clone().unwrap()
   }
 
   pub async fn request(

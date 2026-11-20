@@ -122,7 +122,7 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
   let state = AppState {
     config: Arc::new(config),
     db,
-    setup: Arc::new(tokio::sync::RwLock::new(SetupState { token: setup_token })),
+    setup: Arc::new(tokio::sync::Mutex::new(SetupState { token: setup_token })),
     rate_limiter: RateLimiter::default(),
     limits: Limits::default(),
     keys,

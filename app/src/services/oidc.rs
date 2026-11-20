@@ -138,6 +138,9 @@ struct CachedMetadata {
 /// Discovery results shared across requests.
 #[derive(Clone, Default)]
 pub struct OidcCache {
+  // Shared by every sign-in through the provider. Read on each one and
+  // written when the metadata is first fetched, expires, or is cleared, so
+  // a read-write lock. No guard is held while the provider is asked.
   inner: Arc<RwLock<Option<CachedMetadata>>>,
 }
 
