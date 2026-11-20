@@ -227,7 +227,7 @@ pub async fn update(
   if let Some(self_service) = &request.self_service {
     check_self_service(self_service)?;
   }
-  let branding = request.branding.map(clean_branding).transpose()?;
+  let branding = request.branding.as_ref().map(clean_branding).transpose()?;
 
   let mut sections = Vec::new();
   let user_id = actor.actor_id();
@@ -455,7 +455,7 @@ fn check_limits(limits: &LimitSettings) -> Result<(), HttpError> {
   Ok(())
 }
 
-fn clean_branding(branding: BrandingSettings) -> Result<BrandingSettings, HttpError> {
+fn clean_branding(branding: &BrandingSettings) -> Result<BrandingSettings, HttpError> {
   let app_name = branding.app_name.trim().to_owned();
   if app_name.is_empty()
     || app_name.chars().count() > TEXT_MAX_CHARS

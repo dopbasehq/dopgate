@@ -24,10 +24,10 @@ impl FakeSmtp {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let received = Arc::new(Mutex::new(Vec::new()));
-    let log = received.clone();
+    let log = Arc::clone(&received);
     tokio::spawn(async move {
       while let Ok((stream, _)) = listener.accept().await {
-        let log = log.clone();
+        let log = Arc::clone(&log);
         tokio::spawn(async move {
           let (reader, mut writer) = stream.into_split();
           let mut lines = BufReader::new(reader).lines();
