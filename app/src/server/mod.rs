@@ -115,7 +115,10 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
     _ => None,
   };
   let leaked_passwords =
-    crate::services::leaked_passwords::LeakedPasswords::new(config.leaked_passwords_url.as_deref());
+    crate::services::leaked_passwords::LeakedPasswords::new(config.leaked_passwords_url.as_deref())
+      .context("failed to build the HTTP client for the leaked password list")?;
+  // Hashed here so a failure stops startup, not the first sign-in.
+  modules::auth::service::dummy_hash().context("failed to hash the placeholder password")?;
   let state = AppState {
     config: Arc::new(config),
     db,
@@ -388,13 +391,26 @@ pub async fn serve(config: ServerConfig) -> Result<()> {
   key_reload_task.abort();
   serve_result?;
   crate::services::audit_chain::log_checkpoint(state.db.pool()).await;
-  let _ = tokio::time::timeout(Duration::from_secs(grace), state.db.close()).await;
+  if tokio::time::timeout(Duration::from_secs(grace), state.db.close())
+    .await
+    .is_err()
+  {
+    tracing::warn!(
+      grace,
+      "database connections were still open after the shutdown grace period"
+    );
+  }
   Ok(())
 }
 
 async fn shutdown_signal() {
   let ctrl_c = async {
-    let _ = tokio::signal::ctrl_c().await;
+    // Without a Ctrl-C handler this branch must never finish, or the
+    // server would shut down the moment it starts.
+    if let Err(error) = tokio::signal::ctrl_c().await {
+      tracing::warn!(%error, "could not listen for Ctrl-C; only SIGTERM stops the server");
+      std::future::pending::<()>().await;
+    }
   };
   #[cfg(unix)]
   let terminate = async {

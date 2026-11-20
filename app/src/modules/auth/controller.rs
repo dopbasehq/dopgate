@@ -184,7 +184,7 @@ pub async fn logout(
     Err(error) => error.into_response(),
   };
   if context.session_mode == SessionMode::Cookie || context.refresh_cookie.is_some() {
-    let (name, value) = sessions::service::clear_cookie(&state, Realm::App);
+    let (name, value) = sessions::service::clear_cookie(&state, Realm::App)?;
     response.headers_mut().append(name, value);
   }
   Ok(response)

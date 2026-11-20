@@ -30,9 +30,18 @@ use crate::{
 
 /// A real hash of a random value, checked when the email has no account so
 /// the answer takes as long as a real check.
-static DUMMY_HASH: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-  password::hash(&password::generate()).expect("hashing the dummy password failed")
-});
+static DUMMY_HASH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// The placeholder hash, made on first use and kept for the life of the
+/// process. Startup calls this, so a hashing failure stops the server there
+/// and a sign-in never has to make the hash itself.
+pub fn dummy_hash() -> anyhow::Result<&'static str> {
+  if let Some(hash) = DUMMY_HASH.get() {
+    return Ok(hash);
+  }
+  let hash = password::hash(&password::generate())?;
+  Ok(DUMMY_HASH.get_or_init(|| hash))
+}
 
 fn wrong_credentials() -> HttpError {
   HttpError::unauthorized(AUTHENTICATION_INVALID, "The email or password is wrong.")
@@ -217,10 +226,19 @@ pub async fn check_password(
     return Err(wrong_credentials());
   };
   let account = accounts::find_by_email(pool, realm, &email).await?;
-  let stored = account
+  // The hash moves to a blocking thread, so it is copied either way.
+  let stored = match account
     .as_ref()
     .and_then(|account| account.password_hash.clone())
-    .unwrap_or_else(|| DUMMY_HASH.clone());
+  {
+    Some(hash) => hash,
+    None => dummy_hash()
+      .map_err(|error| {
+        tracing::error!(%error, "failed to hash the placeholder password");
+        HttpError::internal()
+      })?
+      .to_owned(),
+  };
   let matches = password::verify_async(given, stored).await;
   let Some(account) = account else {
     return Err(wrong_credentials());

@@ -236,7 +236,7 @@ pub async fn deliver<T: CarriesRefresh + Serialize>(
   let lifetimes = settings::service::tokens(state.db.pool()).await?;
   let max_age = i64::from(lifetimes.refresh_token_idle_days) * 24 * 60 * 60;
   let value = tokens.take_refresh_token().unwrap_or_default();
-  let cookie = cookie(state, realm, &value, max_age);
+  let cookie = cookie(state, realm, &value, max_age)?;
   Ok(HttpResponse::new(message, status, Some(tokens)).with_header(SET_COOKIE, cookie))
 }
 
@@ -244,16 +244,18 @@ pub async fn deliver<T: CarriesRefresh + Serialize>(
 pub fn clear_cookie(
   state: &AppState,
   realm: Realm,
-) -> (axum::http::HeaderName, HeaderValue) {
-  (SET_COOKIE, cookie(state, realm, "", 0))
+) -> Result<(axum::http::HeaderName, HeaderValue), HttpError> {
+  Ok((SET_COOKIE, cookie(state, realm, "", 0)?))
 }
 
+/// A refresh token that can't travel in a header fails the request. An
+/// empty cookie would sign the person out without a word.
 fn cookie(
   state: &AppState,
   realm: Realm,
   value: &str,
   max_age: i64,
-) -> HeaderValue {
+) -> Result<HeaderValue, HttpError> {
   let secure = if state.config.public_url_is_https() {
     "; Secure"
   } else {
@@ -266,7 +268,10 @@ fn cookie(
   HeaderValue::from_str(&format!(
     "{name}={value}; HttpOnly; SameSite=Strict; Path={path}; Max-Age={max_age}{secure}"
   ))
-  .unwrap_or_else(|_| HeaderValue::from_static(""))
+  .map_err(|error| {
+    tracing::error!(%error, cookie = name, "the refresh cookie is not a valid header value");
+    HttpError::internal()
+  })
 }
 
 pub async fn list(
