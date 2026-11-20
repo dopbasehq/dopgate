@@ -55,7 +55,7 @@ pub async fn update(
 
 /// Send a test email
 ///
-/// Send a message through the SMTP server in use (`DOPGATE_SMTP_*`, or the
+/// Send a message through the SMTP server in use (`DOPGATE_SMTP_URL`, or the
 /// one saved in settings) and report the server's answer. Without `to`, it
 /// goes to the test email address in settings, or to root when none is saved.
 #[utoipa::path(

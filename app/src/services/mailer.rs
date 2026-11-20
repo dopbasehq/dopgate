@@ -1,6 +1,6 @@
 //! Outgoing email: verification codes, sign-in codes, and password resets.
 //!
-//! Messages go out through the SMTP server from `DOPGATE_SMTP_*`, or the
+//! Messages go out through the SMTP server from `DOPGATE_SMTP_URL`, or the
 //! one saved in the dashboard. Without either, the mailer writes each
 //! message to the server log, so local development works without a mail
 //! server.

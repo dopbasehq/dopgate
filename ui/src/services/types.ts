@@ -182,7 +182,7 @@ export interface SmtpSettings {
   fromEmail: string;
   fromName: string | null;
   /**
-   * `server_config`: DOPGATE_SMTP_* sets a host and wins, so it's read-only.
+   * `server_config`: DOPGATE_SMTP_URL is set and wins, so it's read-only.
    * `database`: saved here. `log`: no host anywhere, mail goes to the log.
    */
   source: "server_config" | "database" | "log";

@@ -1,7 +1,7 @@
 //! Runtime settings: sign-up rules, the password policy, token lifetimes,
 //! limits, self-service, branding, SMTP, and where test emails go. Each section is one JSON row in `settings`.
 //!
-//! SMTP is resolved in order: the server config (`DOPGATE_SMTP_*` or the
+//! SMTP is resolved in order: the server config (`DOPGATE_SMTP_URL` or the
 //! config file) when it sets a host, then the section saved here, then the
 //! server log. The saved password is encrypted with the service key.
 
@@ -155,7 +155,7 @@ pub async fn smtp(state: &AppState) -> Result<Option<SmtpConfig>, HttpError> {
   }))
 }
 
-/// Whether `DOPGATE_SMTP_*` or the config file sets a host. When it does,
+/// Whether `DOPGATE_SMTP_URL` or the config file names a server. When it does,
 /// it wins over the saved settings.
 fn server_smtp(state: &AppState) -> bool {
   state.config.smtp.host.is_some()
@@ -234,7 +234,7 @@ pub async fn update(
   let smtp = match request.smtp {
     Some(_) if server_smtp(state) => {
       return Err(invalid(
-        "SMTP is set on the server with DOPGATE_SMTP_* or the config file. Change it there, or unset DOPGATE_SMTP_HOST to manage it here.",
+        "SMTP is set on the server with DOPGATE_SMTP_URL or the config file. Change it there, or unset it to manage SMTP here.",
       ));
     }
     Some(input) => {
@@ -334,7 +334,7 @@ pub async fn test_smtp(
   let config = smtp(state).await?.ok_or_else(|| {
     HttpError::bad_request(
       SMTP_NOT_CONFIGURED,
-      "Save an SMTP host in Settings, or set DOPGATE_SMTP_HOST, before sending a test message.",
+      "Save an SMTP host in Settings, or set DOPGATE_SMTP_URL, before sending a test message.",
     )
   })?;
   let branding = branding(state.db.pool()).await?;

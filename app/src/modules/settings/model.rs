@@ -22,7 +22,7 @@ pub struct Settings {
   pub limits: LimitSettings,
   /// What your app's users may make for themselves.
   pub self_service: SelfServiceSettings,
-  /// Read-only while `DOPGATE_SMTP_HOST` (or the config file) sets a host.
+  /// Read-only while `DOPGATE_SMTP_URL` (or the config file) names a server.
   pub smtp: SmtpSettings,
   pub branding: BrandingSettings,
   /// Where test emails go.
@@ -192,8 +192,8 @@ pub struct SmtpSettings {
 #[derive(Clone, Copy, Debug, Serialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SmtpSource {
-  /// `DOPGATE_SMTP_*` or the config file sets a host. These settings win and
-  /// can't be changed through the API.
+  /// `DOPGATE_SMTP_URL` or the config file names a server. These settings
+  /// win and can't be changed through the API.
   ServerConfig,
   /// The SMTP server saved through the API or the dashboard.
   Database,
@@ -249,7 +249,7 @@ pub struct UpdateSettingsRequest {
   pub self_service: Option<SelfServiceSettings>,
   pub branding: Option<BrandingSettings>,
   pub test_email: Option<TestEmailSettingsInput>,
-  /// Refused while `DOPGATE_SMTP_HOST` or the config file sets SMTP.
+  /// Refused while `DOPGATE_SMTP_URL` or the config file sets SMTP.
   pub smtp: Option<SmtpSettingsInput>,
 }
 
