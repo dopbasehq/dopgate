@@ -33,10 +33,10 @@ const section = (page: Page, name: string) => page.getByTestId(`settings-${name}
 const saveButton = (page: Page, name: string) =>
   section(page, name).getByRole("button", { name: "Save", exact: true });
 const toggle = (page: Page, name: string, label: string) =>
-  section(page, name).getByRole("switch", { name: label });
-/** The switch's input is visually hidden, so a click goes to its label. */
+  section(page, name).getByRole("switch", { name: label, exact: true });
+/** The switch's input is visually hidden, so a click goes to the label around it. */
 const flip = (page: Page, name: string, label: string) =>
-  section(page, name).locator("label").filter({ hasText: label }).click();
+  toggle(page, name, label).locator("xpath=..").click();
 
 async function readSettings() {
   return (await (await app.root()).api.get("/admin/settings", { record: false })).data;
@@ -47,7 +47,7 @@ test(
   {
     tag: ["@settings", "@console"],
     annotation: about(
-      "The Settings page has a card for sign-up, passwords, codes and lockout, tokens, self-service, branding and SMTP. Each shows what the server holds, and every Save button is off until something changes.",
+      "The Settings page has a card for sign-up, passwords, codes and lockout, sessions, personal tokens and agents, branding and email delivery. Each shows what the server holds, and every Save button is off until something changes.",
     ),
   },
   async ({ page }) => {
@@ -59,18 +59,18 @@ test(
       }
     });
     await step("Signup shows its three switches", async () => {
-      await expect(toggle(page, "signup", "Anyone can sign up from your app")).toBeChecked();
+      await expect(toggle(page, "signup", "Open sign-up")).toBeChecked();
       await expect(
-        toggle(page, "signup", "Require a verified email before signing in"),
+        toggle(page, "signup", "Verified email"),
       ).toBeChecked();
       await expect(
-        toggle(page, "signup", "Allow signing up with an email code, without a password"),
+        toggle(page, "signup", "Email code sign-up"),
       ).not.toBeChecked();
     });
     await step("Password shows the minimum length and the leaked password switch", async () => {
       await expect(section(page, "password").getByLabel("Minimum length")).toHaveValue("8");
       await expect(
-        toggle(page, "password", "Refuse passwords found in data breaches"),
+        toggle(page, "password", "Refuse leaked passwords"),
       ).toBeChecked();
     });
     await step("Codes and lockout show the limits the server runs with", async () => {
@@ -99,7 +99,7 @@ test(
     await step("Tokens and agents show switches off and the caps", async () => {
       const rules = section(page, "selfService");
       await expect(
-        toggle(page, "selfService", "Users can create personal tokens that sign in as themselves"),
+        toggle(page, "selfService", "Users can create personal tokens"),
       ).not.toBeChecked();
       await expect(
         toggle(page, "selfService", "Users can create agents of their own"),
@@ -132,7 +132,7 @@ test(
     await step("Open Settings and switch sign-up off", async () => {
       await openAs(page, await app.root(), "/settings");
       await expect(section(page, "signup")).toBeVisible();
-      await flip(page, "signup", "Anyone can sign up from your app");
+      await flip(page, "signup", "Open sign-up");
       await expect(saveButton(page, "signup")).toBeEnabled();
       await expect(section(page, "signup").getByRole("button", { name: "Discard" })).toBeVisible();
     });
@@ -143,7 +143,7 @@ test(
     });
     await step("A reload keeps it off", async () => {
       await page.reload();
-      await expect(toggle(page, "signup", "Anyone can sign up from your app")).not.toBeChecked();
+      await expect(toggle(page, "signup", "Open sign-up")).not.toBeChecked();
       expect((await readSettings()).signup.enabled).toBe(false);
     });
     await step("POST /auth/signup answers SIGNUP_DISABLED", async () => {
@@ -156,7 +156,7 @@ test(
       expect(refused.code).toBe("SIGNUP_DISABLED");
     });
     await step("Switch it back on and a sign-up works", async () => {
-      await flip(page, "signup", "Anyone can sign up from your app");
+      await flip(page, "signup", "Open sign-up");
       await saveButton(page, "signup").click();
       await expect(section(page, "signup").getByText("Saved", { exact: true })).toBeVisible();
       const created = await app.api.post(
@@ -180,12 +180,8 @@ test(
   async ({ page }) => {
     await step("Switch both and save", async () => {
       await openAs(page, await app.root(), "/settings");
-      await flip(page, "signup", "Require a verified email before signing in");
-      await flip(
-        page,
-        "signup",
-        "Allow signing up with an email code, without a password",
-      );
+      await flip(page, "signup", "Verified email");
+      await flip(page, "signup", "Email code sign-up");
       await saveButton(page, "signup").click();
       await expect(section(page, "signup").getByText("Saved", { exact: true })).toBeVisible();
     });
@@ -255,7 +251,7 @@ test(
       expect(leaked.code).toBe("PASSWORD_LEAKED");
     });
     await step("With the switch off the same password is accepted", async () => {
-      await flip(page, "password", "Refuse passwords found in data breaches");
+      await flip(page, "password", "Refuse leaked passwords");
       await saveButton(page, "password").click();
       await expect(section(page, "password").getByText("Saved", { exact: true })).toBeVisible();
       const created = await app.api.post(

@@ -14,6 +14,7 @@ use utoipa::OpenApi;
     controller::update,
     controller::delete,
     controller::revoke_sessions,
+    controller::revoke_session,
     controller::sessions,
     controller::disable,
     controller::enable,

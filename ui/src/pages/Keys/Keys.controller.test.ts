@@ -50,6 +50,11 @@ describe("useKeysController", () => {
     ]);
   });
 
+  it("gives the key set address on this server", async () => {
+    const c = await mountAs();
+    expect(c.jwksUrl).toBe(`${window.location.origin}/.well-known/jwks.json`);
+  });
+
   it("lets only root rotate", async () => {
     expect((await mountAs(root)).canRotate.value).toBe(true);
     expect((await mountAs(admin)).canRotate.value).toBe(false);

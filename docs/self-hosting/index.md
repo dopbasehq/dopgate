@@ -26,7 +26,7 @@ flowchart LR
 
 ## What you need
 
-- PostgreSQL. The bundled Compose file uses PostgreSQL 18, and the test suite runs on 17.
+- PostgreSQL. The bundled Compose file and the test suites use PostgreSQL 18.
 - A host name for Dopgate, such as `auth.example.com`, served over HTTPS. Dopgate serves the console at `/` and the API under `/api`, so give it its own host name instead of a path on your app's site.
 - An SMTP server for real email. Without one, emails go to the log.
 

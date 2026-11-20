@@ -93,6 +93,7 @@ const ROUTES: Route[] = [
   r("POST", "/admin/users/{user_id}/password-reset", "admin"),
   r("GET", "/admin/users/{user_id}/sessions", "admin"),
   r("DELETE", "/admin/users/{user_id}/sessions", "admin"),
+  r("DELETE", "/admin/users/{user_id}/sessions/{session_id}", "admin"),
   // Personal tokens, as admins see them.
   r("GET", "/admin/users/{user_id}/personal-tokens", "admin"),
   r("DELETE", "/admin/users/{user_id}/personal-tokens/{token_id}", "console"),

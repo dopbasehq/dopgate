@@ -291,7 +291,7 @@ test(
   {
     tag: ["@agents", "@console"],
     annotation: about(
-      "Each row has the agent's name, the owner's email with an Admin badge and a mark for the signed-in admin, the On or Turned off badge, and when it was last used.",
+      "Each row has the agent's name, the owner's email marked admin, with a mark for the signed-in admin, On or a Turned off badge, and when it was last used.",
     ),
   },
   async ({ page }) => {
@@ -307,7 +307,7 @@ test(
     await step("Root's own agent shows root as owner, marked as theirs, and On", async () => {
       const row = page.getByTestId("agent-row").filter({ hasText: mine.name });
       await expect(row).toContainText(ROOT_EMAIL);
-      await expect(row).toContainText("Admin");
+      await expect(row).toContainText("admin");
       await expect(row).toContainText("you");
       await expect(row).toContainText("On");
       await expect(row).toContainText("Never");
@@ -385,7 +385,7 @@ test(
   {
     tag: ["@agents", "@console", "@users"],
     annotation: about(
-      "With self-service agents on, a user makes an agent through the API. The list shows the user's email with a User badge, and the agent page links to that user.",
+      "With self-service agents on, a user makes an agent through the API. The list shows the user's email marked user, and the agent page links to that user.",
     ),
   },
   async ({ page }) => {
@@ -402,10 +402,10 @@ test(
       await openAs(page, await app.root(), "/agents");
       await expect(page.getByTestId("agent-row").filter({ hasText: name })).toBeVisible();
     });
-    await step("The row names the user and marks them as a User", async () => {
+    await step("The row names the user and marks them as a user", async () => {
       const row = page.getByTestId("agent-row").filter({ hasText: name });
       await expect(row).toContainText(user.email);
-      await expect(row).toContainText("User");
+      await expect(row).toContainText("user");
       await expect(row).not.toContainText("you");
     });
     await step("Clicking the name opens the agent page", async () => {
@@ -416,7 +416,7 @@ test(
         .click();
       await expect(page).toHaveURL(new RegExp(`/agents/${made.agent.id}$`));
       await seeHeading(page, name);
-      await expect(page.getByText("Owned by a user")).toBeVisible();
+      await expect(page.getByText(`${user.email} (user)`)).toBeVisible();
     });
     await step("The owner link leads to the user", async () => {
       await page.getByRole("link", { name: user.email }).click();

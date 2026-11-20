@@ -89,14 +89,14 @@ test(
     await step("The audit log tells the story, newest first", async () => {
       await nav(page, "Audit log").click();
       await page.getByLabel("Filter by actor").fill(user.id);
-      const list = page.getByTestId("audit-list");
+      const list = page.getByTestId("audit-table");
       await expect(list.getByText("user.sign_in_failed").first()).toBeVisible();
       await expect(list.getByText("user.password_reset", { exact: true })).toBeVisible();
-      await expect(list.locator("li").first()).toContainText("user.signed_in");
+      await expect(list.getByTestId("audit-row").first()).toContainText("user.signed_in");
     });
     await step("What support did is recorded under their name", async () => {
       await page.getByLabel("Filter by actor").fill(support.email);
-      const list = page.getByTestId("audit-list");
+      const list = page.getByTestId("audit-table");
       await expect(list.getByText("user.password_reset_sent")).toBeVisible();
       await expect(list.getByText("user.sessions_revoked")).toBeVisible();
     });

@@ -65,6 +65,17 @@ describe("useAgentsController", () => {
     expect(c.rows.value[0]?.lastUsed).toBe("Never");
   });
 
+  it("opens an agent from its row", async () => {
+    const c = await mount();
+    const row = c.rows.value[1];
+    if (!row) throw new Error("no row");
+    await c.open(row);
+    expect(push).toHaveBeenCalledWith({
+      name: "agent",
+      params: { id: mine.id },
+    });
+  });
+
   it("checks the name and capabilities before sending", async () => {
     const c = await mount();
     c.openCreate();

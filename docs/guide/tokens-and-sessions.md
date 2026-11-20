@@ -166,7 +166,7 @@ Each session has `id`, `method` (`password` or `otp`), `ipAddress`, `userAgent`,
 | `DELETE /api/v1/auth/sessions` | End every session. Add `?keepCurrent=true` to stay signed in here. |
 | `POST /api/v1/auth/logout` | End the current session, or every session with `{"allSessions": true}`. It also takes `{"refreshToken": "dgr_..."}` without an access token, so an app can sign out after the access token expired. |
 
-Admins see and end a user's sessions with `GET` and `DELETE /api/v1/admin/users/{id}/sessions`.
+Admins see and end a user's sessions with `GET` and `DELETE /api/v1/admin/users/{id}/sessions`, and end one of them with `DELETE /api/v1/admin/users/{id}/sessions/{sessionId}`.
 
 ## What ends a session
 

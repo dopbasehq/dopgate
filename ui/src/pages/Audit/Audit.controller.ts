@@ -1,10 +1,12 @@
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useInfiniteQuery } from "@pinia/colada";
 import { errorMessage } from "~/services/api";
 import { verifyAuditChain, type AuditFilters } from "~/services/admin.api";
 import type { AuditEvent, AuditVerification } from "~/services/types";
 import { auditEventsQuery } from "~/queries/admin";
 import { useDebounced } from "~/utils/debounce";
+import { chainLine as lineFor } from "~/utils/audit";
 
 /** What a chain check found, in words. */
 export function describeVerification(result: AuditVerification): {
@@ -45,21 +47,38 @@ export function describeVerification(result: AuditVerification): {
   return { ok: false, title: "Chain check failed", detail: `${records}.` };
 }
 
+const queryText = (value: unknown): string =>
+  typeof value === "string" ? value : "";
+
 /**
  * Audit log controller: every change on the server, newest first, a page
- * at a time. Filter by action and by actor (id or label). Rows expand to
- * show their metadata. "Verify chain" checks the hash chain end to end.
+ * at a time. Filter by action (exact) and by actor (ID or label); both
+ * live in the address, so other pages can link to "what this user did".
+ * A row opens the event in a drawer. "Verify chain" checks the hash chain
+ * end to end, and the drawer says where the open record stands in it.
  */
 export function useAuditController() {
-  const action = ref("");
-  const actor = ref("");
-  const actionQuery = useDebounced(action, "");
-  const actorQuery = useDebounced(actor, "");
+  const route = useRoute();
+  const router = useRouter();
+
+  const action = ref(queryText(route.query.action));
+  const actor = ref(queryText(route.query.actor));
+  const actorQuery = useDebounced(actor, actor.value);
 
   const filters = computed<AuditFilters>(() => ({
-    action: actionQuery.value.trim(),
+    action: action.value.trim(),
     actor: actorQuery.value.trim(),
   }));
+
+  // Keep the filters in the address, without adding history entries.
+  watch(filters, (next) => {
+    const query = { ...route.query };
+    for (const key of ["action", "actor"] as const) {
+      if (next[key]) query[key] = next[key];
+      else delete query[key];
+    }
+    void router.replace({ query });
+  });
 
   const feed = useInfiniteQuery(() => ({
     ...auditEventsQuery(filters.value),
@@ -106,12 +125,8 @@ export function useAuditController() {
     }
   }
 
-  const expanded = ref(new Set<string>());
-  function toggle(id: string): void {
-    const next = new Set(expanded.value);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    expanded.value = next;
+  function setAction(next: string | null): void {
+    action.value = (next ?? "").trim();
   }
 
   function clearFilters(): void {
@@ -119,10 +134,22 @@ export function useAuditController() {
     actor.value = "";
   }
 
+  // The drawer
+  const selected = ref<AuditEvent | null>(null);
+  function openEvent(event: AuditEvent): void {
+    selected.value = event;
+  }
+  function closeEvent(): void {
+    selected.value = null;
+  }
+
   // Chain check
   const verifying = ref(false);
-  const verification = ref<ReturnType<typeof describeVerification> | null>(
-    null,
+  const verificationResult = ref<AuditVerification | null>(null);
+  const verification = computed(() =>
+    verificationResult.value
+      ? describeVerification(verificationResult.value)
+      : null,
   );
   const verifyError = ref<string | null>(null);
 
@@ -130,9 +157,9 @@ export function useAuditController() {
     if (verifying.value) return;
     verifying.value = true;
     verifyError.value = null;
-    verification.value = null;
+    verificationResult.value = null;
     try {
-      verification.value = describeVerification(await verifyAuditChain());
+      verificationResult.value = await verifyAuditChain();
     } catch (cause) {
       verifyError.value = errorMessage(cause, "Couldn't check the chain.");
     } finally {
@@ -140,9 +167,14 @@ export function useAuditController() {
     }
   }
 
+  /** Where one record stands in the chain, given the last check. */
+  const chainLine = (event: AuditEvent) =>
+    lineFor(event, verificationResult.value);
+
   return {
     action,
     actor,
+    setAction,
     filtered,
     events,
     loading,
@@ -151,12 +183,14 @@ export function useAuditController() {
     loadingMore,
     reload,
     loadMore,
-    expanded,
-    toggle,
     clearFilters,
+    selected,
+    openEvent,
+    closeEvent,
     verifying,
     verification,
     verifyError,
     verify,
+    chainLine,
   };
 }

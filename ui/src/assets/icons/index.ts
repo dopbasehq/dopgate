@@ -21,6 +21,7 @@ export { default as RefreshIcon } from "./Refresh.icon.vue";
 export { default as SearchIcon } from "./Search.icon.vue";
 export { default as ShieldIcon } from "./Shield.icon.vue";
 export { default as SlidersHorizontalIcon } from "./SlidersHorizontal.icon.vue";
+export { default as TerminalIcon } from "./Terminal.icon.vue";
 export { default as TrashIcon } from "./Trash.icon.vue";
 export { default as UserIcon } from "./User.icon.vue";
 export { default as UsersIcon } from "./Users.icon.vue";

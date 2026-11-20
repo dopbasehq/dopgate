@@ -12,6 +12,8 @@ defineProps<{
   /** Keep the label for screen readers only, when the row already shows it. */
   hideLabel?: boolean;
   disabled?: boolean;
+  /** ID of the text that explains the switch, read after its name. */
+  describedby?: string;
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: boolean] }>();
@@ -32,6 +34,7 @@ function onChange(event: Event): void {
       :checked="modelValue"
       :disabled="disabled"
       :aria-label="hideLabel ? label : undefined"
+      :aria-describedby="describedby"
       @change="onChange" />
     <!-- Track: 41×24px with a 7px radius. -->
     <span

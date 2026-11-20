@@ -6,6 +6,7 @@ import {
   deleteUser,
   disableUser,
   enableUser,
+  revokeUserSession,
   revokeUserSessions,
   revokeUserToken,
   sendPasswordReset,
@@ -19,6 +20,7 @@ import {
   userTokensQuery,
 } from "~/queries/admin";
 import { useInvalidate } from "~/queries/invalidate";
+import { formatDateTime } from "~/utils/format";
 import {
   PUBLIC_METADATA_MAX_BYTES,
   formatJson,
@@ -28,6 +30,14 @@ import {
 
 /** Actions that ask before they run. */
 export type ConfirmKind = "disable" | "delete" | "sign-out-all";
+
+/** One line of the facts beside the cards. */
+export interface UserFact {
+  label: string;
+  value: string;
+  mono?: boolean;
+  copy?: boolean;
+}
 
 /**
  * User page controller: one of your app's users, with their profile,
@@ -57,6 +67,41 @@ export function useUserController() {
       ? errorMessage(sessionsRead.error.value, "Couldn't load sessions.")
       : null,
   );
+
+  // Signing out one session doesn't ask, like on the Account page.
+  const endingSession = ref<string | null>(null);
+  const sessionError = ref<string | null>(null);
+
+  async function signOutSession(sessionId: string): Promise<void> {
+    if (endingSession.value) return;
+    endingSession.value = sessionId;
+    sessionError.value = null;
+    try {
+      await revokeUserSession(id.value, sessionId);
+      await sessionsRead.refetch();
+    } catch (cause) {
+      sessionError.value = errorMessage(
+        cause,
+        "Couldn't sign out that session.",
+      );
+    } finally {
+      endingSession.value = null;
+    }
+  }
+
+  const facts = computed<UserFact[]>(() => {
+    const shown = user.value;
+    if (!shown) return [];
+    return [
+      { label: "User ID", value: shown.id, mono: true, copy: true },
+      { label: "Created", value: formatDateTime(shown.createdAt) },
+      { label: "Last sign-in", value: formatDateTime(shown.lastSignInAt) },
+      {
+        label: "Signs in with",
+        value: shown.hasPassword ? "Password or email code" : "Email code",
+      },
+    ];
+  });
 
   const tokens = computed(() => tokensRead.data.value ?? null);
   const tokensError = computed(() =>
@@ -151,6 +196,8 @@ export function useUserController() {
   const busy = ref<string | null>(null);
   const error = ref<string | null>(null);
   const notice = ref<string | null>(null);
+  /** The card whose footer says "Saved", until the next action. */
+  const saved = ref<"profile" | "metadata" | null>(null);
 
   async function run(
     name: string,
@@ -161,6 +208,7 @@ export function useUserController() {
     busy.value = name;
     error.value = null;
     notice.value = null;
+    saved.value = null;
     try {
       await action();
       return true;
@@ -187,10 +235,19 @@ export function useUserController() {
         });
         displayName.value = next.displayName ?? "";
         await changed(next);
-        notice.value = "Profile saved.";
+        saved.value = "profile";
       },
       "Couldn't save the profile.",
     );
+  }
+
+  function discardProfile(): void {
+    displayName.value = user.value?.displayName ?? "";
+  }
+
+  function discardMetadata(): void {
+    publicMetadata.value = formatJson(user.value?.publicMetadata);
+    privateMetadata.value = formatJson(user.value?.privateMetadata);
   }
 
   /** Why the metadata can't be saved yet, or null when it can. */
@@ -222,7 +279,7 @@ export function useUserController() {
         publicMetadata.value = formatJson(next.publicMetadata);
         privateMetadata.value = formatJson(next.privateMetadata);
         await changed(next);
-        notice.value = "Metadata saved.";
+        saved.value = "metadata";
       },
       "Couldn't save the metadata.",
     );
@@ -281,6 +338,7 @@ export function useUserController() {
     confirmError.value = null;
     error.value = null;
     notice.value = null;
+    saved.value = null;
     try {
       if (kind === "disable") {
         await changed(await disableUser(id.value));
@@ -319,6 +377,10 @@ export function useUserController() {
     loadError,
     sessions,
     sessionsError,
+    endingSession,
+    sessionError,
+    signOutSession,
+    facts,
     tokens,
     tokensError,
     agents,
@@ -341,8 +403,11 @@ export function useUserController() {
     busy,
     error,
     notice,
+    saved,
     saveProfile,
     saveMetadata,
+    discardProfile,
+    discardMetadata,
     enable,
     markVerified,
     sendReset,

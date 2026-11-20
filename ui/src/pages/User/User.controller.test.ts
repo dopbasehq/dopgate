@@ -63,6 +63,23 @@ describe("useUserController", () => {
     expect(c.metadataDirty.value).toBe(false);
   });
 
+  it("lists the facts beside the cards", async () => {
+    const c = await mountAs(root, userFixture({ hasPassword: false }));
+    expect(c.facts.value.map((fact) => fact.label)).toEqual([
+      "User ID",
+      "Created",
+      "Last sign-in",
+      "Signs in with",
+    ]);
+    expect(c.facts.value[0]).toMatchObject({
+      value: maya.id,
+      mono: true,
+      copy: true,
+    });
+    expect(c.facts.value[2]?.value).toBe("Never");
+    expect(c.facts.value[3]?.value).toBe("Email code");
+  });
+
   it("lets every admin manage every user", async () => {
     expect((await mountAs(root, maya)).canManage.value).toBe(true);
     const c = await mountAs(admin, maya);
@@ -83,7 +100,8 @@ describe("useUserController", () => {
       displayName: "Maya B",
     });
     expect(c.user.value?.displayName).toBe("Maya B");
-    expect(c.notice.value).toBe("Profile saved.");
+    expect(c.saved.value).toBe("profile");
+    expect(c.notice.value).toBeNull();
 
     // Emptying the field clears the name: the server only clears on "".
     vi.mocked(adminApi.updateUser).mockResolvedValue({
@@ -142,6 +160,18 @@ describe("useUserController", () => {
         privateMetadata: { crm: 7 },
       });
       expect(c.metadataDirty.value).toBe(false);
+      expect(c.saved.value).toBe("metadata");
+    });
+
+    it("discards edits back to the saved copy", async () => {
+      const c = await mountAs();
+      c.publicMetadata.value = '{"plan":"pro"}';
+      c.displayName.value = "Someone else";
+      expect(c.metadataDirty.value).toBe(true);
+      c.discardMetadata();
+      c.discardProfile();
+      expect(c.metadataDirty.value).toBe(false);
+      expect(c.profileDirty.value).toBe(false);
     });
   });
 
@@ -210,6 +240,27 @@ describe("useUserController", () => {
     await c.confirm();
     expect(adminApi.revokeUserSessions).toHaveBeenCalledWith(maya.id);
     expect(c.sessions.value).toEqual([]);
+  });
+
+  it("signs one session out without asking", async () => {
+    vi.mocked(adminApi.revokeUserSession).mockResolvedValue(null);
+    const c = await mountAs();
+    vi.mocked(adminApi.fetchUserSessions).mockResolvedValue([]);
+    await c.signOutSession("ses_1");
+    expect(adminApi.revokeUserSession).toHaveBeenCalledWith(maya.id, "ses_1");
+    expect(c.confirming.value).toBeNull();
+    expect(c.sessions.value).toEqual([]);
+    expect(c.endingSession.value).toBeNull();
+  });
+
+  it("keeps the session listed with a reason when signing it out fails", async () => {
+    vi.mocked(adminApi.revokeUserSession).mockRejectedValue(
+      apiError(404, "NOT_FOUND", "This user has no such session."),
+    );
+    const c = await mountAs();
+    await c.signOutSession("ses_1");
+    expect(c.sessionError.value).toBe("This user has no such session.");
+    expect(c.sessions.value).toHaveLength(1);
   });
 
   it("deletes and goes back to the list", async () => {

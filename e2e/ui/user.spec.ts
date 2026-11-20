@@ -14,7 +14,7 @@ test(
   {
     tag: ["@console", "@users", "@smoke"],
     annotation: about(
-      "A user made through the API with a name, public and private metadata, and a metadata object of their own opens on a page that shows each one: title, name, status badges, ID, dates, and every JSON object. The user's own metadata is read only.",
+      "A user made through the API with a name, public and private metadata, and a metadata object of their own opens on a page that shows each one: title, name, status line, ID, dates, and every JSON object. The user's own metadata is read only. View in audit log leads to this user's events.",
     ),
   },
   async ({ page }) => {
@@ -32,15 +32,21 @@ test(
       await expect(page.getByText("Email verified")).toBeVisible();
       await expect(page.getByText("No password")).toHaveCount(0);
       await expect(page.getByText("Locked until")).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "View in audit log" })).toHaveAttribute(
+        "href",
+        `/audit?actor=${ana.id}`,
+      );
     });
     await step("The breadcrumb names Users and this user", async () => {
       const crumbs = page.getByTestId("breadcrumb");
       await expect(crumbs.getByRole("link", { name: "Users" })).toBeVisible();
       await expect(crumbs.getByText(ana.email)).toBeVisible();
     });
-    await step("The profile card has the ID and the display name field", async () => {
-      const profile = page.getByRole("region", { name: "Profile" });
-      await expect(profile.getByText(ana.id)).toBeVisible();
+    await step("The facts have the ID and the profile card the display name field", async () => {
+      const facts = page.getByTestId("user-facts");
+      await expect(facts.getByText(ana.id)).toBeVisible();
+      await expect(facts.getByText("Password or email code")).toBeVisible();
+      const profile = page.getByRole("form", { name: "Profile" });
       await expect(profile.getByLabel("Display name")).toHaveValue("Ana Moreno");
       await expect(profile.getByRole("button", { name: "Save" })).toBeDisabled();
     });
@@ -98,20 +104,21 @@ test(
   {
     tag: ["@console", "@users"],
     annotation: about(
-      "Save is off until the name changes. Saving shows a notice, the heading's subtitle follows, and the service key reads the new name. A reload shows it again. Emptying the field removes the name.",
+      "Save is off until the name changes. Saving says Saved under the card, the heading's subtitle follows, and the service key reads the new name. A reload shows it again. Emptying the field removes the name.",
     ),
   },
   async ({ page }) => {
     const pat = await plainUser(app, { displayName: "Pat Before" });
     await openAs(page, await app.root(), `/users/${pat.id}`);
     const name = page.getByLabel("Display name");
-    const save = page.getByRole("region", { name: "Profile" }).getByRole("button", { name: "Save" });
+    const profile = page.getByRole("form", { name: "Profile" });
+    const save = profile.getByRole("button", { name: "Save" });
     await step("Change the name and save", async () => {
       await expect(save).toBeDisabled();
       await name.fill("Pat After");
       await expect(save).toBeEnabled();
       await save.click();
-      await expect(page.getByText("Profile saved.")).toBeVisible();
+      await expect(profile.getByText("Saved", { exact: true })).toBeVisible();
       await expect(save).toBeDisabled();
     });
     await step("The server has it", async () => {
@@ -125,7 +132,7 @@ test(
     await step("Emptying the field and saving removes the name", async () => {
       await page.getByLabel("Display name").fill("");
       await save.click();
-      await expect(page.getByText("Profile saved.")).toBeVisible();
+      await expect(profile.getByText("Saved", { exact: true })).toBeVisible();
       expect((await stored(pat.id)).displayName).toBeNull();
       await page.reload();
       await expect(page.getByLabel("Display name")).toHaveValue("");
@@ -138,13 +145,14 @@ test(
   {
     tag: ["@console", "@users"],
     annotation: about(
-      "Editing either JSON object turns Save metadata on. Saving replaces the whole object on the server, shows a notice and keeps the new text after a reload. Format tidies compact JSON.",
+      "Editing either JSON object turns Save metadata on. Saving replaces the whole object on the server, says Saved under the card and keeps the new text after a reload. Format tidies compact JSON.",
     ),
   },
   async ({ page }) => {
     const pat = await plainUser(app, { publicMetadata: { role: "viewer" }, privateMetadata: { note: "old" } });
     await openAs(page, await app.root(), `/users/${pat.id}`);
     const save = page.getByRole("button", { name: "Save metadata" });
+    const metadata = page.getByRole("form", { name: "Metadata" });
     await expect(save).toBeDisabled();
     await step("Type new JSON into both editors and format one", async () => {
       await page.getByLabel("Public metadata").fill('{"role":"manager","seats":3}');
@@ -156,7 +164,7 @@ test(
     });
     await step("Save metadata", async () => {
       await save.click();
-      await expect(page.getByText("Metadata saved.")).toBeVisible();
+      await expect(metadata.getByText("Saved", { exact: true })).toBeVisible();
       await expect(save).toBeDisabled();
     });
     await step("The server replaced both objects", async () => {
@@ -172,7 +180,7 @@ test(
     await step("An emptied editor saves as an empty object", async () => {
       await page.getByLabel("Private metadata").fill("");
       await page.getByRole("button", { name: "Save metadata" }).click();
-      await expect(page.getByText("Metadata saved.")).toBeVisible();
+      await expect(metadata.getByText("Saved", { exact: true })).toBeVisible();
       expect((await stored(pat.id)).privateMetadata).toEqual({});
     });
   },
@@ -225,7 +233,7 @@ test(
   {
     tag: ["@console", "@users"],
     annotation: about(
-      "Turn off account asks first. Cancel does nothing. Confirming turns the badge to Disabled, says the sessions ended, and the user's refresh token stops working and sign-in is refused. Turn account back on restores Active and sign-in.",
+      "Turn off account asks first. Cancel does nothing. Confirming turns the status to Turned off, says the sessions ended, and the user's refresh token stops working and sign-in is refused. Turn account back on restores Active and sign-in.",
     ),
   },
   async ({ page }) => {
@@ -246,7 +254,7 @@ test(
       await page.getByRole("menuitem", { name: "Turn off account" }).click();
       await dialog.getByRole("button", { name: "Turn off" }).click();
       await expect(page.getByText("Account turned off. Its sessions have ended.")).toBeVisible();
-      await expect(page.getByText("Disabled", { exact: true })).toBeVisible();
+      await expect(page.getByText("Turned off", { exact: true })).toBeVisible();
       await expect(page.getByText("Active", { exact: true })).toHaveCount(0);
     });
     await step("The user's refresh token and sign-in are refused", async () => {
@@ -385,6 +393,42 @@ test(
         const refreshed = await app.api.post("/auth/refresh", { refreshToken: tokens.refreshToken }, { record: false });
         expect(refreshed.status).toBe(401);
       }
+    });
+  },
+);
+
+test(
+  "Sign out on one session ends only that session",
+  {
+    tag: ["@console", "@users", "@security"],
+    annotation: about(
+      "Each session row has its own Sign out. It doesn't ask first: the row goes away, that session's refresh token stops working, and the user's other session keeps going.",
+    ),
+  },
+  async ({ page }) => {
+    const ana = await app.user("ana");
+    const second = await app.userSession(ana.email, ana.password);
+    await openAs(page, await app.root(), `/users/${ana.id}`);
+    const rows = page.getByRole("region", { name: "Sessions" }).getByTestId("user-session");
+    await step("Two sessions are listed, each with Sign out", async () => {
+      await expect(rows).toHaveCount(2);
+      for (const row of await rows.all()) {
+        await expect(row.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+      }
+    });
+    await step("Sign out the first one", async () => {
+      await rows.first().getByRole("button", { name: "Sign out", exact: true }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(rows).toHaveCount(1);
+      await expect(page.getByTestId("sign-out-everywhere")).toBeVisible();
+    });
+    await step("One refresh token is dead and the other still works", async () => {
+      const results = [];
+      for (const tokens of [ana.tokens!, second.tokens]) {
+        const refreshed = await app.api.post("/auth/refresh", { refreshToken: tokens.refreshToken }, { record: false });
+        results.push(refreshed.status);
+      }
+      expect(results.sort()).toEqual([200, 401]);
     });
   },
 );

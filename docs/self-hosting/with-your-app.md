@@ -14,13 +14,13 @@ Copy the `dopgate` service from the repository's `docker-compose.yml` into your 
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: app
       POSTGRES_USER: app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app -d app"]
       interval: 5s
@@ -57,7 +57,7 @@ volumes:
   pgdata:
 ```
 
-The example runs PostgreSQL 17. On 18 or later, mount the volume at `/var/lib/postgresql` as the bundled Compose file does. The 18 image refuses to start with a volume at `/var/lib/postgresql/data`.
+The example runs PostgreSQL 18, so the volume is mounted at `/var/lib/postgresql`, as in the bundled Compose file. The 18 image keeps its data in a versioned folder under it and refuses to start with a volume at `/var/lib/postgresql/data`. On 17 or earlier, mount it at `/var/lib/postgresql/data` instead.
 
 `DOPGATE_URL` and `DOPGATE_ISSUER` are names your backend would read; Dopgate doesn't use them. Your backend can fetch the JWKS and call the admin API over the internal network at `http://dopgate:8850`, but it must still check the issuer against the public URL, because that is what the tokens carry.
 

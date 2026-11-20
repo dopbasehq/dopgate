@@ -40,7 +40,7 @@
     "clean:app": "cargo clean --manifest-path app/Cargo.toml",
     "clean:docs": "rm -rf ./docs/.vitepress/dist/ ./docs/.vitepress/cache/",
     "clean:test": "bun ./scripts/clean-test.ts",
-    "test:db": "docker start dopgate-test-pg || docker run -d --name dopgate-test-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55432:5432 postgres:17-alpine -c max_connections=400",
+    "test:db": "docker start dopgate-test-pg || docker run -d --name dopgate-test-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55432:5432 postgres:18-alpine -c max_connections=400",
     "docker:build": "docker build -t dopgate ."
   },
   "devDependencies": {

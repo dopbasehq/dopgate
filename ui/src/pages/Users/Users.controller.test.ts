@@ -39,13 +39,21 @@ async function mountAs(user = root) {
 }
 
 describe("useUsersController", () => {
-  it("lists users with their status and last sign-in", async () => {
+  it("lists users with their status, creation day and last sign-in", async () => {
+    vi.mocked(adminApi.listUsers).mockResolvedValue({
+      items: [ada, { ...maya, status: "disabled" }],
+      nextCursor: null,
+    });
     const c = await mountAs();
     expect(c.rows.value.map((row) => row.user.id)).toEqual([ada.id, maya.id]);
     expect(c.rows.value[0]).toMatchObject({
       name: "Maya",
+      active: true,
       lastSignIn: "Never",
     });
+    expect(c.rows.value[0]?.created).toMatch(/2026/);
+    expect(c.rows.value[0]?.created).not.toMatch(/:/);
+    expect(c.rows.value[1]?.active).toBe(false);
     expect(adminApi.listUsers).toHaveBeenCalledWith(
       { search: "", status: null },
       null,
@@ -65,6 +73,15 @@ describe("useUsersController", () => {
       expect.any(AbortSignal),
     );
     expect(c.filtered.value).toBe(true);
+  });
+
+  it("opens a user from their row", async () => {
+    const c = await mountAs();
+    c.openUser(c.rows.value[1]!);
+    expect(push).toHaveBeenCalledWith({
+      name: "user",
+      params: { id: maya.id },
+    });
   });
 
   it("loads the next page with the cursor", async () => {

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as adminApi from "~/services/admin.api";
 import * as authApi from "~/services/auth.api";
+import type { Settings } from "~/services/types";
 import { useAuthStore } from "~/stores/auth.store";
 import { mountController, settle } from "~/tests/mount-controller";
 import { admin, apiError, sessionFixture, signInAs } from "~/tests/fixtures";
 import { useAccountController } from "./Account.controller";
 
 vi.mock("~/services/auth.api");
+vi.mock("~/services/admin.api");
 
 const current = sessionFixture({
   id: "ses_me",
@@ -18,6 +21,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   signInAs(admin);
   vi.mocked(authApi.fetchMySessions).mockResolvedValue([other, current]);
+  vi.mocked(adminApi.fetchSettings).mockResolvedValue({
+    password: { minLength: 10, rejectLeaked: false },
+  } as Settings);
 });
 
 async function mount() {
@@ -52,7 +58,33 @@ describe("useAccountController", () => {
     expect(c.displayName.value).toBe("");
   });
 
+  it("discards an unsaved display name", async () => {
+    const c = await mount();
+    c.displayName.value = "Someone else";
+    expect(c.profileDirty.value).toBe(true);
+    c.discardProfile();
+    expect(c.displayName.value).toBe("Ada");
+    expect(c.profileDirty.value).toBe(false);
+  });
+
   describe("password", () => {
+    it("knows the shortest password the server takes", async () => {
+      const c = await mount();
+      expect(c.passwordMinLength.value).toBe(10);
+    });
+
+    it("has something to send once a field is filled, and clears", async () => {
+      const c = await mount();
+      expect(c.passwordFilled.value).toBe(false);
+      c.newPassword.value = "new one";
+      expect(c.passwordFilled.value).toBe(true);
+      await c.submitPassword();
+      c.clearPassword();
+      expect(c.newPassword.value).toBe("");
+      expect(c.passwordErrors.value).toEqual({});
+      expect(c.passwordFilled.value).toBe(false);
+    });
+
     it("checks the fields first", async () => {
       const c = await mount();
       c.newPassword.value = "new one";
@@ -167,6 +199,18 @@ describe("useAccountController", () => {
       expect(useAuthStore().admin?.email).toBe("ada@new.example");
       expect(c.emailStep.value).toBe("idle");
       expect(c.emailChanged.value).toBe(true);
+    });
+
+    it("has something to send once a field is filled, and clears", async () => {
+      const c = await mount();
+      expect(c.emailFilled.value).toBe(false);
+      c.newEmail.value = "nope";
+      expect(c.emailFilled.value).toBe(true);
+      await c.requestEmailChange();
+      c.clearEmail();
+      expect(c.newEmail.value).toBe("");
+      expect(c.emailFieldError.value).toBeNull();
+      expect(c.emailFilled.value).toBe(false);
     });
 
     it("asks for the current password before calling the server", async () => {

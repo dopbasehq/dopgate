@@ -7,8 +7,8 @@ const NEW_PASSWORD = "a brand new passphrase";
 
 /** The password card of the account page. */
 const passwordForm = (page: import("@playwright/test").Page) => page.getByTestId("password-form");
-/** The Email card of the account page. */
-const emailCard = (page: import("@playwright/test").Page) => page.getByRole("region", { name: "Email" });
+/** The Email card of the account page, a form of its own. */
+const emailCard = (page: import("@playwright/test").Page) => page.getByRole("form", { name: "Email" });
 /** The Sessions card of the account page. */
 const sessionsCard = (page: import("@playwright/test").Page) => page.getByRole("region", { name: "Sessions" });
 
@@ -72,10 +72,17 @@ test(
     await openAs(page, sam, "/account");
     const form = passwordForm(page);
     const submit = form.getByRole("button", { name: "Change password" });
-    await step("Submit the empty form", async () => {
+    await step("Change password stays off while the form is empty", async () => {
+      await expect(submit).toBeDisabled();
+    });
+    await step("Empty fields are caught in the page", async () => {
+      await form.getByLabel("Current password").fill(PASSWORD);
+      await submit.click();
+      await expect(form.getByText("Choose a new password.")).toBeVisible();
+      await form.getByLabel("Current password").fill("");
+      await form.getByLabel("New password", { exact: true }).fill(NEW_PASSWORD);
       await submit.click();
       await expect(form.getByText("Enter your current password.")).toBeVisible();
-      await expect(form.getByText("Choose a new password.")).toBeVisible();
     });
     await step("A confirmation that differs", async () => {
       await form.getByLabel("Current password").fill(PASSWORD);

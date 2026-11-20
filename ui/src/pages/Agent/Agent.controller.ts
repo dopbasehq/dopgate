@@ -139,6 +139,15 @@ export function useAgentController() {
     );
   }
 
+  /** Puts the name and description back to what's saved. */
+  function discardDetails(): void {
+    if (!agent.value) return;
+    name.value = agent.value.name;
+    description.value = agent.value.description ?? "";
+    nameError.value = null;
+    error.value = null;
+  }
+
   async function saveCapabilities(): Promise<boolean> {
     const parsed = toCapabilities(capabilities.value);
     capabilityErrors.value = parsed.ok ? {} : parsed.errors;
@@ -159,6 +168,14 @@ export function useAgentController() {
       },
       "Couldn't save the capabilities.",
     );
+  }
+
+  /** Puts the capabilities back to what's saved. */
+  function discardCapabilities(): void {
+    if (!agent.value) return;
+    capabilities.value = rowsFrom(agent.value.capabilities);
+    capabilityErrors.value = {};
+    error.value = null;
   }
 
   function enable(): Promise<boolean> {
@@ -230,7 +247,9 @@ export function useAgentController() {
     capabilityErrors,
     revealed,
     saveDetails,
+    discardDetails,
     saveCapabilities,
+    discardCapabilities,
     enable,
     confirming,
     confirmError,
