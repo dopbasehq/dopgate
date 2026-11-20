@@ -31,7 +31,7 @@ You need Rust 1.89 or newer, [Bun](https://bun.sh), and Docker for PostgreSQL.
 ```bash
 bun install
 bun install --cwd ui
-bun run dev:db   # PostgreSQL 17 in a container named dopgate-dev-pg, on port 55433
+bun run dev:db   # PostgreSQL 18 in a container named dopgate-dev-pg, on port 55433
 bun run dev      # API, console, and docs together; Ctrl-C stops all three
 ```
 

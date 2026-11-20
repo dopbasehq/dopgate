@@ -194,7 +194,7 @@ jobs:
           docker run --detach --name dopgate-test-pg \
             --env POSTGRES_HOST_AUTH_METHOD=trust \
             --publish 127.0.0.1:55432:5432 \
-            postgres:17-alpine -c max_connections=400
+            postgres:18-alpine -c max_connections=400
 
       - name: Install Rust
         shell: bash
@@ -332,7 +332,7 @@ jobs:
           docker run --detach --name dopgate-test-pg \
             --env POSTGRES_HOST_AUTH_METHOD=trust \
             --publish 127.0.0.1:55432:5432 \
-            postgres:17-alpine -c max_connections=400
+            postgres:18-alpine -c max_connections=400
 
       - name: Install Rust
         shell: bash

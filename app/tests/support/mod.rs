@@ -6,7 +6,7 @@
 //!
 //! ```text
 //! docker run -d --name dopgate-test-pg -e POSTGRES_HOST_AUTH_METHOD=trust \
-//!   -p 127.0.0.1:55432:5432 postgres:17-alpine -c max_connections=400
+//!   -p 127.0.0.1:55432:5432 postgres:18-alpine -c max_connections=400
 //! ```
 
 pub mod breaches;
