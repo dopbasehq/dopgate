@@ -26,18 +26,30 @@ function readJson<T>(file: string): T | undefined {
     : undefined;
 }
 
-// The console's mono font, embedded so the report looks the same opened
-// from disk or from a CI artifact. Without ui/node_modules the page falls
-// back to the system mono font.
-const FONT = join(
-  ROOT,
-  "ui/node_modules/@fontsource-variable/fira-code/files/fira-code-latin-wght-normal.woff2",
-);
+// The console's fonts, embedded so the report looks the same opened from
+// disk or from a CI artifact: Fira Code for mono text and Geist for the
+// wordmark. Without ui/node_modules the page falls back to system fonts.
+const FONTS = "ui/node_modules/@fontsource-variable";
+const FACES = [
+  {
+    family: "Fira Code Variable",
+    weight: "300 700",
+    file: "fira-code/files/fira-code-latin-wght-normal.woff2",
+  },
+  {
+    family: "Geist Variable",
+    weight: "100 900",
+    file: "geist/files/geist-latin-wght-normal.woff2",
+  },
+];
 
 function fontFace(): string {
-  if (!existsSync(FONT)) return "";
-  const data = readFileSync(FONT).toString("base64");
-  return `@font-face { font-family: "Fira Code Variable"; font-style: normal; font-display: swap; font-weight: 300 700; src: url(data:font/woff2;base64,${data}) format("woff2"); }`;
+  return FACES.map(({ family, weight, file }) => {
+    const path = join(ROOT, FONTS, file);
+    if (!existsSync(path)) return "";
+    const data = readFileSync(path).toString("base64");
+    return `@font-face { font-family: "${family}"; font-style: normal; font-display: swap; font-weight: ${weight}; src: url(data:font/woff2;base64,${data}) format("woff2"); }`;
+  }).join("\n");
 }
 
 export function buildReport(): string {

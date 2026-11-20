@@ -1,6 +1,6 @@
 // The HTML report page. build.ts replaces the data and font placeholders.
 // It follows the Admin UI (ui/src/style.css and components/ui): the same
-// dark tokens, purple accent, 6px corners, 14px text floor, sidebar and
+// dark tokens, Gate Red accent and Hash D mark, 6px corners, 14px text floor, sidebar and
 // tables, so a run reads like the rest of Dopgate.
 // The page script avoids template literals so this file can hold it as one.
 export const PAGE = String.raw`<!doctype html>
@@ -9,7 +9,7 @@ export const PAGE = String.raw`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>E2E report · Dopgate</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 54 64'%3E%3Cpath fill='%23c4a3fc' d='M6 0h14a20 20 0 0 1 20 20v4a20 20 0 0 1-20 20H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z'/%3E%3Cpath fill='%23c4a3fc' d='M20 20h14a20 20 0 0 1 20 20v4a20 20 0 0 1-20 20H20a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6Z'/%3E%3Cpath fill='%23af8ef0' d='M34 20a20 20 0 0 1 6 .92V24a20 20 0 0 1-20 20h-6V26a6 6 0 0 1 6-6Z'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cdefs%3E%3ClinearGradient id='t' x1='22.86' y1='22.86' x2='137.14' y2='137.14' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%23FF4053'/%3E%3Cstop offset='1' stop-color='%23B0182C'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='160' height='160' rx='40' fill='url(%23t)'/%3E%3Cpath transform='translate(41.6 38.4) scale(1.6)' fill='%23fff' fill-rule='evenodd' d='M22 0C28.8956 0 35.5088 2.73929 40.3848 7.61523C45.2607 12.4912 48 19.1044 48 26C48 32.8956 45.2607 39.5088 40.3848 44.3848C35.5088 49.2607 28.8956 52 22 52H8C5.87827 52 3.84306 51.1575 2.34277 49.6572C0.842482 48.1569 0 46.1217 0 44V8C0 5.87827 0.842482 3.84306 2.34277 2.34277C3.84306 0.842482 5.87827 0 8 0H22ZM27.5 12C26.1193 12 25 13.1193 25 14.5V18H19V14.5C19 13.1193 17.8807 12 16.5 12C15.1193 12 14 13.1193 14 14.5V18H10.5C9.11929 18 8 19.1193 8 20.5C8 21.8807 9.11929 23 10.5 23H14V29H10.5C9.11929 29 8 30.1193 8 31.5C8 32.8807 9.11929 34 10.5 34H14V37.5C14 38.8807 15.1193 40 16.5 40C17.8807 40 19 38.8807 19 37.5V34H25V37.5C25 38.8807 26.1193 40 27.5 40C28.8807 40 30 38.8807 30 37.5V34H33.5C34.8807 34 36 32.8807 36 31.5C36 30.1193 34.8807 29 33.5 29H30V23H33.5C34.8807 23 36 21.8807 36 20.5C36 19.1193 34.8807 18 33.5 18H30V14.5C30 13.1193 28.8807 12 27.5 12ZM25 23V29H19V23H25Z'/%3E%3C/svg%3E">
 <style>
 /*__FONT_FACE__*/
 :root {
@@ -25,17 +25,19 @@ export const PAGE = String.raw`<!doctype html>
   --ink: color-mix(in srgb, #ebebeb, transparent 15%);
   --ink-muted: color-mix(in srgb, #ebebeb, transparent 45%);
   --ink-faint: color-mix(in srgb, #ebebeb, transparent 65%);
-  --accent: #aa3bff;
-  --accent-strong: #c084fc;
-  --accent-soft: color-mix(in srgb, #aa3bff, transparent 86%);
-  --brand-mark: #c4a3fc;
-  --brand-mark-overlap: #af8ef0;
+  /* Gate Red, as in the console. Failures use coral so they read apart
+     from the brand red. */
+  --accent: #ff4053;
+  --accent-strong: #ff8593;
+  --accent-soft: color-mix(in srgb, #ff4053, transparent 86%);
+  --brand-mark: #ff4053;
   --ok: #3fd68f;
   --warn: #f5b74e;
-  --crit: #f26d6d;
+  --crit: #ff7a59;
   --radius-card: 6px;
   --radius-control: 5px;
   --sans: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --brand: "Geist Variable", var(--sans);
   --mono: "Fira Code Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
   scrollbar-gutter: stable;
 }
@@ -65,7 +67,7 @@ code, .mono { font-family: var(--mono); font-size: 14px; }
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; }
 .brand svg { width: 30px; height: 30px; flex-shrink: 0; }
-.brand-name { font-size: 15px; font-weight: 600; line-height: 20px; letter-spacing: -0.3px; color: var(--ink-strong); }
+.brand-name { font-family: var(--brand); font-size: 17px; font-weight: 600; line-height: 20px; letter-spacing: -0.02em; color: var(--ink-strong); }
 .brand-sub { font-family: var(--mono); font-size: 14px; line-height: 22px; color: var(--ink-faint); }
 .nav { display: flex; flex-direction: column; gap: 2px; padding: 4px 12px; flex: 1; overflow-y: auto; }
 .nav-label { padding: 12px 10px 4px; font-size: 14px; font-weight: 500; color: var(--ink-faint); }
@@ -264,10 +266,8 @@ button.chip { border: 0; cursor: pointer; font: inherit; font-family: var(--mono
 <div class="shell">
   <aside class="side">
     <div class="brand">
-      <svg viewBox="0 0 54 64" aria-hidden="true">
-        <path fill="var(--brand-mark)" d="M6 0h14a20 20 0 0 1 20 20v4a20 20 0 0 1-20 20H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z"/>
-        <path fill="var(--brand-mark)" d="M20 20h14a20 20 0 0 1 20 20v4a20 20 0 0 1-20 20H20a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6Z"/>
-        <path fill="var(--brand-mark-overlap)" d="M34 20a20 20 0 0 1 6 .92V24a20 20 0 0 1-20 20h-6V26a6 6 0 0 1 6-6Z"/>
+      <svg viewBox="0 0 48 52" aria-hidden="true">
+        <path fill="var(--brand-mark)" fill-rule="evenodd" d="M22 0C28.8956 0 35.5088 2.73929 40.3848 7.61523C45.2607 12.4912 48 19.1044 48 26C48 32.8956 45.2607 39.5088 40.3848 44.3848C35.5088 49.2607 28.8956 52 22 52H8C5.87827 52 3.84306 51.1575 2.34277 49.6572C0.842482 48.1569 0 46.1217 0 44V8C0 5.87827 0.842482 3.84306 2.34277 2.34277C3.84306 0.842482 5.87827 0 8 0H22ZM27.5 12C26.1193 12 25 13.1193 25 14.5V18H19V14.5C19 13.1193 17.8807 12 16.5 12C15.1193 12 14 13.1193 14 14.5V18H10.5C9.11929 18 8 19.1193 8 20.5C8 21.8807 9.11929 23 10.5 23H14V29H10.5C9.11929 29 8 30.1193 8 31.5C8 32.8807 9.11929 34 10.5 34H14V37.5C14 38.8807 15.1193 40 16.5 40C17.8807 40 19 38.8807 19 37.5V34H25V37.5C25 38.8807 26.1193 40 27.5 40C28.8807 40 30 38.8807 30 37.5V34H33.5C34.8807 34 36 32.8807 36 31.5C36 30.1193 34.8807 29 33.5 29H30V23H33.5C34.8807 23 36 21.8807 36 20.5C36 19.1193 34.8807 18 33.5 18H30V14.5C30 13.1193 28.8807 12 27.5 12ZM25 23V29H19V23H25Z"/>
       </svg>
       <div>
         <p class="brand-name">Dopgate</p>
