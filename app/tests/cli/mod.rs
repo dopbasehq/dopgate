@@ -118,6 +118,127 @@ fn commands_need_a_database_url() {
 }
 
 #[test]
+fn admin_reset_password_prints_a_generated_password() {
+  let schema = unique_schema();
+  let _guard = SchemaGuard(schema.clone());
+  assert!(init(&schema, "correct-horse").status.success());
+  let output = dopgate(&schema)
+    .args(["--json", "admin", "reset-password", "Root@Example.com"])
+    // Left over from the first start, and ignored by a reset.
+    .env("DOPGATE_ROOT_PASSWORD", "correct-horse")
+    .output()
+    .unwrap();
+  assert!(output.status.success(), "{output:?}");
+  let body = json(&output.stdout);
+  assert_eq!(body["data"]["email"], "root@example.com");
+  assert_eq!(body["data"]["role"], "root");
+  assert_eq!(body["data"]["sessionsEnded"], 0);
+  let password = body["data"]["password"].as_str().unwrap();
+  assert_eq!(password.len(), 29, "{password}");
+  assert!(app::services::password::verify(
+    password,
+    &root_password_hash(&schema)
+  ));
+}
+
+/// Root's stored password hash, read straight from the schema.
+fn root_password_hash(schema: &str) -> String {
+  let schema = schema.to_owned();
+  std::thread::spawn(move || {
+    tokio::runtime::Builder::new_current_thread()
+      .enable_all()
+      .build()
+      .unwrap()
+      .block_on(async move {
+        let pool = sqlx::PgPool::connect(&database_url()).await.unwrap();
+        let hash: String = sqlx::query_scalar(&format!(
+          "SELECT password_hash FROM \"{schema}\".admins WHERE role = 'root'"
+        ))
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        pool.close().await;
+        hash
+      })
+  })
+  .join()
+  .unwrap()
+}
+
+#[test]
+fn admin_reset_password_says_which_instance_it_changed() {
+  let schema = unique_schema();
+  let _guard = SchemaGuard(schema.clone());
+  assert!(init(&schema, "correct-horse").status.success());
+  let output = dopgate(&schema)
+    .args(["admin", "reset-password", "root@example.com"])
+    .output()
+    .unwrap();
+  assert!(output.status.success(), "{output:?}");
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  let stderr = String::from_utf8_lossy(&output.stderr);
+  assert!(stderr.contains(&format!("(schema {schema})")), "{stderr}");
+  assert!(stderr.starts_with("Instance: "), "{stderr}");
+  assert!(
+    stdout.contains("Password reset for root@example.com."),
+    "{stdout}"
+  );
+  assert!(stdout.contains("shown once"), "{stdout}");
+  assert!(stdout.contains("0 console sessions ended."), "{stdout}");
+}
+
+#[test]
+fn admin_reset_password_reads_the_password_from_stdin() {
+  let schema = unique_schema();
+  let _guard = SchemaGuard(schema.clone());
+  assert!(init(&schema, "correct-horse").status.success());
+  let mut child = dopgate(&schema)
+    .args([
+      "--json",
+      "admin",
+      "reset-password",
+      "root@example.com",
+      "--password-stdin",
+    ])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .unwrap();
+  child
+    .stdin
+    .take()
+    .unwrap()
+    .write_all(b"battery-staple\n")
+    .unwrap();
+  let output = child.wait_with_output().unwrap();
+  assert!(output.status.success(), "{output:?}");
+  assert!(json(&output.stdout)["data"]["password"].is_null());
+  assert!(app::services::password::verify(
+    "battery-staple",
+    &root_password_hash(&schema)
+  ));
+}
+
+#[test]
+fn admin_reset_password_needs_an_existing_admin() {
+  let schema = unique_schema();
+  let _guard = SchemaGuard(schema.clone());
+  let output = dopgate(&schema)
+    .args(["--json", "admin", "reset-password", "root@example.com"])
+    .output()
+    .unwrap();
+  assert_eq!(output.status.code(), Some(1));
+  let body = json(&output.stderr);
+  assert!(
+    body["error"]["CLI_ERROR"]
+      .as_str()
+      .unwrap()
+      .contains("no root or admin has that email")
+  );
+}
+
+#[test]
 fn keys_rotate_makes_a_new_active_key() {
   let schema = unique_schema();
   let _guard = SchemaGuard(schema.clone());
