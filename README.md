@@ -106,7 +106,7 @@ If you ran a 0.1.0 preview, delete the old `.dev-data` folder. It held SQLite fi
 | `ui/` | The admin console (Vue 3, Vite, Tailwind), embedded into the binary at build time |
 | `e2e/` | End-to-end suites that run the release binary: CLI, API, console, and journeys |
 | `docs/` | The VitePress documentation site |
-| `scripts/` | `dev.ts`, which starts the API, console, and docs together, `clean-test.ts`, and the release scripts |
+| `scripts/` | `dev.ts`, which starts the API, console, and docs together, `clean-test.ts`, `bench.ts` behind `bun run bench`, and the release scripts |
 | `public/` | The logo and favicon the docs use |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | The image and the smallest PostgreSQL plus Dopgate stack |
 

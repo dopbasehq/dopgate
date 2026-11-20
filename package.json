@@ -28,6 +28,7 @@
     "test:e2e:journeys": "bun ./e2e/run.ts --project journeys",
     "test:e2e:coverage": "bun ./e2e/coverage/check.ts",
     "test:e2e:report": "bun ./e2e/run.ts --open-report",
+    "bench": "bun ./scripts/bench.ts",
     "lint": "bun run lint:ui && bun run lint:app",
     "lint:ui": "bun run --cwd ui lint",
     "lint:app": "cargo clippy --manifest-path app/Cargo.toml --all-targets -- -D warnings",
