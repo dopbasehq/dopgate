@@ -124,6 +124,10 @@ Nothing below has shipped before.
 - Release archives of the `dopgate` binary for Linux and macOS, on amd64 and
   arm64, with a `checksums.txt` to verify them. Each GitHub release takes its
   notes from this file.
+- A Docker image for every release at `dopbase/dopgate` on Docker Hub, for
+  linux/amd64 and linux/arm64, tagged with the version, its minor line (`0.1`), and
+  `latest`. It holds the same static binary as the Linux release archive on
+  a distroless base, runs as a non-root user, and has no shell.
 - Documentation site and README for the setup above. The docs have an AI
   agents section and cover personal tokens, console tokens, and starting over
   from a development build. The home page links each feature to its guide and
