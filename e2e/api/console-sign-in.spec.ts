@@ -618,7 +618,8 @@ test(
       const sent = await app.api.post("/console/codes/send", { email: admin.email });
       expect(sent.status).toBe(200);
       expect(sent.message).toBe("CODE_SENT");
-      expect(sent.data).toBeNull();
+      // Seconds until the next code. This server has the wait turned off.
+      expect(sent.data).toEqual({ retryAfter: 0 });
     });
     const mail = await step("A sign-in code arrives by email", () =>
       app.mail.last(admin.email),

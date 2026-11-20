@@ -169,13 +169,14 @@ async fn an_admin_without_a_password_signs_in_with_a_code() {
     )
     .await;
   assert_eq!(status, StatusCode::CREATED);
-  let (status, _) = post(
+  let (status, body) = post(
     &app,
     "/api/v1/console/codes/send",
     json!({ "email": "ana@example.com" }),
   )
   .await;
   assert_eq!(status, StatusCode::OK);
+  assert_eq!(body["data"]["retryAfter"], 60, "the default resend wait");
   let code = smtp.code_for("ana@example.com").await;
 
   // The code is the console's: the app's confirm endpoint doesn't take it.

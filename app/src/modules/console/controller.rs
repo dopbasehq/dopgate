@@ -20,6 +20,7 @@ use crate::{
       self,
       model::{RevokeAllQuery, SessionResponse},
     },
+    verification::model::CodeSent,
   },
   state::AppState,
 };
@@ -154,14 +155,15 @@ pub async fn logout(
 /// Send a console sign-in code
 ///
 /// Email a 6-digit sign-in code to an admin. The answer is the same whether
-/// or not an admin uses the email.
+/// or not an admin uses the email. `retryAfter` says how many seconds until
+/// the email can be sent another code.
 #[utoipa::path(
   post,
   path = crate::constants::api::console::CODES_SEND,
   tag = "console",
   request_body = ConsoleSendCodeRequest,
   responses(
-    (status = 200, description = "A code was sent if an admin uses the email", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 200, description = "A code was sent if an admin uses the email", body = inline(HttpResponseFormat<CodeSent>)),
     (status = 422, description = "The email was refused", body = crate::http::ErrorBody),
     (status = 429, description = "Too many codes; see Retry-After", body = crate::http::ErrorBody),
   ),
@@ -169,9 +171,9 @@ pub async fn logout(
 pub async fn send_code(
   State(state): State<AppState>,
   Json(request): Json<ConsoleSendCodeRequest>,
-) -> Result<HttpResponse<serde_json::Value>, ConsoleError> {
-  service::send_code(&state, request).await?;
-  Ok(HttpResponse::done("CODE_SENT"))
+) -> Result<HttpResponse<CodeSent>, ConsoleError> {
+  let sent = service::send_code(&state, request).await?;
+  Ok(HttpResponse::ok(sent, "CODE_SENT"))
 }
 
 /// Confirm a console code

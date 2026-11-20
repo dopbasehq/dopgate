@@ -17,14 +17,14 @@ use axum::{
 /// Email a 6-digit code to verify an address (`email_verify`) or to sign in
 /// without a password (`login`). The answer is the same whether or not the
 /// email has an account. Asking again replaces the earlier code, after a
-/// short wait.
+/// short wait: `retryAfter` in the answer says how many seconds.
 #[utoipa::path(
   post,
   path = crate::constants::api::verification::SEND,
   tag = "verification",
   request_body = SendCodeRequest,
   responses(
-    (status = 200, description = "A code was sent if the email can receive one", body = inline(HttpResponseFormat<serde_json::Value>)),
+    (status = 200, description = "A code was sent if the email can receive one", body = inline(HttpResponseFormat<CodeSent>)),
     (status = 422, description = "The email or purpose was refused", body = crate::http::ErrorBody),
     (status = 429, description = "Too many codes; see Retry-After", body = crate::http::ErrorBody),
   ),
@@ -32,9 +32,9 @@ use axum::{
 pub async fn send(
   State(state): State<AppState>,
   Json(request): Json<SendCodeRequest>,
-) -> Result<HttpResponse<serde_json::Value>, VerificationError> {
-  service::send(&state, request).await?;
-  Ok(HttpResponse::done("CODE_SENT"))
+) -> Result<HttpResponse<CodeSent>, VerificationError> {
+  let sent = service::send(&state, request).await?;
+  Ok(HttpResponse::ok(sent, "CODE_SENT"))
 }
 
 /// Confirm a code
