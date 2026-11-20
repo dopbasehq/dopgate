@@ -31,7 +31,7 @@ export default defineConfig({
     assetsInlineLimit: 0,
   },
   server: {
-    port: 5174,
+    port: 9000,
     strictPort: true,
     proxy: {
       "/api": { target: backend, changeOrigin: true },

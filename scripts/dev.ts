@@ -1,7 +1,8 @@
 // Local development defaults. `bun run dev:db` starts this database.
-process.env.DOPGATE_DATABASE_URL ??= "postgres://postgres@localhost:55433/postgres";
-process.env.DOPGATE_ALLOWED_ORIGINS ??= "http://localhost:5174";
-process.env.DOPGATE_ROOT_EMAIL ??= "admin@example.com";
+process.env.DOPGATE_DATABASE_URL ??=
+  "postgres://postgres@localhost:55433/postgres";
+process.env.DOPGATE_ALLOWED_ORIGINS ??= "http://localhost:9000";
+process.env.DOPGATE_ROOT_EMAIL ??= "root@dopgate.com";
 
 type ChildName = "dopgate API" | "Admin console" | "Docs";
 
@@ -20,18 +21,18 @@ const children: Child[] = [
     }),
   },
   {
-    name: "Admin console",
-    // Vite and VitePress would both read keyboard shortcuts from stdin.
-    process: Bun.spawn(["bun", "run", "dev:ui"], {
-      stdin: "ignore",
+    name: "Docs",
+    process: Bun.spawn(["bun", "run", "dev:docs"], {
+      stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
     }),
   },
   {
-    name: "Docs",
-    process: Bun.spawn(["bun", "run", "dev:docs"], {
-      stdin: "inherit",
+    name: "Admin console",
+    // Vite and VitePress would both read keyboard shortcuts from stdin.
+    process: Bun.spawn(["bun", "run", "dev:ui"], {
+      stdin: "ignore",
       stdout: "inherit",
       stderr: "inherit",
     }),
@@ -43,7 +44,11 @@ console.log("  API:      http://localhost:8850/api/v1");
 console.log("  API docs: http://localhost:8850/api/docs");
 console.log("  Console:  http://localhost:5174");
 console.log("  Docs:     http://localhost:5173");
-console.log("  Database: " + process.env.DOPGATE_DATABASE_URL + " (start it with `bun run dev:db`)");
+console.log(
+  "  Database: " +
+    process.env.DOPGATE_DATABASE_URL +
+    " (start it with `bun run dev:db`)",
+);
 
 let stopping = false;
 
