@@ -48,6 +48,14 @@ export function useTemplateController({ previewDelay = 400 } = {}) {
     const testEmail = settings.data.value?.testEmail;
     return testEmail?.recipient ?? testEmail?.rootEmail ?? null;
   });
+  /** Who the email comes from, as the SMTP settings name it. */
+  const sender = computed(() => {
+    const smtp = settings.data.value?.smtp;
+    if (!smtp) return null;
+    return smtp.fromName
+      ? `${smtp.fromName} <${smtp.fromEmail}>`
+      : smtp.fromEmail;
+  });
   const template = computed<Template | null>(() => read.data.value ?? null);
   const loadError = computed(() =>
     read.error.value && !read.isLoading.value && !read.data.value
@@ -86,7 +94,8 @@ export function useTemplateController({ previewDelay = 400 } = {}) {
   const preview = ref<TemplateContent | null>(null);
   const previewError = ref<string | null>(null);
   const previewing = ref(false);
-  const previewTab = ref<"html" | "text">("html");
+  /** The body being edited, which is also the one the preview shows. */
+  const body = ref<"html" | "text">("html");
   let previewTimer: ReturnType<typeof setTimeout> | null = null;
   let previewAbort: AbortController | null = null;
 
@@ -217,7 +226,8 @@ export function useTemplateController({ previewDelay = 400 } = {}) {
     preview,
     previewError,
     previewing,
-    previewTab,
+    body,
+    sender,
     busy,
     error,
     notice,

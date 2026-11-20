@@ -49,7 +49,10 @@ test(
         await expect(row).toContainText(template.subject);
       }
     });
-    await step("No row says Customized", async () => {
+    await step("Every row says Built-in and none says Customized", async () => {
+      await expect(
+        page.getByTestId("templates-list").getByText("Built-in", { exact: true }),
+      ).toHaveCount(6);
       await expect(page.getByText("Customized")).toHaveCount(0);
     });
   },

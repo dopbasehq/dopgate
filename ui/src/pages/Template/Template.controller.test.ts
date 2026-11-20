@@ -131,6 +131,22 @@ describe("useTemplateController", () => {
     expect(c.notice.value).toBe("Sent a test email to qa@example.com.");
   });
 
+  it("names the sender from the SMTP settings", async () => {
+    vi.mocked(adminApi.fetchSettings).mockResolvedValue({
+      smtp: { fromName: "Acme", fromEmail: "no-reply@acme.dev" },
+    } as Settings);
+    const c = await mount();
+    expect(c.sender.value).toBe("Acme <no-reply@acme.dev>");
+  });
+
+  it("names the sender by address alone when there's no from name", async () => {
+    vi.mocked(adminApi.fetchSettings).mockResolvedValue({
+      smtp: { fromName: null, fromEmail: "no-reply@dopgate.com" },
+    } as Settings);
+    const c = await mount();
+    expect(c.sender.value).toBe("no-reply@dopgate.com");
+  });
+
   it("shows the server's reason when sending fails", async () => {
     vi.mocked(adminApi.sendTemplateTest).mockRejectedValue(
       apiError(502, "SMTP_SEND_FAILED", "The mail server refused the message."),

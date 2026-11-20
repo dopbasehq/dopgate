@@ -5,6 +5,9 @@ import { seeHeading } from "./instance.support.ts";
 const app = useServer();
 
 const save = (page: import("@playwright/test").Page) => page.getByTestId("save-template");
+/** Picks the body the editor and the preview show: "HTML" or "Plain text". */
+const showBody = (page: import("@playwright/test").Page, body: "HTML" | "Plain text") =>
+  page.getByRole("radio", { name: body, exact: true }).click();
 
 test(
   "a template page shows subject, HTML, text and the variables it accepts",
@@ -25,7 +28,9 @@ test(
       await expect(page.getByText("Built-in", { exact: true })).toBeVisible();
       await expect(page.getByLabel("Subject")).toHaveValue(read.data.subject);
       await expect(page.getByLabel("HTML")).toHaveValue(read.data.html);
+      await showBody(page, "Plain text");
       await expect(page.getByLabel("Plain text")).toHaveValue(read.data.text);
+      await showBody(page, "HTML");
     });
     await step("Save is off and Reset is not offered", async () => {
       await expect(save(page)).toBeDisabled();
@@ -43,10 +48,10 @@ test(
       await expect(frame.locator("body")).toContainText("482913");
       await expect(frame.locator("body")).toContainText("Dopgate");
     });
-    await step("The Text tab shows the plain text rendering", async () => {
-      await page.getByRole("tab", { name: "Text" }).click();
+    await step("Switching the body to Plain text shows the plain text rendering", async () => {
+      await showBody(page, "Plain text");
       await expect(page.locator("pre")).toContainText("482913");
-      await page.getByRole("tab", { name: "HTML" }).click();
+      await showBody(page, "HTML");
     });
   },
 );
@@ -90,16 +95,17 @@ test(
     await step("Edit the subject and the HTML", async () => {
       await page.getByLabel("Subject").fill(`${marker} for {{email}}`);
       await page.getByLabel("HTML").fill("<p>Hello {{display_name}} at {{app_name}}</p>");
+      await showBody(page, "Plain text");
       await page.getByLabel("Plain text").fill("Plain hello {{display_name}}");
     });
     await step("The preview shows sample values in place of variables", async () => {
       await expect(page.getByRole("region", { name: "Preview" })).toContainText(
         `${marker} for ${ROOT_EMAIL}`,
       );
+      await expect(page.locator("pre")).toContainText("Plain hello Alex");
+      await showBody(page, "HTML");
       const frame = page.frameLocator('iframe[title="HTML preview"]');
       await expect(frame.locator("body")).toContainText("Hello Alex at Dopgate");
-      await page.getByRole("tab", { name: "Text" }).click();
-      await expect(page.locator("pre")).toContainText("Plain hello Alex");
     });
     await step("The page says the changes are unsaved", async () => {
       await expect(page.getByText("Unsaved changes")).toBeVisible();
@@ -128,6 +134,7 @@ test(
       await seeHeading(page, "Verify email");
       await page.getByLabel("Subject").fill(`${label}: {{code}} confirms {{email}}`);
       await page.getByLabel("HTML").fill("<p>Your {{app_name}} code is <b>{{code}}</b></p>");
+      await showBody(page, "Plain text");
       await page.getByLabel("Plain text").fill(`${label} code {{code}} lasts {{expires_minutes}} minutes`);
     });
     await step("Save", async () => {
@@ -288,6 +295,7 @@ test(
       await expect(page.getByText("Built-in", { exact: true })).toBeVisible();
       await expect(page.getByLabel("Subject")).toHaveValue(original.subject);
       await expect(page.getByLabel("HTML")).toHaveValue(original.html);
+      await showBody(page, "Plain text");
       await expect(page.getByLabel("Plain text")).toHaveValue(original.text);
       await expect(page.getByRole("button", { name: "Reset to built-in" })).toHaveCount(0);
     });
