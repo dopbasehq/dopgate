@@ -77,7 +77,9 @@ describe("audit helpers", () => {
     expect(AUDIT_ACTIONS).toContain("user.sign_in_failed");
     expect(AUDIT_ACTIONS).toContain("admin.signed_in");
     expect(new Set(AUDIT_ACTIONS).size).toBe(AUDIT_ACTIONS.length);
-    expect([...AUDIT_ACTIONS].sort()).toEqual(AUDIT_ACTIONS);
+    expect([...AUDIT_ACTIONS].sort((a, b) => a.localeCompare(b))).toEqual(
+      AUDIT_ACTIONS,
+    );
   });
 
   it("marks failures and refusals", () => {

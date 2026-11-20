@@ -53,7 +53,7 @@ export const AUDIT_ACTIONS: readonly string[] = [
   "user.sessions_revoked",
   "user.signed_up",
   "user.updated",
-].sort();
+].sort((a, b) => a.localeCompare(b));
 
 /** Failures and refusals stand out; everything else stays neutral. */
 export function actionTone(action: string): "crit" | "neutral" {
