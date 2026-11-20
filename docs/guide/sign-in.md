@@ -52,7 +52,7 @@ curl -X POST https://auth.example.com/api/v1/auth/verification/send \
   -d '{"email":"ana@example.com","purpose":"login"}'
 ```
 
-The answer is always `200 CODE_SENT`. The code goes out with the `login_code` [template](/guide/email-templates) when the email belongs to an active account. Then confirm it:
+The answer is always `200 CODE_SENT`, with `retryAfter`: the seconds until you can ask for another code for that email. The code goes out with the `login_code` [template](/guide/email-templates) when the email belongs to an active account. Then confirm it:
 
 ```bash
 curl -X POST https://auth.example.com/api/v1/auth/verification/confirm \

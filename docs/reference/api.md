@@ -269,7 +269,7 @@ Every agent, for admins. `GET` needs Admin; the rest need Console, not the servi
 
 ### `POST /api/v1/auth/verification/send`
 
-Public. Emails a 6-digit code. Always answers `200 CODE_SENT`, whether or not the email has an account.
+Public. Emails a 6-digit code. Always answers `200 CODE_SENT`, whether or not the email has an account. `data.retryAfter` is the seconds until the same email can be sent another code, `0` when it can right away.
 
 | Request field | Required | Notes |
 | --- | --- | --- |
@@ -335,7 +335,7 @@ The console's own sign-in and the signed-in admin's account. These mirror the ac
 | `POST /api/v1/console/login` | Public | `email` and `password`. Answers `200 SIGNED_IN` with console tokens. Same errors as `/auth/login`, without `EMAIL_NOT_VERIFIED`. |
 | `POST /api/v1/console/refresh` | Public | `refreshToken`, or the `dopgate_console` cookie. Answers `200 TOKENS_REFRESHED`. |
 | `POST /api/v1/console/logout` | Public, or Console | `refreshToken` and `allSessions`, as on `/auth/logout`. |
-| `POST /api/v1/console/codes/send` | Public | `email`. Emails a `login_code` to the admin. The answer is the same for unknown emails. |
+| `POST /api/v1/console/codes/send` | Public | `email`. Emails a `login_code` to the admin. The answer is the same for unknown emails, with `retryAfter`, the seconds until the next code. |
 | `POST /api/v1/console/codes/confirm` | Public | `email`, `purpose` (`login` or `email_change`), and `code`. Tokens for `login`, the admin for `email_change`. |
 | `POST /api/v1/console/password/forgot` | Public | `email`. Emails a reset code to the admin. |
 | `POST /api/v1/console/password/reset` | Public | `email`, `code`, `newPassword`. Ends every console session of the admin. |
