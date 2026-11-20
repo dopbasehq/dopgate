@@ -25,8 +25,8 @@ The sidebar groups the pages under **People** (Users, Agents), **Email** (Templa
 | Agent | `/agents/{id}` | The agent's owner, token, and capabilities. The owner edits it and regenerates the token; any admin turns it off, back on, or deletes it. |
 | Admins | `/admins` | See root and every admin. Root adds admins and turns them off, back on, or removes them. |
 | Email templates | `/templates` | See the six emails and which ones are customized. |
-| Template | `/templates/{name}` | Edit the subject, HTML, and text, copy a variable's placeholder, preview the result, send yourself a test, or reset to the built-in version. |
-| Settings | `/settings` | Sign-up rules, the minimum password length, codes and lockout, token lifetimes, whether users can make personal tokens and agents, and branding. The SMTP section is editable unless the server config sets a host (`DOPGATE_SMTP_HOST` or the config file), and has a button that sends a test email. |
+| Template | `/templates/{name}` | Edit the subject, HTML, and text, copy a variable's placeholder, preview the result, send a test to the test email address, or reset to the built-in version. |
+| Settings | `/settings` | Sign-up rules, the minimum password length, codes and lockout, token lifetimes, whether users can make personal tokens and agents, and branding. The SMTP section is editable unless the server config sets a host (`DOPGATE_SMTP_HOST` or the config file), and has a button that sends a test email. Test emails go to root unless you save another address next to it. |
 | Signing keys | `/keys` | See the active, retiring, and retired keys. Root can rotate the key here. |
 | Audit log | `/audit` | Page through every recorded event, filter by action or actor, and verify the hash chain. |
 | Account | `/account` | Your own profile, password, email, and signed-in sessions. An admin without a password asks for an emailed code here to set one. |
