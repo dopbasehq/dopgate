@@ -1,15 +1,16 @@
 //! Owns `settings`: one JSON object per section.
 
-use sqlx::{PgConnection, PgPool};
+use sqlx::{PgConnection, PgExecutor};
 
-/// The JSON of a section, if it was ever saved.
+/// The JSON of a section, if it was ever saved. Takes the pool, or the
+/// connection of a transaction that is already open.
 pub async fn value(
-  pool: &PgPool,
+  executor: impl PgExecutor<'_>,
   key: &str,
 ) -> Result<Option<serde_json::Value>, sqlx::Error> {
   sqlx::query_scalar("SELECT value FROM settings WHERE key = $1")
     .bind(key)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await
 }
 

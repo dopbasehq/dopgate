@@ -55,23 +55,13 @@ pub async fn console_tokens(
 }
 
 async fn start(
-  state: &AppState,
   account: &accounts::AccountRow,
   method: SignInMethod,
   user_agent: Option<&str>,
   tx: &mut sqlx::PgConnection,
 ) -> Result<Grant, HttpError> {
   let actor_type = verification::actor_type_of(&mut *tx, Realm::Console, &account.id).await?;
-  sessions::service::start(
-    state,
-    tx,
-    Realm::Console,
-    account,
-    actor_type,
-    method,
-    user_agent,
-  )
-  .await
+  sessions::service::start(tx, Realm::Console, account, actor_type, method, user_agent).await
 }
 
 /// Sign an admin in with an email and password.
@@ -83,7 +73,7 @@ pub async fn login(
   let admin =
     auth::service::check_password(state, Realm::Console, &request.email, request.password).await?;
   let mut tx = state.db.pool().begin().await?;
-  let grant = start(state, &admin, SignInMethod::Password, user_agent, &mut tx).await?;
+  let grant = start(&admin, SignInMethod::Password, user_agent, &mut tx).await?;
   tx.commit().await?;
   console_tokens(state, &admin.id, grant).await
 }
@@ -144,7 +134,7 @@ pub async fn confirm_code(
         ));
       }
       accounts::mark_verified(&mut *tx, Realm::Console, &admin.id).await?;
-      let grant = start(state, &admin, SignInMethod::Otp, user_agent, &mut tx).await?;
+      let grant = start(&admin, SignInMethod::Otp, user_agent, &mut tx).await?;
       tx.commit().await?;
       Ok(Confirmed::SignedIn(
         console_tokens(state, &admin.id, grant).await?,

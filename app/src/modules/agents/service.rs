@@ -225,10 +225,9 @@ pub async fn create(
   )?;
   let (secret, hash, last_four) = new_token()?;
   let id = token::public_id(AGENT_ID_PREFIX);
-  let pool = state.db.pool();
-  let mut tx = pool.begin().await?;
+  let mut tx = state.db.pool().begin().await?;
   if let Owner::User(user_id) = owner {
-    let rules = settings::service::self_service(pool).await?;
+    let rules = settings::service::self_service(&mut *tx).await?;
     if !rules.agents {
       return Err(feature_off());
     }

@@ -136,7 +136,6 @@ pub async fn signup(
       .ok_or_else(HttpError::internal)?;
     Some(
       sessions::service::start(
-        state,
         &mut tx,
         Realm::App,
         &account,
@@ -295,7 +294,6 @@ pub async fn login(
   }
   let mut tx = pool.begin().await?;
   let grant = sessions::service::start(
-    state,
     &mut tx,
     Realm::App,
     &user,

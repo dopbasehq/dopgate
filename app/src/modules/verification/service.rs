@@ -265,9 +265,7 @@ pub async fn confirm(
         consume(state, Realm::App, request.purpose, &email, &request.code).await?;
       let user = match accounts::find_by_email(&mut *tx, Realm::App, &email).await? {
         Some(user) => user,
-        None if request.purpose == Purpose::Login => {
-          create_passwordless(state, &mut tx, &email).await?
-        }
+        None if request.purpose == Purpose::Login => create_passwordless(&mut tx, &email).await?,
         None => {
           return Err(HttpError::bad_request(
             CODE_INVALID,
@@ -287,7 +285,6 @@ pub async fn confirm(
         .await?;
       }
       let grant = sessions::service::start(
-        state,
         &mut tx,
         Realm::App,
         &user,
@@ -318,11 +315,10 @@ pub async fn confirm(
 
 /// A member account for a first sign-in by code, when settings allow it.
 async fn create_passwordless(
-  state: &AppState,
   tx: &mut PgConnection,
   email: &str,
 ) -> Result<AccountRow, HttpError> {
-  let signup = settings::service::signup(state.db.pool()).await?;
+  let signup = settings::service::signup(&mut *tx).await?;
   if !(signup.enabled && signup.passwordless_signup) {
     return Err(HttpError::bad_request(
       CODE_INVALID,

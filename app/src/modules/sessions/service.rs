@@ -55,7 +55,6 @@ pub struct Grant {
 /// commit together. `actor_type` is what the audit log records: `user`, or
 /// the admin's role.
 pub async fn start(
-  state: &AppState,
   tx: &mut PgConnection,
   realm: Realm,
   account: &AccountRow,
@@ -63,7 +62,9 @@ pub async fn start(
   method: SignInMethod,
   user_agent: Option<&str>,
 ) -> Result<Grant, HttpError> {
-  let lifetimes = settings::service::tokens(state.db.pool()).await?;
+  // Read through the transaction. The pool would have to hand out a second
+  // connection while this request holds one.
+  let lifetimes = settings::service::tokens(&mut *tx).await?;
   let now = Utc::now();
   let session_id = token::public_id(SESSION_ID_PREFIX);
   let idle = now + Duration::days(i64::from(lifetimes.refresh_token_idle_days));

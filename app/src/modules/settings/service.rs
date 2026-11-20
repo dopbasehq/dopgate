@@ -26,7 +26,7 @@ use crate::{
 };
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use sqlx::PgPool;
+use sqlx::PgExecutor;
 
 const SIGNUP: &str = "signup";
 const PASSWORD: &str = "password";
@@ -61,28 +61,33 @@ const ACCESS_TOKEN_MINUTES_MAX: u32 = 24 * 60;
 const REFRESH_REUSE_SECONDS_MAX: u32 = 60;
 const TEXT_MAX_CHARS: usize = 255;
 
-pub async fn signup(pool: &PgPool) -> Result<SignupSettings, HttpError> {
-  section(pool, SIGNUP).await
+// The section readers take the pool, or the connection of a transaction
+// that is already open. Inside a transaction, pass its connection: asking
+// the pool for a second one while holding the first stalls every request
+// once all connections are held that way.
+
+pub async fn signup(executor: impl PgExecutor<'_>) -> Result<SignupSettings, HttpError> {
+  section(executor, SIGNUP).await
 }
 
-pub async fn password(pool: &PgPool) -> Result<PasswordSettings, HttpError> {
-  section(pool, PASSWORD).await
+pub async fn password(executor: impl PgExecutor<'_>) -> Result<PasswordSettings, HttpError> {
+  section(executor, PASSWORD).await
 }
 
-pub async fn tokens(pool: &PgPool) -> Result<TokenSettings, HttpError> {
-  section(pool, TOKENS).await
+pub async fn tokens(executor: impl PgExecutor<'_>) -> Result<TokenSettings, HttpError> {
+  section(executor, TOKENS).await
 }
 
-pub async fn limits(pool: &PgPool) -> Result<LimitSettings, HttpError> {
-  section(pool, LIMITS).await
+pub async fn limits(executor: impl PgExecutor<'_>) -> Result<LimitSettings, HttpError> {
+  section(executor, LIMITS).await
 }
 
-pub async fn self_service(pool: &PgPool) -> Result<SelfServiceSettings, HttpError> {
-  section(pool, SELF_SERVICE).await
+pub async fn self_service(executor: impl PgExecutor<'_>) -> Result<SelfServiceSettings, HttpError> {
+  section(executor, SELF_SERVICE).await
 }
 
-pub async fn branding(pool: &PgPool) -> Result<BrandingSettings, HttpError> {
-  section(pool, BRANDING).await
+pub async fn branding(executor: impl PgExecutor<'_>) -> Result<BrandingSettings, HttpError> {
+  section(executor, BRANDING).await
 }
 
 pub async fn get(state: &AppState) -> Result<Settings, HttpError> {
@@ -353,10 +358,10 @@ pub async fn test_smtp(
 
 /// A stored section, or its defaults when it was never saved.
 async fn section<T: DeserializeOwned + Default>(
-  pool: &PgPool,
+  executor: impl PgExecutor<'_>,
   key: &str,
 ) -> Result<T, HttpError> {
-  let Some(json) = repository::value(pool, key).await? else {
+  let Some(json) = repository::value(executor, key).await? else {
     return Ok(T::default());
   };
   serde_json::from_value(json).map_err(|error| {
