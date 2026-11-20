@@ -6,9 +6,8 @@ use crate::{
 };
 
 pub async fn jwks(state: &AppState) -> Jwks {
-  let set = state.keys.jwks().await;
   Jwks {
-    keys: set["keys"].as_array().cloned().unwrap_or_default(),
+    keys: state.keys.jwks().await,
   }
 }
 

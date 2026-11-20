@@ -29,13 +29,13 @@ pub async fn sign(
   state: &AppState,
   claims: &AccessClaims,
 ) -> Result<String, HttpError> {
-  let (kid, key) = state.keys.signing_key().await.ok_or_else(|| {
+  let signing = state.keys.signing_key().await.ok_or_else(|| {
     tracing::error!("no active signing key");
     HttpError::internal()
   })?;
   let mut header = Header::new(Algorithm::ES256);
-  header.kid = Some(kid);
-  encode(&header, claims, &key).map_err(|error| {
+  header.kid = Some(signing.kid.clone());
+  encode(&header, claims, &signing.key).map_err(|error| {
     tracing::error!(%error, "failed to sign an access token");
     HttpError::internal()
   })
