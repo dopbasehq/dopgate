@@ -1,6 +1,6 @@
 ---
 title: "Reference"
-description: "Reference material for the Dopgate API, token claims, errors, email template variables, environment variables, security model, and audit events."
+description: "Reference material for the Dopgate API, token claims, errors, email template variables, environment variables, security model, audit events, and benchmarks."
 ---
 
 # Reference
@@ -12,6 +12,7 @@ description: "Reference material for the Dopgate API, token claims, errors, emai
 - [Environment variables](/reference/environment-variables): every `DOPGATE_*` variable with its default.
 - [Security model](/reference/security): how passwords, tokens, keys, and the audit log are protected.
 - [Audit events](/reference/audit-events): every action the audit log records and how to verify it.
+- [Benchmarks](/reference/benchmarks): measured requests per second, latency, and memory, and how to repeat the run.
 - [Glossary](/reference/glossary): the terms these docs use.
 
 The running server also describes its own API in Swagger UI at `/api/docs` and as OpenAPI at `/api/v1/openapi.json`, built from the same code as the binary you run.

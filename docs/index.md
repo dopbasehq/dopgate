@@ -45,6 +45,10 @@ features:
     details: Every record is hash-chained to the one before it, so edits and deletions show up when you verify the chain.
     link: /reference/audit-events
     linkText: See the events
+  - title: Light on your server
+    details: Dopgate holds 14 MiB of memory at rest. On two Apple M3 Pro cores shared with PostgreSQL it trades 5,803 agent tokens a second. The script that measured it is in the repository.
+    link: /reference/benchmarks
+    linkText: See the benchmarks
 ---
 
 <section class="dg-steps" aria-labelledby="dg-steps-title">

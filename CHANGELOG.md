@@ -125,6 +125,11 @@ with an admin console and Docker images. Nothing below has shipped before.
   long-lived token reaches the browser and Dopgate can run on any domain.
 - Single sign-on and MFA routes answer `501 NOT_IMPLEMENTED` until they are
   built. They are hidden from the API docs at `/api/docs` for now.
+- Password hashes run one per CPU at a time and the rest wait in line, so a
+  burst of sign-ins doesn't take 19 MiB each at once. On glibc the memory of
+  a finished hash goes back to the system.
+- A [benchmarks page](docs/reference/benchmarks.md) with measured requests per
+  second, latency, and memory. `bun run bench` repeats the run in Docker.
 
 ### Security
 

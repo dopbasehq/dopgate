@@ -294,6 +294,10 @@ const config = defineConfig({
           ],
         },
         {
+          text: "Performance",
+          items: [{ text: "Benchmarks", link: "/reference/benchmarks" }],
+        },
+        {
           text: "Terms",
           items: [{ text: "Glossary", link: "/reference/glossary" }],
         },
