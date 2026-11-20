@@ -4,10 +4,13 @@
 //! strings, so the parameters travel with each hash and can be raised later
 //! without breaking existing ones.
 
+use std::{num::NonZero, sync::LazyLock, thread};
+
 use argon2::{
   Argon2,
   password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
 };
+use tokio::{sync::Semaphore, task::JoinError};
 
 use crate::constants::limits::{PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH};
 
@@ -58,18 +61,48 @@ pub fn generate() -> String {
     .join("-")
 }
 
-/// Hash on a blocking thread: Argon2 takes tens of milliseconds of CPU and
-/// would stall the async workers.
-pub async fn hash_async(password: String) -> anyhow::Result<String> {
-  tokio::task::spawn_blocking(move || hash(&password)).await?
+/// How many hashes may run at once: one per CPU the process may use. Every
+/// hash holds 19 MiB while it runs, and more of them than CPUs would only
+/// take turns on the same cores. A burst of sign-ins waits here in line
+/// and costs memory for the ones that are running, not for all of them.
+///
+/// Shared by every request that hashes or checks a password, so a static.
+/// Nothing closes it.
+static HASHING: LazyLock<Semaphore> = LazyLock::new(|| Semaphore::new(hashing_slots()));
+
+/// The number of hashes that run at the same time.
+pub fn hashing_slots() -> usize {
+  thread::available_parallelism().map_or(1, NonZero::get)
 }
 
-/// Verify on a blocking thread, for the same reason as [`hash_async`].
+/// Run `work` on a blocking thread once a hashing slot is free: Argon2
+/// takes tens of milliseconds of CPU and would stall the async workers.
+async fn on_hashing_thread<T: Send + 'static>(
+  work: impl FnOnce() -> T + Send + 'static
+) -> Result<T, JoinError> {
+  // Acquiring fails only on a closed semaphore, and this one never closes.
+  // If it ever did, the hash would run without a slot instead of failing.
+  let slot = HASHING.acquire().await;
+  tokio::task::spawn_blocking(move || {
+    // The slot moves into the thread, so it stays taken until the hash is
+    // done even when the request that asked for it has gone away.
+    let _slot = slot;
+    work()
+  })
+  .await
+}
+
+/// Hash on a blocking thread, in a hashing slot.
+pub async fn hash_async(password: String) -> anyhow::Result<String> {
+  on_hashing_thread(move || hash(&password)).await?
+}
+
+/// Verify on a blocking thread, in a hashing slot like [`hash_async`].
 pub async fn verify_async(
   password: String,
   stored: String,
 ) -> bool {
-  match tokio::task::spawn_blocking(move || verify(&password, &stored)).await {
+  match on_hashing_thread(move || verify(&password, &stored)).await {
     Ok(matches) => matches,
     // The hashing thread panicked or was cancelled. The password is refused,
     // and the log says it was not a wrong guess.
