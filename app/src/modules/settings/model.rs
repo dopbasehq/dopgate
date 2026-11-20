@@ -25,6 +25,26 @@ pub struct Settings {
   /// Read-only while `DOPGATE_SMTP_HOST` (or the config file) sets a host.
   pub smtp: SmtpSettings,
   pub branding: BrandingSettings,
+  /// Where test emails go.
+  pub test_email: TestEmailSettings,
+}
+
+/// Where the SMTP test and template tests send their message.
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestEmailSettings {
+  /// The saved address. Unset means test emails go to root.
+  pub recipient: Option<String>,
+  /// Root's email, used while `recipient` is unset.
+  pub root_email: Option<String>,
+}
+
+/// Where test emails go. The section is replaced whole.
+#[derive(Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TestEmailSettingsInput {
+  /// Empty or null sends test emails to root.
+  pub recipient: Option<String>,
 }
 
 /// What your app's users may make for themselves. Off until an admin turns
@@ -228,6 +248,7 @@ pub struct UpdateSettingsRequest {
   pub limits: Option<LimitSettings>,
   pub self_service: Option<SelfServiceSettings>,
   pub branding: Option<BrandingSettings>,
+  pub test_email: Option<TestEmailSettingsInput>,
   /// Refused while `DOPGATE_SMTP_HOST` or the config file sets SMTP.
   pub smtp: Option<SmtpSettingsInput>,
 }
@@ -235,6 +256,7 @@ pub struct UpdateSettingsRequest {
 #[derive(Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SmtpTestRequest {
-  /// Where to send the test message. Default: the caller's own email.
+  /// Where to send the test message. Default: the test email address in
+  /// settings, or root's email when none is saved.
   pub to: Option<String>,
 }

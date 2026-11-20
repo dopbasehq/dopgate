@@ -1,5 +1,5 @@
 //! Runtime settings: sign-up rules, the password policy, token lifetimes,
-//! limits, self-service, branding, and SMTP. Each section is one JSON row in `settings`.
+//! limits, self-service, branding, SMTP, and where test emails go. Each section is one JSON row in `settings`.
 //!
 //! SMTP is resolved in order: the server config (`DOPGATE_SMTP_*` or the
 //! config file) when it sets a host, then the section saved here, then the
@@ -16,7 +16,7 @@ use crate::{
   },
   http::HttpError,
   models::AuthIdentity,
-  modules::audit,
+  modules::{admins, audit},
   services::{
     mailer::{self, Message, SmtpConfig, SmtpSecurity},
     secret_box::SecretBox,
@@ -35,6 +35,7 @@ const LIMITS: &str = "limits";
 const BRANDING: &str = "branding";
 const SELF_SERVICE: &str = "selfService";
 const SMTP: &str = "smtp";
+const TEST_EMAIL: &str = "testEmail";
 
 /// Keeps the SMTP password key apart from keys for other secrets.
 const SMTP_PASSWORD_PURPOSE: &str = "smtp-password";
@@ -94,6 +95,28 @@ pub async fn get(state: &AppState) -> Result<Settings, HttpError> {
     self_service: self_service(pool).await?,
     smtp: smtp_settings(state).await?,
     branding: branding(pool).await?,
+    test_email: TestEmailSettings {
+      recipient: section::<TestEmailSettingsInput>(pool, TEST_EMAIL)
+        .await?
+        .recipient,
+      root_email: admins::repository::root_email(pool).await?,
+    },
+  })
+}
+
+/// Where test emails go: the address saved in settings, or root's email.
+pub async fn test_recipient(state: &AppState) -> Result<String, HttpError> {
+  let pool = state.db.pool();
+  let saved: TestEmailSettingsInput = section(pool, TEST_EMAIL).await?;
+  if let Some(recipient) = saved.recipient {
+    return Ok(recipient);
+  }
+  admins::repository::root_email(pool).await?.ok_or_else(|| {
+    HttpError::new(
+      StatusCode::UNPROCESSABLE_ENTITY,
+      EMAIL_INVALID,
+      "There is no root account yet. Save an address for test emails in Settings.",
+    )
   })
 }
 
@@ -228,6 +251,11 @@ pub async fn update(
     check_self_service(self_service)?;
   }
   let branding = request.branding.as_ref().map(clean_branding).transpose()?;
+  let test_email = request
+    .test_email
+    .as_ref()
+    .map(clean_test_email)
+    .transpose()?;
 
   let mut sections = Vec::new();
   let user_id = actor.actor_id();
@@ -260,6 +288,10 @@ pub async fn update(
     save(&mut tx, SMTP, smtp, user_id).await?;
     sections.push(SMTP);
   }
+  if let Some(test_email) = &test_email {
+    save(&mut tx, TEST_EMAIL, test_email, user_id).await?;
+    sections.push(TEST_EMAIL);
+  }
   if !sections.is_empty() {
     audit::service::record(
       &mut tx,
@@ -273,10 +305,10 @@ pub async fn update(
   get(state).await
 }
 
-/// Send a test message through the SMTP server in use.
+/// Send a test message through the SMTP server in use. Without `to`, it goes
+/// where every test email goes.
 pub async fn test_smtp(
   state: &AppState,
-  actor: &AuthIdentity,
   request: SmtpTestRequest,
 ) -> Result<(), HttpError> {
   let to = match request
@@ -292,16 +324,7 @@ pub async fn test_smtp(
         EMAIL_INVALID_MESSAGE,
       )
     })?,
-    None => match actor {
-      AuthIdentity::Admin { email, .. } | AuthIdentity::User { email, .. } => email.clone(),
-      AuthIdentity::Agent { .. } | AuthIdentity::Service => {
-        return Err(HttpError::new(
-          StatusCode::UNPROCESSABLE_ENTITY,
-          EMAIL_INVALID,
-          "Give the address to send the test message to in `to`.",
-        ));
-      }
-    },
+    None => test_recipient(state).await?,
   };
   let config = smtp(state).await?.ok_or_else(|| {
     HttpError::bad_request(
@@ -477,6 +500,20 @@ fn clean_branding(branding: &BrandingSettings) -> Result<BrandingSettings, HttpE
     return Err(invalid("The logo URL must start with https:// or http://."));
   }
   Ok(BrandingSettings { app_name, logo_url })
+}
+
+fn clean_test_email(input: &TestEmailSettingsInput) -> Result<TestEmailSettingsInput, HttpError> {
+  let recipient = input
+    .recipient
+    .as_deref()
+    .map(str::trim)
+    .filter(|recipient| !recipient.is_empty())
+    .map(|recipient| {
+      email::normalize(recipient)
+        .ok_or_else(|| invalid("Enter a valid email address for test emails."))
+    })
+    .transpose()?;
+  Ok(TestEmailSettingsInput { recipient })
 }
 
 /// Check and tidy SMTP settings from the API. A left-out password keeps the

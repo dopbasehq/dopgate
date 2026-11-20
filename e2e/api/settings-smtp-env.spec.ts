@@ -57,7 +57,7 @@ test(
   {
     tag: ["@settings", "@templates"],
     annotation: about(
-      "A sign-up code arrives at the SMTP server named in the environment. The SMTP test reaches it too, for the caller and for a given address, and the log gets no copy.",
+      "A sign-up code arrives at the SMTP server named in the environment. The SMTP test reaches it too, for root and for a given address, and the log gets no copy.",
     ),
   },
   async () => {
@@ -88,9 +88,11 @@ test(
       expect(sent.status).toBe(200);
       expect((await app.mail.last(to)).subject).toBe("Test message from Dopgate");
     });
-    await step("The service key without an address is EMAIL_INVALID", async () => {
-      const refused = await app.service.post("/admin/settings/smtp/test");
-      expect(refused.code).toBe("EMAIL_INVALID");
+    await step("The service key without an address sends it to root", async () => {
+      const before = await app.mail.count(root.email);
+      const sent = await app.service.post("/admin/settings/smtp/test");
+      expect(sent.status).toBe(200);
+      await app.mail.last(root.email, { after: before });
     });
     await step("The server's SMTP can refuse the recipient, which is a 502", async () => {
       app.server.smtp!.refuseRecipients("550 no");

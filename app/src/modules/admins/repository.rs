@@ -63,6 +63,13 @@ pub async fn find_by_id(
     .await
 }
 
+/// Root's email, once root exists.
+pub async fn root_email(executor: impl PgExecutor<'_>) -> Result<Option<String>, sqlx::Error> {
+  sqlx::query_scalar("SELECT email FROM admins WHERE role = 'root'")
+    .fetch_optional(executor)
+    .await
+}
+
 pub struct NewAdmin<'a> {
   pub id: &'a str,
   pub email: &'a str,

@@ -541,16 +541,17 @@ test(
 );
 
 test(
-  "the template test emails the rendered draft to the signed-in admin",
+  "the template test emails the rendered draft to the test address",
   {
     tag: "@templates",
     annotation: about(
-      "POST /test sends the draft with sample values to the caller's own address. Without SMTP it is written to the server log. The service key has no address and gets EMAIL_INVALID.",
+      "POST /test sends the draft with sample values to the test email address in settings, which is root's email until one is saved. That holds for every admin and the service key. Without SMTP it is written to the server log.",
     ),
   },
   async () => {
     const root = await app.root();
     const sam = await app.admin("sam");
+    const qa = app.email("qa");
     const input = {
       subject: "Test {{app_name}} {{code}}",
       html: "<p>Hello {{display_name}}</p>",
@@ -566,23 +567,36 @@ test(
       expect(mail.subject).toBe("Test Dopgate 482913");
       expect(mail.text).toContain(`Sample code 482913 for ${root.email}`);
     });
-    await step("Another admin gets it at their own address", async () => {
-      const before = await app.mail.count(sam.email);
+    await step("Another admin's test goes to root too", async () => {
+      const before = await app.mail.count(root.email);
       const sent = await sam.api.post("/admin/email-templates/password_changed/test", {
         subject: "Sam {{email}}",
         html: "<p>x</p>",
         text: "x",
       });
       expect(sent.status).toBe(200);
-      const mail = await app.mail.last(sam.email, { after: before });
-      expect(mail.subject).toBe(`Sam ${sam.email}`);
+      const mail = await app.mail.last(root.email, { after: before });
+      expect(mail.subject).toBe(`Sam ${root.email}`);
+      expect(await app.mail.count(sam.email)).toBe(0);
     });
-    await step("The service key is 400 EMAIL_INVALID", async () => {
-      const refused = await app.service.post("/admin/email-templates/verify_email/test", input);
-      expect(refused.status).toBe(400);
-      expect(refused.code).toBe("EMAIL_INVALID");
+    await step("With a saved test address, the service key's test goes there", async () => {
+      const saved = await root.api.patch(
+        "/admin/settings",
+        { testEmail: { recipient: qa } },
+        { record: false },
+      );
+      expect(saved.status).toBe(200);
+      const sent = await app.service.post("/admin/email-templates/verify_email/test", input);
+      expect(sent.status).toBe(200);
+      const mail = await app.mail.last(qa);
+      expect(mail.text).toContain(`Sample code 482913 for ${qa}`);
     });
     await step("Testing doesn't save the draft", async () => {
+      await root.api.patch(
+        "/admin/settings",
+        { testEmail: { recipient: null } },
+        { record: false },
+      );
       const got = await app.service.get("/admin/email-templates/verify_email");
       expect(got.data.customized).toBe(false);
     });

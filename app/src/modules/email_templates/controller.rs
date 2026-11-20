@@ -141,7 +141,8 @@ pub async fn preview(
 
 /// Send a test email
 ///
-/// Render a draft with sample values and send it to the signed-in admin.
+/// Render a draft with sample values and send it to the test email address
+/// in settings, or to root when none is saved.
 #[utoipa::path(
   post,
   path = crate::constants::api::email_templates::TEST,
@@ -157,10 +158,10 @@ pub async fn preview(
 )]
 pub async fn test(
   State(state): State<AppState>,
-  AdminIdentity(actor): AdminIdentity,
+  AdminIdentity(_actor): AdminIdentity,
   Path(name): Path<String>,
   Json(input): Json<TemplateInput>,
 ) -> Result<HttpResponse<serde_json::Value>, EmailTemplatesError> {
-  service::test(&state, &actor, &name, input).await?;
+  service::test(&state, &name, input).await?;
   Ok(HttpResponse::done("EMAIL_TEMPLATE_TEST_SENT"))
 }

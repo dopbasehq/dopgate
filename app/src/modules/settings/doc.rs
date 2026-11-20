@@ -20,13 +20,15 @@ use utoipa::OpenApi;
     SmtpSource,
     SmtpSettingsInput,
     BrandingSettings,
+    TestEmailSettings,
+    TestEmailSettingsInput,
     UpdateSettingsRequest,
     SmtpTestRequest,
     ErrorBody,
     HttpResponseFormat<Settings>,
     HttpResponseFormat<serde_json::Value>
   )),
-  tags((name = "settings", description = "Admin: sign-up rules, limits, token lifetimes, branding, and SMTP"))
+  tags((name = "settings", description = "Admin: sign-up rules, limits, token lifetimes, branding, SMTP, and where test emails go"))
 )]
 struct SettingsApi;
 

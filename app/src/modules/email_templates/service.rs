@@ -9,7 +9,7 @@ use super::{
   repository,
 };
 use crate::{
-  constants::errors::{EMAIL_INVALID, NOT_FOUND, SMTP_SEND_FAILED, TEMPLATE_INVALID},
+  constants::errors::{NOT_FOUND, SMTP_SEND_FAILED, TEMPLATE_INVALID},
   http::HttpError,
   models::AuthIdentity,
   modules::{audit, settings},
@@ -232,24 +232,19 @@ pub async fn preview(
   Ok(render_input(&input, &sample_values(state, &email).await?))
 }
 
-/// Send a draft with sample values to the signed-in admin.
+/// Send a draft with sample values to where test emails go: the address in
+/// settings, or root.
 pub async fn test(
   state: &AppState,
-  actor: &AuthIdentity,
   name: &str,
   input: TemplateInput,
 ) -> Result<(), HttpError> {
   let template = builtin(name)?;
   check(template, &input)?;
-  let AuthIdentity::Admin { email, .. } = actor else {
-    return Err(HttpError::bad_request(
-      EMAIL_INVALID,
-      "The service key has no email to send a test to. Use an admin's access token.",
-    ));
-  };
-  let content = render_input(&input, &sample_values(state, email).await?);
+  let to = settings::service::test_recipient(state).await?;
+  let content = render_input(&input, &sample_values(state, &to).await?);
   let message = Message {
-    to: email.clone(),
+    to,
     subject: content.subject,
     text: content.text,
     html: Some(content.html),

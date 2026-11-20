@@ -102,6 +102,52 @@ async fn an_override_is_used_for_real_mail_until_reset() {
 }
 
 #[tokio::test]
+async fn a_test_goes_to_root_or_the_saved_test_address() {
+  let smtp = FakeSmtp::start().await;
+  let key = "k".repeat(40);
+  let service_key = key.clone();
+  let fake = &smtp;
+  let app = TestApp::with(move |config| {
+    use_smtp(config, fake);
+    config.service_key = Some(zeroize::Zeroizing::new(service_key));
+  })
+  .await;
+  let root = app.root_token().await;
+  let draft =
+    json!({ "subject": "Test {{code}}", "html": "<p>{{email}}</p>", "text": "{{email}}" });
+  let send_test = |token: String| {
+    let app = &app;
+    let draft = draft.clone();
+    async move {
+      let (status, body) = app
+        .request_with(
+          Method::POST,
+          &format!("{BASE}/login_code/test"),
+          Some(draft),
+          Some(&token),
+        )
+        .await;
+      assert_eq!(status, StatusCode::OK, "{body}");
+    }
+  };
+
+  // The service key has no email of its own, so root gets it.
+  send_test(key.clone()).await;
+  assert_eq!(smtp.wait_for(crate::support::ROOT_EMAIL, 1).await, 1);
+
+  app
+    .settings(
+      &root,
+      json!({ "testEmail": { "recipient": "qa@example.com" } }),
+    )
+    .await;
+  send_test(root).await;
+  assert_eq!(smtp.wait_for("qa@example.com", 1).await, 1);
+  let message = smtp.messages_to("qa@example.com").pop().unwrap();
+  assert!(message.contains("qa@example.com"), "{message}");
+}
+
+#[tokio::test]
 async fn unknown_variables_and_empty_parts_are_refused() {
   let app = TestApp::new().await;
   let root = app.root_token().await;
