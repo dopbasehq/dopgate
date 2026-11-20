@@ -560,7 +560,7 @@ test(
       const result = await send(unknown);
       expect(result.status).toBe(200);
       expect(result.message).toBe("CODE_SENT");
-      expect(result.data).toBeNull();
+      expect(result.data).toEqual({ retryAfter: 0 });
     });
     await step("So does a verified account, a disabled one and a pending one", async () => {
       for (const email of [verified.email, disabled.email, pending.email]) {
