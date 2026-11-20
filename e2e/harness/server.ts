@@ -67,7 +67,7 @@ export type ServerOptions = {
   relaxLimits?: boolean;
   /**
    * Where email goes. By default it is written to the server log. "env"
-   * starts a fake SMTP server and names it in `DOPGATE_SMTP_*`, which
+   * starts a fake SMTP server and names it in `DOPGATE_SMTP_URL`, which
    * locks SMTP to it.
    */
   smtp?: "env";
@@ -324,9 +324,7 @@ async function bootOnce(
         : { DOPGATE_ROOT_EMAIL: ROOT_EMAIL, DOPGATE_ROOT_PASSWORD: PASSWORD }),
       ...(smtp
         ? {
-            DOPGATE_SMTP_HOST: "127.0.0.1",
-            DOPGATE_SMTP_PORT: String(smtp.port),
-            DOPGATE_SMTP_SECURITY: "none",
+            DOPGATE_SMTP_URL: `smtp://127.0.0.1:${smtp.port}?security=none`,
             DOPGATE_SMTP_FROM_EMAIL: "no-reply@dopbase.com",
           }
         : {}),
