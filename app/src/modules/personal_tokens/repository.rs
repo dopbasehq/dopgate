@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{PgExecutor, PgPool};
 
 use super::model::PersonalToken;
+use crate::modules::accounts::repository::LiveAccount;
 
 const COLUMNS: &str = "id,user_id,name,last_four,expires_at,last_used_at,created_at";
 
@@ -23,13 +24,14 @@ impl TokenRow {
     self.expires_at.is_some_and(|at| at <= Utc::now())
   }
 
-  pub fn to_token(&self) -> PersonalToken {
+  /// The token as the API lists it. Takes the row, so nothing is copied.
+  pub fn into_token(self) -> PersonalToken {
     PersonalToken {
-      id: self.id.clone(),
-      name: self.name.clone(),
-      last_four: self.last_four.clone(),
-      expires_at: self.expires_at,
       expired: self.is_expired(),
+      id: self.id,
+      name: self.name,
+      last_four: self.last_four,
+      expires_at: self.expires_at,
       last_used_at: self.last_used_at,
       created_at: self.created_at,
     }
@@ -139,9 +141,9 @@ pub async fn live_owner(
   executor: impl PgExecutor<'_>,
   token_id: &str,
   user_id: &str,
-) -> Result<Option<(String, String, bool)>, sqlx::Error> {
+) -> Result<Option<LiveAccount>, sqlx::Error> {
   sqlx::query_as(
-    "SELECT u.email, u.status, u.email_verified_at IS NOT NULL \
+    "SELECT u.email, u.status, (u.email_verified_at IS NOT NULL) AS email_verified \
      FROM personal_tokens t JOIN users u ON u.id = t.user_id \
      WHERE t.id = $1 AND t.user_id = $2 AND (t.expires_at IS NULL OR t.expires_at > now())",
   )

@@ -19,7 +19,8 @@ pub struct UserRow {
   pub password_hash: Option<String>,
   pub display_name: Option<String>,
   pub avatar_url: Option<String>,
-  pub status: String,
+  #[sqlx(try_from = "String")]
+  pub status: UserStatus,
   pub user_metadata: Value,
   pub public_metadata: Value,
   pub private_metadata: Value,
@@ -31,7 +32,7 @@ pub struct UserRow {
 
 impl UserRow {
   pub fn is_active(&self) -> bool {
-    self.status == "active"
+    self.status == UserStatus::Active
   }
 
   pub fn is_verified(&self) -> bool {
@@ -48,22 +49,19 @@ impl UserRow {
       .then(|| self.public_metadata.clone())
   }
 
-  /// The account as the user sees it.
-  pub fn to_user(&self) -> User {
+  /// The account as the user sees it. Takes the row, so its text and
+  /// metadata move into the answer and nothing is copied.
+  pub fn into_user(self) -> User {
     User {
-      id: self.id.clone(),
-      email: self.email.clone(),
       email_verified: self.is_verified(),
-      display_name: self.display_name.clone(),
-      avatar_url: self.avatar_url.clone(),
-      status: if self.is_active() {
-        UserStatus::Active
-      } else {
-        UserStatus::Disabled
-      },
-      user_metadata: self.user_metadata.clone(),
-      public_metadata: self.public_metadata.clone(),
       has_password: self.password_hash.is_some(),
+      id: self.id,
+      email: self.email,
+      display_name: self.display_name,
+      avatar_url: self.avatar_url,
+      status: self.status,
+      user_metadata: self.user_metadata,
+      public_metadata: self.public_metadata,
       last_sign_in_at: self.last_sign_in_at,
       created_at: self.created_at,
       updated_at: self.updated_at,
@@ -71,11 +69,12 @@ impl UserRow {
   }
 
   /// The account as admins see it.
-  pub fn to_admin(&self) -> AdminUser {
+  pub fn into_admin(mut self) -> AdminUser {
+    let private_metadata = std::mem::take(&mut self.private_metadata);
     AdminUser {
-      user: self.to_user(),
-      private_metadata: self.private_metadata.clone(),
       locked_until: self.locked_until.filter(|until| *until > Utc::now()),
+      private_metadata,
+      user: self.into_user(),
     }
   }
 }
@@ -165,9 +164,19 @@ pub async fn update_profile(
   ))
   .bind(id)
   .bind(changes.display_name.is_some())
-  .bind(changes.display_name.clone().flatten())
+  .bind(
+    changes
+      .display_name
+      .as_ref()
+      .and_then(|value| value.as_deref()),
+  )
   .bind(changes.avatar_url.is_some())
-  .bind(changes.avatar_url.clone().flatten())
+  .bind(
+    changes
+      .avatar_url
+      .as_ref()
+      .and_then(|value| value.as_deref()),
+  )
   .bind(changes.user_metadata.as_ref())
   .bind(changes.public_metadata.as_ref())
   .bind(changes.private_metadata.as_ref())

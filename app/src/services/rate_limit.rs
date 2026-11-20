@@ -14,6 +14,9 @@ const HARD_MAX_ENTRIES: usize = 100_000;
 
 #[derive(Clone)]
 pub struct RateLimiter {
+  // One map for every request handler, so wrong setup tokens add up across
+  // requests. Each call reads and writes its bucket in one step, so a
+  // mutex. Nothing waits while the guard is held.
   entries: Arc<Mutex<HashMap<String, Entry>>>,
   max_entries: usize,
   hard_max_entries: usize,
@@ -111,19 +114,23 @@ impl RateLimiter {
     key: &str,
   ) {
     let mut entries = self.entries.lock().await;
-    if !entries.contains_key(key) {
-      self.make_room(&mut entries);
-    }
-    let entry = entries.entry(key.to_owned()).or_insert(Entry {
+    let fresh = || Entry {
       failures: 0,
       started: Instant::now(),
-    });
-    if entry.expired() {
-      *entry = Entry {
-        failures: 0,
-        started: Instant::now(),
-      };
-    }
+    };
+    // The key is copied only for a bucket that isn't there yet.
+    let entry = match entries.get_mut(key) {
+      Some(entry) => {
+        if entry.expired() {
+          *entry = fresh();
+        }
+        entry
+      }
+      None => {
+        self.make_room(&mut entries);
+        entries.entry(key.to_owned()).or_insert_with(fresh)
+      }
+    };
     entry.failures += 1;
   }
 

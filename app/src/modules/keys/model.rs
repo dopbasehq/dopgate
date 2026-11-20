@@ -8,7 +8,7 @@ pub struct Jwks {
   /// Public keys in JWK form. Pick the one whose `kid` matches the token
   /// header.
   #[schema(value_type = Vec<Object>)]
-  pub keys: Vec<serde_json::Value>,
+  pub keys: Vec<crate::services::keys::PublicJwk>,
 }
 
 /// The discovery document: where a tool that only knows the issuer URL

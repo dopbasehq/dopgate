@@ -87,16 +87,22 @@ pub async fn reset(
   accounts::mark_verified(&mut *tx, realm, &user.id).await?;
   let ended =
     sessions::service::revoke_all(&mut tx, realm, &user.id, None, "password_reset").await?;
-  let actor_type = verification::actor_type_of(&mut tx, realm, &user.id).await?;
+  let actor_type = verification::actor_type_of(&mut *tx, realm, &user.id).await?;
   let action = format!("{}.password_reset", realm.resource());
   audit::service::record(
     &mut tx,
-    audit::service::Event::account(realm, &user.id, &user.email, &actor_type, &action)
+    audit::service::Event::account(realm, &user.id, &user.email, actor_type, &action)
       .metadata(serde_json::json!({ "sessionsEnded": ended })),
   )
   .await?;
   tx.commit().await?;
   let values =
     email_templates::service::base_values(state, &user.email, user.display_name.as_deref()).await?;
-  email_templates::service::send(state, "password_changed", &user.email, values).await
+  email_templates::service::send(
+    state,
+    email_templates::Template::PasswordChanged,
+    &user.email,
+    values,
+  )
+  .await
 }

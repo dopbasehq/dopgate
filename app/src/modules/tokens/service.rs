@@ -22,32 +22,53 @@ fn rejected() -> HttpError {
   HttpError::unauthorized(TOKEN_INVALID, "The token is wrong or was revoked.")
 }
 
+/// What a refused token looked like, going by its prefix.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Rejected {
+  /// A `dgp_` token no personal token matches.
+  Personal,
+  /// A `dga_` token no agent matches.
+  Agent,
+  /// Neither prefix. It may be a password pasted into the wrong field.
+  Unknown,
+}
+
+impl Rejected {
+  fn as_str(self) -> &'static str {
+    match self {
+      Self::Personal => "personal",
+      Self::Agent => "agent",
+      Self::Unknown => "unknown",
+    }
+  }
+}
+
 /// Record a token that matched nothing, never the token itself. A `dgp_` or
 /// `dga_` token keeps its last four characters, which match what the token
 /// lists show. Anything else keeps nothing: it may be a password pasted
 /// into the wrong field, and its tail has no business in the audit log.
 async fn record_rejection(
   state: &AppState,
-  kind: &str,
+  kind: Rejected,
   presented: &str,
 ) {
-  let action = if kind == "agent" {
-    "agent.token_rejected"
-  } else {
-    "token.rejected"
+  let action = match kind {
+    Rejected::Agent => "agent.token_rejected",
+    Rejected::Personal | Rejected::Unknown => "token.rejected",
   };
-  let metadata = if kind == "unknown" {
-    serde_json::json!({ "kind": kind })
-  } else {
-    let last_four: String = presented
-      .chars()
-      .rev()
-      .take(4)
-      .collect::<Vec<_>>()
-      .into_iter()
-      .rev()
-      .collect();
-    serde_json::json!({ "kind": kind, "lastFour": last_four })
+  let metadata = match kind {
+    Rejected::Unknown => serde_json::json!({ "kind": kind.as_str() }),
+    Rejected::Personal | Rejected::Agent => {
+      let last_four: String = presented
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+      serde_json::json!({ "kind": kind.as_str(), "lastFour": last_four })
+    }
   };
   audit::service::record_now(
     state.db.pool(),
@@ -68,7 +89,7 @@ pub async fn trade(
   if presented.starts_with(AGENT_TOKEN_PREFIX) {
     return agent(state, presented).await;
   }
-  record_rejection(state, "unknown", presented).await;
+  record_rejection(state, Rejected::Unknown, presented).await;
   Err(rejected())
 }
 
@@ -78,7 +99,7 @@ async fn personal(
 ) -> Result<TradedToken, HttpError> {
   let pool = state.db.pool();
   let Some(row) = personal_tokens::find_by_hash(pool, &token::hash(presented)).await? else {
-    record_rejection(state, "personal", presented).await;
+    record_rejection(state, Rejected::Personal, presented).await;
     return Err(rejected());
   };
   if row.is_expired() {
@@ -132,7 +153,7 @@ async fn agent(
 ) -> Result<TradedToken, HttpError> {
   let pool = state.db.pool();
   let Some(row) = agents::find_by_hash(pool, &token::hash(presented)).await? else {
-    record_rejection(state, "agent", presented).await;
+    record_rejection(state, Rejected::Agent, presented).await;
     return Err(rejected());
   };
   if !row.is_active() || !row.owner_is_active() {
@@ -145,9 +166,11 @@ async fn agent(
   let lifetimes = settings::service::tokens(pool).await?;
   let now = Utc::now();
   let expires_in = i64::from(lifetimes.access_token_minutes) * 60;
+  // The row is not needed after this, so its fields move into the claims.
+  let owner = row.owner_id().to_owned();
   let claims = AccessClaims {
     iss: state.config.issuer().to_owned(),
-    sub: row.id.clone(),
+    sub: row.id,
     aud: state.config.issuer().to_owned(),
     exp: now.timestamp() + expires_in,
     iat: now.timestamp(),
@@ -158,8 +181,8 @@ async fn agent(
     tid: None,
     email: None,
     email_verified: None,
-    owner: Some(row.owner_id().to_owned()),
-    capabilities: Some(row.capabilities.clone()),
+    owner: Some(owner),
+    capabilities: Some(row.capabilities),
     public_metadata: None,
   };
   Ok(TradedToken {

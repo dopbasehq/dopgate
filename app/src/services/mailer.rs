@@ -116,9 +116,11 @@ impl std::error::Error for MailError {}
 
 /// Send `message` through `config`, or write it to the log when there is no
 /// SMTP server.
+///
+/// Takes the message, so its bodies move into the email and are not copied.
 pub async fn send(
   config: Option<&SmtpConfig>,
-  message: &Message,
+  message: Message,
 ) -> Result<(), MailError> {
   let Some(config) = config else {
     tracing::info!(
@@ -139,7 +141,7 @@ pub async fn send(
 
 fn build(
   config: &SmtpConfig,
-  message: &Message,
+  message: Message,
 ) -> Result<lettre::Message, MailError> {
   let from_address = config
     .from_email
@@ -152,16 +154,13 @@ fn build(
   let builder = lettre::Message::builder()
     .from(Mailbox::new(config.from_name.clone(), from_address))
     .to(to)
-    .subject(&message.subject);
-  match &message.html {
-    Some(html) => builder.multipart(MultiPart::alternative_plain_html(
-      message.text.clone(),
-      html.clone(),
-    )),
+    .subject(message.subject);
+  match message.html {
+    Some(html) => builder.multipart(MultiPart::alternative_plain_html(message.text, html)),
     None => builder.singlepart(
       SinglePart::builder()
         .header(ContentType::TEXT_PLAIN)
-        .body(message.text.clone()),
+        .body(message.text),
     ),
   }
   .map_err(|error| MailError(error.to_string()))

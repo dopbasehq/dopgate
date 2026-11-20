@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgExecutor};
 
-use crate::models::Realm;
+use crate::models::{Realm, UserStatus};
 
 /// The columns both account tables have.
 pub const COLUMNS: &str = "id,email,email_verified_at,password_hash,display_name,avatar_url,status,failed_login_count,locked_until,last_sign_in_at,created_at,updated_at";
@@ -17,7 +17,8 @@ pub struct AccountRow {
   pub password_hash: Option<String>,
   pub display_name: Option<String>,
   pub avatar_url: Option<String>,
-  pub status: String,
+  #[sqlx(try_from = "String")]
+  pub status: UserStatus,
   pub failed_login_count: i32,
   pub locked_until: Option<DateTime<Utc>>,
   pub last_sign_in_at: Option<DateTime<Utc>>,
@@ -27,7 +28,7 @@ pub struct AccountRow {
 
 impl AccountRow {
   pub fn is_active(&self) -> bool {
-    self.status == "active"
+    self.status == UserStatus::Active
   }
 
   pub fn is_verified(&self) -> bool {
@@ -37,6 +38,16 @@ impl AccountRow {
   pub fn is_locked(&self) -> bool {
     self.locked_until.is_some_and(|until| until > Utc::now())
   }
+}
+
+/// The account behind an access token as it is right now. Read on every
+/// request that carries one.
+#[derive(Debug, sqlx::FromRow)]
+pub struct LiveAccount {
+  pub email: String,
+  #[sqlx(try_from = "String")]
+  pub status: UserStatus,
+  pub email_verified: bool,
 }
 
 pub async fn find_by_id(

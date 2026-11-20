@@ -28,6 +28,43 @@ impl Role {
   }
 }
 
+/// A stored value that is not one its column may hold. Rows decode `role`
+/// and `status` through `TryFrom<String>`, so a value Dopgate doesn't know
+/// fails the query that read it and is never taken for a default.
+#[derive(Debug)]
+pub struct UnknownValue {
+  column: &'static str,
+  value: String,
+}
+
+impl UnknownValue {
+  pub fn new(
+    column: &'static str,
+    value: String,
+  ) -> Self {
+    Self { column, value }
+  }
+}
+
+impl std::fmt::Display for UnknownValue {
+  fn fmt(
+    &self,
+    formatter: &mut std::fmt::Formatter<'_>,
+  ) -> std::fmt::Result {
+    write!(formatter, "unknown {} \"{}\"", self.column, self.value)
+  }
+}
+
+impl std::error::Error for UnknownValue {}
+
+impl TryFrom<String> for Role {
+  type Error = UnknownValue;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    Self::parse(&value).ok_or_else(|| UnknownValue::new("role", value))
+  }
+}
+
 /// Whether an account may sign in. Stored in `status` on admins and users.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -43,6 +80,22 @@ impl UserStatus {
       Self::Active => "active",
       Self::Disabled => "disabled",
     }
+  }
+
+  pub fn parse(value: &str) -> Option<Self> {
+    match value {
+      "active" => Some(Self::Active),
+      "disabled" => Some(Self::Disabled),
+      _ => None,
+    }
+  }
+}
+
+impl TryFrom<String> for UserStatus {
+  type Error = UnknownValue;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    Self::parse(&value).ok_or_else(|| UnknownValue::new("status", value))
   }
 }
 

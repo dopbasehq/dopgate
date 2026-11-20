@@ -13,6 +13,8 @@ pub mod render;
 mod repository;
 pub mod service;
 
+pub use defaults::Template;
+
 pub fn routes() -> Router<AppState> {
   use crate::constants::api::email_templates;
   Router::new()

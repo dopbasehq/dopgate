@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use chrono::Utc;
-use sqlx::{PgConnection, Postgres, Transaction};
+use sqlx::{PgConnection, PgExecutor, Postgres, Transaction};
 
 use super::{model::*, repository};
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
     tokens::{USER_ID_PREFIX, VERIFICATION_ID_PREFIX},
   },
   http::HttpError,
-  models::{Realm, User},
+  models::{Realm, Role, User},
   modules::{
     accounts::repository::{self as accounts, AccountRow},
     audit,
@@ -303,7 +303,7 @@ pub async fn confirm(
       let user = users::find_by_id(state.db.pool(), &user_id)
         .await?
         .ok_or_else(HttpError::internal)?;
-      Ok(Confirmed::EmailChanged(user.to_user()))
+      Ok(Confirmed::EmailChanged(user.into_user()))
     }
     Purpose::PasswordReset => Err(HttpError::new(
       StatusCode::UNPROCESSABLE_ENTITY,
@@ -384,11 +384,11 @@ pub async fn confirm_email_change(
     }
     Err(error) => return Err(error.into()),
   }
-  let actor_type = actor_type_of(&mut tx, realm, &account.id).await?;
+  let actor_type = actor_type_of(&mut *tx, realm, &account.id).await?;
   let action = format!("{}.email_changed", realm.resource());
   audit::service::record(
     &mut tx,
-    audit::service::Event::account(realm, &account.id, &new_email, &actor_type, &action)
+    audit::service::Event::account(realm, &account.id, &new_email, actor_type, &action)
       .metadata(serde_json::json!({ "from": account.email, "to": new_email })),
   )
   .await?;
@@ -396,24 +396,29 @@ pub async fn confirm_email_change(
   let mut values =
     email_templates::service::base_values(state, &account.email, account.display_name.as_deref())
       .await?;
-  values.insert("new_email", new_email.clone());
-  email_templates::service::send(state, "email_changed", &account.email, values).await?;
+  values.insert("new_email", new_email);
+  email_templates::service::send(
+    state,
+    email_templates::Template::EmailChanged,
+    &account.email,
+    values,
+  )
+  .await?;
   Ok(account.id)
 }
 
 /// What the audit log calls an account: `user`, or the admin's role.
+/// Only the console realm reads the database, for the admin's role.
 pub async fn actor_type_of(
-  connection: &mut PgConnection,
+  executor: impl PgExecutor<'_>,
   realm: Realm,
   account_id: &str,
-) -> Result<String, HttpError> {
+) -> Result<&'static str, HttpError> {
   Ok(match realm {
-    Realm::App => "user".to_owned(),
-    Realm::Console => crate::modules::admins::repository::find_by_id(&mut *connection, account_id)
+    Realm::App => "user",
+    Realm::Console => crate::modules::admins::repository::find_by_id(executor, account_id)
       .await?
-      .map_or_else(
-        || "admin".to_owned(),
-        |admin| admin.role().as_str().to_owned(),
-      ),
+      .map_or(Role::Admin, |admin| admin.role)
+      .as_str(),
   })
 }

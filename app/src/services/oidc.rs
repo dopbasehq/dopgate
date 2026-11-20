@@ -138,6 +138,9 @@ struct CachedMetadata {
 /// Discovery results shared across requests.
 #[derive(Clone, Default)]
 pub struct OidcCache {
+  // Shared by every sign-in through the provider. Read on each one and
+  // written when the metadata is first fetched, expires, or is cleared, so
+  // a read-write lock. No guard is held while the provider is asked.
   inner: Arc<RwLock<Option<CachedMetadata>>>,
 }
 
@@ -263,7 +266,7 @@ pub async fn exchange(
     .id_token_verifier()
     .set_allowed_algs(ALLOWED_ALGORITHMS);
   let claims = match id_token.claims(&verifier, &nonce) {
-    Ok(claims) => claims.clone(),
+    Ok(claims) => claims,
     Err(openidconnect::ClaimsVerificationError::SignatureVerification(_)) => {
       // The provider may have rotated its keys since discovery. Refetch
       // once and verify again; a second failure is final.
@@ -279,7 +282,6 @@ pub async fn exchange(
       id_token
         .claims(&verifier, &nonce)
         .map_err(|_| OidcError::InvalidToken)?
-        .clone()
     }
     Err(error) => {
       tracing::warn!(%error, "OIDC ID token rejected");

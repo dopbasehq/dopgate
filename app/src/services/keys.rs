@@ -22,12 +22,13 @@ use p256::{
   elliptic_curve::sec1::ToEncodedPoint,
   pkcs8::{EncodePrivateKey, LineEnding},
 };
-use serde_json::{Value, json};
-use sqlx::{PgConnection, PgPool};
+use serde::{Deserialize, Serialize};
+use sqlx::{PgConnection, PgPool, types::Json};
 use tokio::sync::RwLock;
 
 use crate::{
   constants::tokens::{CONSOLE_KEY_ID_PREFIX, SIGNING_KEY_ID_PREFIX},
+  models::UnknownValue,
   services::token,
 };
 
@@ -35,22 +36,80 @@ use crate::{
 /// an access token can last.
 pub const RETIRING_HOURS: i64 = 24;
 
+/// The public half of a signing key as a JSON Web Key (RFC 7517), the way
+/// `signing_keys.public_jwk` stores it and the JWKS serves it.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PublicJwk {
+  pub kty: String,
+  pub crv: String,
+  pub x: String,
+  pub y: String,
+  pub kid: String,
+  pub alg: String,
+  #[serde(rename = "use")]
+  pub usage: String,
+}
+
+/// Where a signing key is in its life. Stored in `signing_keys.status`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyStatus {
+  /// Signs new tokens.
+  Active,
+  /// Only verifies the tokens it signed.
+  Retiring,
+  /// Out of the key set.
+  Retired,
+}
+
+impl TryFrom<String> for KeyStatus {
+  type Error = UnknownValue;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    match value.as_str() {
+      "active" => Ok(Self::Active),
+      "retiring" => Ok(Self::Retiring),
+      "retired" => Ok(Self::Retired),
+      _ => Err(UnknownValue::new("key status", value)),
+    }
+  }
+}
+
+/// A key as `reload` reads it.
+#[derive(sqlx::FromRow)]
+struct StoredKey {
+  id: String,
+  public_jwk: Json<PublicJwk>,
+  private_pem: String,
+  #[sqlx(try_from = "String")]
+  status: KeyStatus,
+}
+
+/// The key that signs new tokens, with its ID.
+pub struct SigningKey {
+  pub kid: String,
+  pub key: EncodingKey,
+}
+
 #[derive(Clone, Default)]
 pub struct KeyStore {
+  // Every request reads the keys to verify its token. Only a reload writes
+  // them: once a minute, after a rotation, and when a token names a key
+  // this server has not seen. So a read-write lock, and the keys sit behind
+  // `Arc` so a reader leaves with a handle and copies no key material.
   cache: Arc<RwLock<Cache>>,
 }
 
 #[derive(Default)]
 struct Cache {
-  signing: Option<(String, EncodingKey)>,
-  verifying: HashMap<String, DecodingKey>,
-  jwks: Vec<Value>,
+  signing: Option<Arc<SigningKey>>,
+  verifying: HashMap<String, Arc<DecodingKey>>,
+  jwks: Vec<PublicJwk>,
 }
 
 /// A freshly generated key, ready to insert.
 pub struct NewKey {
   pub id: String,
-  pub public_jwk: Value,
+  pub public_jwk: PublicJwk,
   pub private_pem: String,
 }
 
@@ -65,15 +124,15 @@ pub fn generate() -> Result<NewKey> {
   let id = token::public_id(SIGNING_KEY_ID_PREFIX);
   let x = point.x().context("signing key has no x coordinate")?;
   let y = point.y().context("signing key has no y coordinate")?;
-  let public_jwk = json!({
-    "kty": "EC",
-    "crv": "P-256",
-    "x": URL_SAFE_NO_PAD.encode(x),
-    "y": URL_SAFE_NO_PAD.encode(y),
-    "kid": id,
-    "alg": "ES256",
-    "use": "sig",
-  });
+  let public_jwk = PublicJwk {
+    kty: "EC".into(),
+    crv: "P-256".into(),
+    x: URL_SAFE_NO_PAD.encode(x),
+    y: URL_SAFE_NO_PAD.encode(y),
+    kid: id.clone(),
+    alg: "ES256".into(),
+    usage: "sig".into(),
+  };
   Ok(NewKey {
     id,
     public_jwk,
@@ -91,7 +150,7 @@ pub async fn insert_active(
     "INSERT INTO signing_keys(id,algorithm,public_jwk,private_pem,status,created_at) VALUES($1,'ES256',$2,$3,'active',now())",
   )
   .bind(&key.id)
-  .bind(&key.public_jwk)
+  .bind(Json(&key.public_jwk))
   .bind(&key.private_pem)
   .execute(connection)
   .await
@@ -166,29 +225,32 @@ impl KeyStore {
     ))
     .execute(pool)
     .await?;
-    let rows: Vec<(String, Value, String, String)> = sqlx::query_as(
+    let rows: Vec<StoredKey> = sqlx::query_as(
       "SELECT id, public_jwk, private_pem, status FROM signing_keys WHERE status IN ('active','retiring') ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await?;
     let mut cache = Cache::default();
-    for (id, jwk, pem, status) in rows {
-      let x = jwk["x"].as_str().context("stored key has no x")?;
-      let y = jwk["y"].as_str().context("stored key has no y")?;
-      cache
-        .verifying
-        .insert(id.clone(), DecodingKey::from_ec_components(x, y)?);
-      if status == "active" {
-        cache.signing = Some((id.clone(), EncodingKey::from_ec_pem(pem.as_bytes())?));
+    for row in rows {
+      let Json(jwk) = row.public_jwk;
+      let verifying = DecodingKey::from_ec_components(&jwk.x, &jwk.y)
+        .with_context(|| format!("stored key {} has an unusable public key", row.id))?;
+      if row.status == KeyStatus::Active {
+        cache.signing = Some(Arc::new(SigningKey {
+          kid: row.id.clone(),
+          key: EncodingKey::from_ec_pem(row.private_pem.as_bytes())
+            .with_context(|| format!("stored key {} has an unusable private key", row.id))?,
+        }));
       }
+      cache.verifying.insert(row.id, Arc::new(verifying));
       cache.jwks.push(jwk);
     }
     *self.cache.write().await = cache;
     Ok(())
   }
 
-  /// The key ID and key that sign new tokens.
-  pub async fn signing_key(&self) -> Option<(String, EncodingKey)> {
+  /// The key that signs new tokens.
+  pub async fn signing_key(&self) -> Option<Arc<SigningKey>> {
     self.cache.read().await.signing.clone()
   }
 
@@ -198,9 +260,9 @@ impl KeyStore {
     &self,
     pool: &PgPool,
     kid: &str,
-  ) -> Option<DecodingKey> {
+  ) -> Option<Arc<DecodingKey>> {
     if let Some(key) = self.cache.read().await.verifying.get(kid) {
-      return Some(key.clone());
+      return Some(Arc::clone(key));
     }
     if let Err(error) = self.reload(pool).await {
       tracing::warn!(%error, "failed to reload signing keys");
@@ -233,8 +295,8 @@ impl KeyStore {
       .await
   }
 
-  /// The JSON Web Key Set apps verify tokens with.
-  pub async fn jwks(&self) -> Value {
-    json!({ "keys": self.cache.read().await.jwks })
+  /// The public keys of the JSON Web Key Set apps verify tokens with.
+  pub async fn jwks(&self) -> Vec<PublicJwk> {
+    self.cache.read().await.jwks.clone()
   }
 }

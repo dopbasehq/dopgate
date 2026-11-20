@@ -145,6 +145,64 @@ async fn retention_removes_old_records_and_keeps_the_chain_whole() {
   assert_eq!(report.pruned_seq, Some(2));
 }
 
+/// Retention reads old records a page at a time. It removes the whole old
+/// run however long it is, and stops at the first record that stays: an old
+/// record behind it is kept until that one expires too.
+#[tokio::test]
+async fn retention_removes_a_long_run_and_stops_at_the_first_record_that_stays() {
+  let (db, _guard) = support::database().await;
+  let old = at(chrono::Utc::now() - chrono::Duration::days(400));
+  let entry = |id: &str, created_at: &str| {
+    let (id, created_at) = (id.to_owned(), created_at.to_owned());
+    let pool = db.pool().clone();
+    async move {
+      let mut tx = pool.begin().await.unwrap();
+      audit_chain::append(
+        &mut tx,
+        &AuditEntry {
+          id: &id,
+          actor_type: "system",
+          actor_id: None,
+          actor_label: Some("test"),
+          action: "test.event",
+          resource_type: None,
+          resource_id: None,
+          ip_address: None,
+          metadata: "{}",
+          created_at: &created_at,
+        },
+      )
+      .await
+      .unwrap();
+      tx.commit().await.unwrap();
+    }
+  };
+  // More than one page of 500.
+  for index in 0..620 {
+    entry(&format!("aud_old{index:04}"), &old).await;
+  }
+  entry("aud_new", &at(chrono::Utc::now())).await;
+  entry("aud_old_behind", &old).await;
+
+  let pruned = audit_chain::apply_retention(db.pool(), &Retention::new(365))
+    .await
+    .unwrap();
+  assert_eq!(pruned, 620);
+
+  let remaining: Vec<String> = sqlx::query_scalar("SELECT id FROM audit_events ORDER BY seq")
+    .fetch_all(db.pool())
+    .await
+    .unwrap();
+  assert_eq!(remaining.len(), 3, "{remaining:?}");
+  assert_eq!(remaining[..2], ["aud_new", "aud_old_behind"]);
+
+  let report = audit_chain::verify(db.pool()).await.unwrap();
+  assert!(report.ok, "{report:?}");
+  assert_eq!(report.pruned_seq, Some(620));
+  assert_eq!(report.records, 3);
+  assert_eq!(report.head_seq, Some(623));
+}
+
 /// Moving the anchor forward to hide old records is caught: no
 /// `audit.pruned` record vouches for the new position.
 #[tokio::test]

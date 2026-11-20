@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 
 use crate::{
   config::ServerConfig,
@@ -14,7 +14,11 @@ use crate::{
 pub struct AppState {
   pub config: Arc<ServerConfig>,
   pub db: DbClient,
-  pub setup: Arc<RwLock<SetupState>>,
+  /// The one-time setup token. Shared by every `POST /bootstrap/root`, which
+  /// checks the token and clears it as one step, so a mutex. It is an async
+  /// one because that request holds it while it creates root: a second
+  /// request with the same token waits, then finds the token gone.
+  pub setup: Arc<Mutex<SetupState>>,
   /// Locks out an address after repeated wrong setup tokens.
   pub rate_limiter: RateLimiter,
   /// Per-address and per-email request limits for sign-in, sign-up, and

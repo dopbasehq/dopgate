@@ -3,7 +3,7 @@
 use axum::http::StatusCode;
 
 use super::{
-  defaults::{self, Builtin},
+  defaults::{self, Builtin, Template},
   model::*,
   render::{self, Values},
   repository,
@@ -210,10 +210,19 @@ fn render_input(
   input: &TemplateInput,
   values: &Values,
 ) -> TemplateContent {
+  render_parts(&input.subject, &input.html, &input.text, values)
+}
+
+fn render_parts(
+  subject: &str,
+  html: &str,
+  text: &str,
+  values: &Values,
+) -> TemplateContent {
   TemplateContent {
-    subject: render::subject_line(&render::render(&input.subject, values, false)),
-    html: render::render(&input.html, values, true),
-    text: render::render(&input.text, values, false),
+    subject: render::subject_line(&render::render(subject, values, false)),
+    html: render::render(html, values, true),
+    text: render::render(text, values, false),
   }
 }
 
@@ -226,10 +235,10 @@ pub async fn preview(
   let template = builtin(name)?;
   check(template, &input)?;
   let email = match actor {
-    AuthIdentity::Admin { email, .. } | AuthIdentity::User { email, .. } => email.clone(),
-    AuthIdentity::Agent { .. } | AuthIdentity::Service => "person@example.com".into(),
+    AuthIdentity::Admin { email, .. } | AuthIdentity::User { email, .. } => email.as_str(),
+    AuthIdentity::Agent { .. } | AuthIdentity::Service => "person@example.com",
   };
-  Ok(render_input(&input, &sample_values(state, &email).await?))
+  Ok(render_input(&input, &sample_values(state, email).await?))
 }
 
 /// Send a draft with sample values to where test emails go: the address in
@@ -250,7 +259,7 @@ pub async fn test(
     html: Some(content.html),
   };
   let config = settings::service::smtp(state).await?;
-  mailer::send(config.as_ref(), &message)
+  mailer::send(config.as_ref(), message)
     .await
     .map_err(|error| {
       HttpError::new(
@@ -280,27 +289,21 @@ pub async fn base_values(
 /// time whether or not a message goes out. Failures are logged.
 pub async fn send(
   state: &AppState,
-  name: &'static str,
+  template: Template,
   to: &str,
   values: Values,
 ) -> Result<(), HttpError> {
-  let template = builtin(name)?;
-  let custom = repository::find(state.db.pool(), name).await?;
-  let input = match custom {
-    Some(row) => TemplateInput {
-      subject: row.subject,
-      html: row.html,
-      text: row.text,
-    },
-    None => TemplateInput {
-      subject: template.subject.into(),
-      html: template.html.into(),
-      text: template.text.into(),
-    },
+  let builtin = template.builtin();
+  let name = builtin.name;
+  // Both the override and the built-in text are rendered where they are.
+  let content = match repository::find(state.db.pool(), name).await? {
+    Some(row) => render_parts(&row.subject, &row.html, &row.text, &values),
+    None => render_parts(builtin.subject, builtin.html, builtin.text, &values),
   };
-  let content = render_input(&input, &values);
+  // The task owns the message; this copy of the address is for its log line.
+  let to = to.to_owned();
   let message = Message {
-    to: to.to_owned(),
+    to: to.clone(),
     subject: content.subject,
     text: content.text,
     html: Some(content.html),
@@ -309,13 +312,13 @@ pub async fn send(
   let config = match settings::service::smtp(state).await {
     Ok(config) => config,
     Err(error) => {
-      tracing::error!(%error, template = name, to = %message.to, "the email was not sent");
+      tracing::error!(%error, template = name, %to, "the email was not sent");
       return Ok(());
     }
   };
   tokio::spawn(async move {
-    if let Err(error) = mailer::send(config.as_ref(), &message).await {
-      tracing::error!(%error, template = name, to = %message.to, "failed to send an email");
+    if let Err(error) = mailer::send(config.as_ref(), message).await {
+      tracing::error!(%error, template = name, %to, "failed to send an email");
     }
   });
   Ok(())

@@ -22,12 +22,14 @@ pub struct AgentRow {
   pub description: Option<String>,
   pub capabilities: Value,
   pub last_four: String,
-  pub status: String,
+  #[sqlx(try_from = "String")]
+  pub status: UserStatus,
   pub last_used_at: Option<DateTime<Utc>>,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
   pub owner_email: String,
-  pub owner_status: String,
+  #[sqlx(try_from = "String")]
+  pub owner_status: UserStatus,
 }
 
 impl AgentRow {
@@ -40,34 +42,32 @@ impl AgentRow {
   }
 
   pub fn is_active(&self) -> bool {
-    self.status == "active"
+    self.status == UserStatus::Active
   }
 
   pub fn owner_is_active(&self) -> bool {
-    self.owner_status == "active"
+    self.owner_status == UserStatus::Active
   }
 
-  pub fn to_agent(&self) -> Agent {
+  /// The agent as the API returns it. Takes the row, so its text and
+  /// capabilities move into the answer and nothing is copied.
+  pub fn into_agent(self) -> Agent {
+    let (owner_id, kind) = match (self.owner_admin_id, self.owner_user_id) {
+      (Some(admin_id), _) => (admin_id, OwnerKind::Admin),
+      (None, user_id) => (user_id.unwrap_or_default(), OwnerKind::User),
+    };
     Agent {
-      id: self.id.clone(),
-      name: self.name.clone(),
-      description: self.description.clone(),
+      id: self.id,
+      name: self.name,
+      description: self.description,
       owner: AgentOwner {
-        id: self.owner_id().to_owned(),
-        kind: if self.owner_admin_id.is_some() {
-          OwnerKind::Admin
-        } else {
-          OwnerKind::User
-        },
-        email: self.owner_email.clone(),
+        id: owner_id,
+        kind,
+        email: self.owner_email,
       },
-      capabilities: self.capabilities.clone(),
-      status: if self.is_active() {
-        UserStatus::Active
-      } else {
-        UserStatus::Disabled
-      },
-      last_four: self.last_four.clone(),
+      capabilities: self.capabilities,
+      status: self.status,
+      last_four: self.last_four,
       last_used_at: self.last_used_at,
       created_at: self.created_at,
       updated_at: self.updated_at,
@@ -210,7 +210,12 @@ pub async fn update(
   .bind(id)
   .bind(changes.name.as_deref())
   .bind(changes.description.is_some())
-  .bind(changes.description.clone().flatten())
+  .bind(
+    changes
+      .description
+      .as_ref()
+      .and_then(|value| value.as_deref()),
+  )
   .bind(changes.capabilities.as_ref())
   .execute(executor)
   .await

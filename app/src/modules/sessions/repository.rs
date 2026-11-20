@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgExecutor};
 
 use super::model::SessionResponse;
-use crate::models::Realm;
+use crate::{models::Realm, modules::accounts::repository::LiveAccount};
 
 pub struct NewSession<'a> {
   pub id: &'a str,
@@ -218,9 +218,9 @@ pub async fn live_account(
   realm: Realm,
   session_id: &str,
   account_id: &str,
-) -> Result<Option<(String, String, bool)>, sqlx::Error> {
+) -> Result<Option<LiveAccount>, sqlx::Error> {
   sqlx::query_as(&format!(
-    "SELECT a.email, a.status, a.email_verified_at IS NOT NULL \
+    "SELECT a.email, a.status, (a.email_verified_at IS NOT NULL) AS email_verified \
      FROM {} s JOIN {} a ON a.id = s.{} \
      WHERE s.id = $1 AND s.{} = $2 AND s.revoked_at IS NULL AND s.absolute_expires_at > now()",
     realm.sessions(),

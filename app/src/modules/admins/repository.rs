@@ -15,8 +15,10 @@ pub struct AdminRow {
   pub password_hash: Option<String>,
   pub display_name: Option<String>,
   pub avatar_url: Option<String>,
-  pub role: String,
-  pub status: String,
+  #[sqlx(try_from = "String")]
+  pub role: Role,
+  #[sqlx(try_from = "String")]
+  pub status: UserStatus,
   pub locked_until: Option<DateTime<Utc>>,
   pub last_sign_in_at: Option<DateTime<Utc>>,
   pub created_at: DateTime<Utc>,
@@ -24,28 +26,17 @@ pub struct AdminRow {
 }
 
 impl AdminRow {
-  pub fn role(&self) -> Role {
-    Role::parse(&self.role).unwrap_or(Role::Admin)
-  }
-
-  pub fn is_active(&self) -> bool {
-    self.status == "active"
-  }
-
-  pub fn to_admin(&self) -> Admin {
+  /// The admin as the API returns it. Takes the row, so nothing is copied.
+  pub fn into_admin(self) -> Admin {
     Admin {
-      id: self.id.clone(),
-      email: self.email.clone(),
-      display_name: self.display_name.clone(),
-      avatar_url: self.avatar_url.clone(),
-      role: self.role(),
-      status: if self.is_active() {
-        UserStatus::Active
-      } else {
-        UserStatus::Disabled
-      },
       has_password: self.password_hash.is_some(),
       locked_until: self.locked_until.filter(|until| *until > Utc::now()),
+      id: self.id,
+      email: self.email,
+      display_name: self.display_name,
+      avatar_url: self.avatar_url,
+      role: self.role,
+      status: self.status,
       last_sign_in_at: self.last_sign_in_at,
       created_at: self.created_at,
       updated_at: self.updated_at,
@@ -121,9 +112,19 @@ pub async fn update_profile(
   ))
   .bind(id)
   .bind(changes.display_name.is_some())
-  .bind(changes.display_name.clone().flatten())
+  .bind(
+    changes
+      .display_name
+      .as_ref()
+      .and_then(|value| value.as_deref()),
+  )
   .bind(changes.avatar_url.is_some())
-  .bind(changes.avatar_url.clone().flatten())
+  .bind(
+    changes
+      .avatar_url
+      .as_ref()
+      .and_then(|value| value.as_deref()),
+  )
   .fetch_one(executor)
   .await
 }

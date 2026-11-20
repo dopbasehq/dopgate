@@ -214,3 +214,32 @@ async fn members_cannot_touch_templates() {
     .await;
   assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+/// Code names a template with `Template`, the API with a string. Both reach
+/// the same built-in text, and the list has each template once.
+#[test]
+fn every_template_dopgate_sends_is_one_of_the_built_in_ones() {
+  use app::modules::email_templates::{Template, defaults};
+  let sent = [
+    (Template::VerifyEmail, "verify_email"),
+    (Template::LoginCode, "login_code"),
+    (Template::PasswordReset, "password_reset"),
+    (Template::EmailChange, "email_change"),
+    (Template::EmailChanged, "email_changed"),
+    (Template::PasswordChanged, "password_changed"),
+  ];
+  assert_eq!(defaults::ALL.len(), sent.len());
+  for (template, name) in sent {
+    let builtin = template.builtin();
+    assert_eq!(builtin.name, name);
+    let found = defaults::find(name).unwrap();
+    assert!(std::ptr::eq(found, builtin), "{name}");
+    assert!(
+      defaults::ALL
+        .iter()
+        .any(|listed| std::ptr::eq(*listed, builtin)),
+      "{name}"
+    );
+  }
+  assert!(defaults::find("no_such_template").is_none());
+}

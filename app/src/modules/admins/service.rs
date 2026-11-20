@@ -34,7 +34,7 @@ async fn find(
 
 /// Root is managed from its own account, never through this API.
 fn require_not_root(target: &AdminRow) -> Result<(), HttpError> {
-  if target.role() == Role::Root {
+  if target.role == Role::Root {
     return Err(HttpError::forbidden(
       ROOT_PROTECTED,
       "The root account can't be changed through the API.",
@@ -47,8 +47,8 @@ pub async fn list(state: &AppState) -> Result<AdminList, HttpError> {
   Ok(AdminList {
     items: repository::list(state.db.pool())
       .await?
-      .iter()
-      .map(AdminRow::to_admin)
+      .into_iter()
+      .map(AdminRow::into_admin)
       .collect(),
   })
 }
@@ -57,7 +57,7 @@ pub async fn get(
   state: &AppState,
   id: &str,
 ) -> Result<Admin, HttpError> {
-  Ok(find(state, id).await?.to_admin())
+  Ok(find(state, id).await?.into_admin())
 }
 
 pub async fn create(
@@ -112,7 +112,7 @@ pub async fn create(
   )
   .await?;
   tx.commit().await?;
-  Ok(admin.to_admin())
+  Ok(admin.into_admin())
 }
 
 pub async fn update(
@@ -145,7 +145,7 @@ pub async fn update(
   )
   .await?;
   tx.commit().await?;
-  Ok(updated.to_admin())
+  Ok(updated.into_admin())
 }
 
 pub async fn set_status(
@@ -174,7 +174,7 @@ pub async fn set_status(
   )
   .await?;
   tx.commit().await?;
-  Ok(updated.to_admin())
+  Ok(updated.into_admin())
 }
 
 pub async fn delete(

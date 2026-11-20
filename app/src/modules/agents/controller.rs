@@ -102,7 +102,7 @@ pub async fn get_own(
   Ok(HttpResponse::ok(
     service::find_own(&state, &user.user_id, &id)
       .await?
-      .to_agent(),
+      .into_agent(),
     "AGENT_FETCHED",
   ))
 }
@@ -317,7 +317,7 @@ pub async fn get(
   Path(id): Path<String>,
 ) -> Result<HttpResponse<Agent>, AgentsError> {
   Ok(HttpResponse::ok(
-    service::find(&state, &id).await?.to_agent(),
+    service::find(&state, &id).await?.into_agent(),
     "AGENT_FETCHED",
   ))
 }

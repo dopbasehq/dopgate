@@ -74,7 +74,7 @@ pub async fn list(
     None
   };
   Ok(UserPage {
-    items: rows.iter().map(UserRow::to_admin).collect(),
+    items: rows.into_iter().map(UserRow::into_admin).collect(),
     next_cursor,
   })
 }
@@ -92,7 +92,7 @@ pub async fn get(
   state: &AppState,
   id: &str,
 ) -> Result<AdminUser, HttpError> {
-  Ok(find(state, id).await?.to_admin())
+  Ok(find(state, id).await?.into_admin())
 }
 
 pub async fn create(
@@ -158,7 +158,7 @@ pub async fn create(
   )
   .await?;
   tx.commit().await?;
-  Ok(user.to_admin())
+  Ok(user.into_admin())
 }
 
 pub async fn update(
@@ -204,7 +204,7 @@ pub async fn update(
   )
   .await?;
   tx.commit().await?;
-  Ok(updated.to_admin())
+  Ok(updated.into_admin())
 }
 
 pub async fn delete(
@@ -252,7 +252,7 @@ pub async fn set_status(
   )
   .await?;
   tx.commit().await?;
-  Ok(updated.to_admin())
+  Ok(updated.into_admin())
 }
 
 /// Email the user a password reset code.

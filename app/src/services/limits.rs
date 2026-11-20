@@ -17,6 +17,9 @@ const SWEEP_AT: usize = 50_000;
 
 #[derive(Clone, Default)]
 pub struct Limits {
+  // One map for every request handler: each sign-in, sign-up and code
+  // request counts itself here. A request reads and writes its bucket in
+  // one step, so a mutex. Nothing waits while the guard is held.
   buckets: Arc<Mutex<HashMap<String, Bucket>>>,
 }
 
@@ -50,18 +53,21 @@ impl Limits {
     if buckets.len() >= SWEEP_AT {
       buckets.retain(|_, bucket| !bucket.expired());
     }
-    let bucket = buckets.entry(key.to_owned()).or_insert(Bucket {
+    let fresh = || Bucket {
       count: 0,
       started: Instant::now(),
       window,
-    });
-    if bucket.expired() {
-      *bucket = Bucket {
-        count: 0,
-        started: Instant::now(),
-        window,
-      };
-    }
+    };
+    // The key is copied only for a bucket that isn't there yet.
+    let bucket = match buckets.get_mut(key) {
+      Some(bucket) => {
+        if bucket.expired() {
+          *bucket = fresh();
+        }
+        bucket
+      }
+      None => buckets.entry(key.to_owned()).or_insert_with(fresh),
+    };
     if bucket.count >= max.max(1) {
       let left = bucket.window.saturating_sub(bucket.started.elapsed());
       return Err(Limited {

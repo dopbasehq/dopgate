@@ -30,9 +30,18 @@ use crate::{
 
 /// A real hash of a random value, checked when the email has no account so
 /// the answer takes as long as a real check.
-static DUMMY_HASH: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-  password::hash(&password::generate()).expect("hashing the dummy password failed")
-});
+static DUMMY_HASH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// The placeholder hash, made on first use and kept for the life of the
+/// process. Startup calls this, so a hashing failure stops the server there
+/// and a sign-in never has to make the hash itself.
+pub fn dummy_hash() -> anyhow::Result<&'static str> {
+  if let Some(hash) = DUMMY_HASH.get() {
+    return Ok(hash);
+  }
+  let hash = password::hash(&password::generate())?;
+  Ok(DUMMY_HASH.get_or_init(|| hash))
+}
 
 fn wrong_credentials() -> HttpError {
   HttpError::unauthorized(AUTHENTICATION_INVALID, "The email or password is wrong.")
@@ -147,7 +156,7 @@ pub async fn signup(
   Ok(SignupResult {
     user: tokens
       .as_ref()
-      .map_or_else(|| user.to_user(), |tokens| tokens.user.clone()),
+      .map_or_else(|| user.into_user(), |tokens| tokens.user.clone()),
     verification_required: signup.require_email_verification,
     verification_sent: true,
     tokens,
@@ -197,7 +206,7 @@ pub async fn app_tokens(
     token_type: "Bearer".into(),
     expires_in,
     refresh_token: Some(grant.refresh_token),
-    user: user.to_user(),
+    user: user.into_user(),
   })
 }
 
@@ -217,22 +226,29 @@ pub async fn check_password(
     return Err(wrong_credentials());
   };
   let account = accounts::find_by_email(pool, realm, &email).await?;
-  let stored = account
+  // The hash moves to a blocking thread, so it is copied either way.
+  let stored = match account
     .as_ref()
     .and_then(|account| account.password_hash.clone())
-    .unwrap_or_else(|| DUMMY_HASH.clone());
+  {
+    Some(hash) => hash,
+    None => dummy_hash()
+      .map_err(|error| {
+        tracing::error!(%error, "failed to hash the placeholder password");
+        HttpError::internal()
+      })?
+      .to_owned(),
+  };
   let matches = password::verify_async(given, stored).await;
   let Some(account) = account else {
     return Err(wrong_credentials());
   };
-  let mut tx = pool.begin().await?;
-  let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
-  tx.commit().await?;
+  let actor_type = verification::actor_type_of(pool, realm, &account.id).await?;
   let failed = format!("{}.sign_in_failed", realm.resource());
   if account.is_locked() {
     audit::service::record_now(
       pool,
-      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
+      audit::service::Event::account(realm, &account.id, &account.email, actor_type, &failed)
         .metadata(serde_json::json!({ "reason": "locked" })),
     )
     .await;
@@ -250,7 +266,7 @@ pub async fn check_password(
     .await?;
     audit::service::record_now(
       pool,
-      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
+      audit::service::Event::account(realm, &account.id, &account.email, actor_type, &failed)
         .metadata(serde_json::json!({ "reason": "password", "locked": locked })),
     )
     .await;
@@ -324,11 +340,11 @@ pub async fn logout(
     sessions::service::revoke_current(&mut tx, realm, &account_id, &session_id).await?;
   }
   if let Some(account) = accounts::find_by_id(&mut *tx, realm, &account_id).await? {
-    let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
+    let actor_type = verification::actor_type_of(&mut *tx, realm, &account.id).await?;
     let action = format!("{}.signed_out", realm.resource());
     audit::service::record(
       &mut tx,
-      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &action)
+      audit::service::Event::account(realm, &account.id, &account.email, actor_type, &action)
         .metadata(serde_json::json!({ "allSessions": all_sessions, "sessionId": session_id })),
     )
     .await?;
@@ -350,7 +366,7 @@ pub async fn me(
   state: &AppState,
   user_id: &str,
 ) -> Result<User, HttpError> {
-  Ok(current(state, user_id).await?.to_user())
+  Ok(current(state, user_id).await?.into_user())
 }
 
 pub async fn update_me(
@@ -375,7 +391,7 @@ pub async fn update_me(
   )
   .await?;
   tx.commit().await?;
-  Ok(updated.to_user())
+  Ok(updated.into_user())
 }
 
 async fn find_account(
@@ -405,14 +421,12 @@ async fn confirm_password(
   limits::per_address(state).await?;
   let wrong = || HttpError::unauthorized(AUTHENTICATION_INVALID, "The current password is wrong.");
   let pool = state.db.pool();
-  let mut tx = pool.begin().await?;
-  let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
-  tx.commit().await?;
+  let actor_type = verification::actor_type_of(pool, realm, &account.id).await?;
   let failed = format!("{}.password_check_failed", realm.resource());
   if account.is_locked() {
     audit::service::record_now(
       pool,
-      audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
+      audit::service::Event::account(realm, &account.id, &account.email, actor_type, &failed)
         .metadata(serde_json::json!({ "reason": "locked" })),
     )
     .await;
@@ -432,7 +446,7 @@ async fn confirm_password(
   .await?;
   audit::service::record_now(
     pool,
-    audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &failed)
+    audit::service::Event::account(realm, &account.id, &account.email, actor_type, &failed)
       .metadata(serde_json::json!({ "reason": "password", "locked": locked })),
   )
   .await;
@@ -501,11 +515,11 @@ pub async fn change_password(
     "password_changed",
   )
   .await?;
-  let actor_type = verification::actor_type_of(&mut tx, realm, &account.id).await?;
+  let actor_type = verification::actor_type_of(&mut *tx, realm, &account.id).await?;
   let action = format!("{}.password_changed", realm.resource());
   audit::service::record(
     &mut tx,
-    audit::service::Event::account(realm, &account.id, &account.email, &actor_type, &action)
+    audit::service::Event::account(realm, &account.id, &account.email, actor_type, &action)
       .metadata(serde_json::json!({ "otherSessionsEnded": ended })),
   )
   .await?;
@@ -513,7 +527,13 @@ pub async fn change_password(
   let values =
     email_templates::service::base_values(state, &account.email, account.display_name.as_deref())
       .await?;
-  email_templates::service::send(state, "password_changed", &account.email, values).await
+  email_templates::service::send(
+    state,
+    email_templates::Template::PasswordChanged,
+    &account.email,
+    values,
+  )
+  .await
 }
 
 /// Start an email change: a code goes to the new address. The account moves

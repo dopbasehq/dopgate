@@ -114,7 +114,10 @@ impl std::fmt::Debug for ServerConfig {
 pub fn redact_database_url(url: &str) -> String {
   match Url::parse(url) {
     Ok(mut parsed) if parsed.password().is_some() => {
-      let _ = parsed.set_password(Some("***"));
+      // A URL whose password can't be replaced is never printed as it is.
+      if parsed.set_password(Some("***")).is_err() {
+        return "<invalid URL>".into();
+      }
       parsed.to_string()
     }
     Ok(parsed) => parsed.to_string(),

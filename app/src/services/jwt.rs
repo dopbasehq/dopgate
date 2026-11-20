@@ -17,7 +17,7 @@ use crate::{
     tokens::CONSOLE_AUDIENCE,
   },
   http::HttpError,
-  models::{AccessClaims, ConsoleClaims, Realm},
+  models::{AccessClaims, ConsoleClaims, Realm, UserStatus},
   modules::{
     admins, personal_tokens::repository as personal_tokens, sessions::repository as sessions,
   },
@@ -29,13 +29,13 @@ pub async fn sign(
   state: &AppState,
   claims: &AccessClaims,
 ) -> Result<String, HttpError> {
-  let (kid, key) = state.keys.signing_key().await.ok_or_else(|| {
+  let signing = state.keys.signing_key().await.ok_or_else(|| {
     tracing::error!("no active signing key");
     HttpError::internal()
   })?;
   let mut header = Header::new(Algorithm::ES256);
-  header.kid = Some(kid);
-  encode(&header, claims, &key).map_err(|error| {
+  header.kid = Some(signing.kid.clone());
+  encode(&header, claims, &signing.key).map_err(|error| {
     tracing::error!(%error, "failed to sign an access token");
     HttpError::internal()
   })
@@ -135,12 +135,12 @@ async fn verify_app(
     }
     (None, None) => None,
   };
-  let (email, status, verified) = live.ok_or_else(invalid)?;
-  if status != "active" {
+  let live = live.ok_or_else(invalid)?;
+  if live.status != UserStatus::Active {
     return Err(disabled());
   }
-  claims.email = Some(email);
-  claims.email_verified = Some(verified);
+  claims.email = Some(live.email);
+  claims.email_verified = Some(live.email_verified);
   Ok(claims)
 }
 
@@ -161,17 +161,16 @@ async fn verify_console(
   let mut claims = decode::<ConsoleClaims>(token, &DecodingKey::from_secret(&secret), &rules)
     .map_err(|_| invalid())?
     .claims;
-  let (_, status, _) =
-    sessions::live_account(state.db.pool(), Realm::Console, &claims.sid, &claims.sub)
-      .await?
-      .ok_or_else(invalid)?;
-  if status != "active" {
+  let live = sessions::live_account(state.db.pool(), Realm::Console, &claims.sid, &claims.sub)
+    .await?
+    .ok_or_else(invalid)?;
+  if live.status != UserStatus::Active {
     return Err(disabled());
   }
   let admin = admins::repository::find_by_id(state.db.pool(), &claims.sub)
     .await?
     .ok_or_else(invalid)?;
-  claims.email = admin.email.clone();
-  claims.role = admin.role();
+  claims.role = admin.role;
+  claims.email = admin.email;
   Ok(claims)
 }

@@ -5,7 +5,10 @@
 //! `search_path` to that schema, so queries use bare table names and the
 //! migrations, sqlx's own `_sqlx_migrations` table included, land there too.
 
-use std::time::{Duration, Instant};
+use std::{
+  sync::Arc,
+  time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, bail};
 use sqlx::{
@@ -45,7 +48,8 @@ pub fn validate_schema(schema: &str) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct DbClient {
   pool: PgPool,
-  schema: String,
+  /// Shared, so a clone copies no text.
+  schema: Arc<str>,
 }
 
 impl DbClient {
@@ -108,7 +112,7 @@ impl DbClient {
       .await?;
     Ok(Self {
       pool,
-      schema: schema.to_owned(),
+      schema: Arc::from(schema),
     })
   }
 

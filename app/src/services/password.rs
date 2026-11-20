@@ -69,9 +69,15 @@ pub async fn verify_async(
   password: String,
   stored: String,
 ) -> bool {
-  tokio::task::spawn_blocking(move || verify(&password, &stored))
-    .await
-    .unwrap_or(false)
+  match tokio::task::spawn_blocking(move || verify(&password, &stored)).await {
+    Ok(matches) => matches,
+    // The hashing thread panicked or was cancelled. The password is refused,
+    // and the log says it was not a wrong guess.
+    Err(error) => {
+      tracing::error!(%error, "password verification did not finish");
+      false
+    }
+  }
 }
 
 /// Check the policy with an admin-configured minimum length.

@@ -205,7 +205,7 @@ pub async fn list(
     None
   };
   Ok(AgentPage {
-    items: rows.iter().map(AgentRow::to_agent).collect(),
+    items: rows.into_iter().map(AgentRow::into_agent).collect(),
     next_cursor,
   })
 }
@@ -284,7 +284,7 @@ pub async fn create(
   tx.commit().await?;
   Ok(AgentWithToken {
     token: secret,
-    agent: row.to_agent(),
+    agent: row.into_agent(),
   })
 }
 
@@ -328,7 +328,7 @@ pub async fn update(
     .await?
     .ok_or_else(not_found)?;
   tx.commit().await?;
-  Ok(updated.to_agent())
+  Ok(updated.into_agent())
 }
 
 /// Give the agent a new token. The old one stops working at once.
@@ -353,7 +353,7 @@ pub async fn regenerate(
   tx.commit().await?;
   Ok(AgentWithToken {
     token: secret,
-    agent: updated.to_agent(),
+    agent: updated.into_agent(),
   })
 }
 
@@ -380,7 +380,7 @@ pub async fn set_status(
     .await?
     .ok_or_else(not_found)?;
   tx.commit().await?;
-  Ok(updated.to_agent())
+  Ok(updated.into_agent())
 }
 
 pub async fn delete(

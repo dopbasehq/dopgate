@@ -9,7 +9,7 @@
 //! The check never stands in the way of a sign-up: when the list can't be
 //! reached in time, the password is accepted and a warning is logged.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use sha1::{Digest, Sha1};
 
@@ -23,22 +23,23 @@ const PREFIX_LENGTH: usize = 5;
 #[derive(Clone)]
 pub struct LeakedPasswords {
   http: reqwest::Client,
-  base: Option<String>,
+  /// Shared, so cloning the app state for a request copies no text.
+  base: Option<Arc<str>>,
 }
 
 impl LeakedPasswords {
   /// `base_url` is where the range API lives. `None` turns the lookup off,
-  /// whatever the settings say.
-  pub fn new(base_url: Option<&str>) -> Self {
+  /// whatever the settings say. Fails when the HTTP client can't be built,
+  /// such as when the TLS backend doesn't start.
+  pub fn new(base_url: Option<&str>) -> Result<Self, reqwest::Error> {
     let http = reqwest::Client::builder()
       .timeout(TIMEOUT)
       .user_agent("dopgate")
-      .build()
-      .expect("the HTTP client has no settings that can fail");
-    Self {
+      .build()?;
+    Ok(Self {
       http,
-      base: base_url.map(|url| url.trim_end_matches('/').to_owned()),
-    }
+      base: base_url.map(|url| Arc::from(url.trim_end_matches('/'))),
+    })
   }
 
   /// Whether `password` is on the list. An unreachable list answers `false`.

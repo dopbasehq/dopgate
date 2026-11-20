@@ -1,5 +1,5 @@
 use app::{
-  models::{AuthIdentity, Role, UserVia},
+  models::{AuthIdentity, Role, UserStatus, UserVia},
   services::authz::{require_admin, require_root},
 };
 
@@ -43,6 +43,18 @@ fn roles_round_trip_and_name_the_actor() {
     assert_eq!(Role::parse(role.as_str()), Some(role));
   }
   assert_eq!(Role::parse("member"), None);
+  // A stored role or status Dopgate doesn't know is an error when a row is
+  // read. It never falls back to a default.
+  assert_eq!(Role::try_from("root".to_owned()).ok(), Some(Role::Root));
+  assert!(Role::try_from("member".to_owned()).is_err());
+  for status in [UserStatus::Active, UserStatus::Disabled] {
+    assert_eq!(
+      UserStatus::try_from(status.as_str().to_owned()).ok(),
+      Some(status)
+    );
+  }
+  let error = UserStatus::try_from("suspended".to_owned()).unwrap_err();
+  assert_eq!(error.to_string(), "unknown status \"suspended\"");
   assert_eq!(admin(Role::Admin).audit_actor_type(), "admin");
   assert_eq!(admin(Role::Root).audit_actor_type(), "root");
   assert_eq!(user().audit_actor_type(), "user");

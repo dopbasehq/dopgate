@@ -24,7 +24,6 @@
 
 use std::time::Duration;
 
-use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::{Connection, PgConnection, PgPool, Row};
 
@@ -398,6 +397,8 @@ async fn verify_snapshot(connection: &mut PgConnection) -> Result<ChainReport, s
   let anchor = pruning_anchor(connection).await?;
   report.pruned_seq = anchor.as_ref().map(|(seq, _)| *seq);
   let mut after: Option<i64> = None;
+  // The record before the one being checked: the pruning anchor at first,
+  // then each verified record in turn. Its hash is moved in, never copied.
   let mut previous: Option<(i64, String)> = anchor.clone();
   'walk: loop {
     let page = sqlx::query_as::<_, Record>(&format!(
@@ -411,9 +412,7 @@ async fn verify_snapshot(connection: &mut PgConnection) -> Result<ChainReport, s
     }
     for record in page {
       let seq = record.seq.unwrap_or_default();
-      let expected_prev = previous
-        .as_ref()
-        .map_or(GENESIS.to_owned(), |(_, hash)| hash.clone());
+      let expected_prev = previous.as_ref().map_or(GENESIS, |(_, hash)| hash.as_str());
       let reason = if previous
         .as_ref()
         .is_some_and(|(previous_seq, _)| seq != *previous_seq + 1)
@@ -422,7 +421,7 @@ async fn verify_snapshot(connection: &mut PgConnection) -> Result<ChainReport, s
       } else if record.prev_hash.as_deref().unwrap_or(GENESIS) != expected_prev {
         Some("previous record hash does not match")
       } else if record.record_hash.as_deref()
-        != Some(record.entry().hash(seq, &expected_prev).as_str())
+        != Some(record.entry().hash(seq, expected_prev).as_str())
       {
         Some("record hash does not match its contents")
       } else {
@@ -431,18 +430,24 @@ async fn verify_snapshot(connection: &mut PgConnection) -> Result<ChainReport, s
       if let Some(reason) = reason {
         report.broken = Some(ChainBreak {
           seq,
-          id: record.id.clone(),
+          id: record.id,
           reason: reason.into(),
         });
         report.ok = false;
         break 'walk;
       }
       report.records += 1;
-      report.head_seq = Some(seq);
-      report.head_hash = record.record_hash.clone();
-      previous = Some((seq, record.record_hash.clone().unwrap_or_default()));
+      previous = Some((seq, record.record_hash.unwrap_or_default()));
       after = Some(seq);
     }
+  }
+  // The last record that verified is the head. A walk that checked nothing
+  // has none, even when a pruning anchor exists.
+  if report.records > 0
+    && let Some((seq, hash)) = &previous
+  {
+    report.head_seq = Some(*seq);
+    report.head_hash = Some(hash.clone());
   }
   if let (None, Some((pruned_seq, pruned_hash))) = (&report.broken, &anchor)
     && !pruning_is_evidenced(connection, *pruned_seq, pruned_hash).await?
@@ -534,13 +539,13 @@ impl Retention {
       return Ok(0);
     }
     let removed = legacy + chained.as_ref().map_or(0, |pruned| pruned.records);
-    let metadata = json!({
-      "legacyRecords": legacy,
-      "records": chained.as_ref().map_or(0, |pruned| pruned.records),
-      "fromSeq": chained.as_ref().map(|pruned| pruned.from_seq),
-      "throughSeq": chained.as_ref().map(|pruned| pruned.through_seq),
-      "throughHash": chained.as_ref().map(|pruned| pruned.through_hash.as_str()),
-    });
+    let metadata = serde_json::to_string(&PrunedMetadata {
+      from_seq: chained.as_ref().map(|pruned| pruned.from_seq),
+      legacy_records: legacy,
+      records: chained.as_ref().map_or(0, |pruned| pruned.records),
+      through_hash: chained.as_ref().map(|pruned| pruned.through_hash.as_str()),
+      through_seq: chained.as_ref().map(|pruned| pruned.through_seq),
+    })?;
     append(
       connection,
       &AuditEntry {
@@ -552,7 +557,7 @@ impl Retention {
         resource_type: Some("audit"),
         resource_id: None,
         ip_address: None,
-        metadata: &metadata.to_string(),
+        metadata: &metadata,
         created_at: &timestamp(chrono::Utc::now()),
       },
     )
@@ -565,12 +570,6 @@ impl Retention {
     connection: &mut PgConnection,
     cutoff: &str,
   ) -> anyhow::Result<Option<Pruned>> {
-    let expired: Vec<(i64, Option<String>)> = sqlx::query_as(
-      "SELECT seq, record_hash FROM audit_events WHERE seq IS NOT NULL AND created_at < $1 ORDER BY seq",
-    )
-    .bind(cutoff)
-    .fetch_all(&mut *connection)
-    .await?;
     // Only the oldest contiguous run of records can be removed: an expired
     // record that sits behind a retained one would leave a hole in the
     // chain that no anchor can describe, so it stays until everything
@@ -579,38 +578,74 @@ impl Retention {
       sqlx::query_scalar("SELECT MIN(seq) FROM audit_events WHERE seq IS NOT NULL")
         .fetch_one(&mut *connection)
         .await?;
-    let mut prefix: Vec<(i64, Option<String>)> = Vec::new();
-    for record in expired {
-      let expected = prefix.last().map_or(minimum, |(seq, _)| Some(seq + 1));
-      if Some(record.0) != expected {
+    // The expired records are walked a page at a time and only the ends of
+    // the run are kept, so a first pass over a long log uses no more memory
+    // than a later one.
+    let mut first: Option<i64> = None;
+    let mut latest: Option<(i64, Option<String>)> = None;
+    let mut records: u64 = 0;
+    'walk: loop {
+      let page: Vec<(i64, Option<String>)> = sqlx::query_as(&format!(
+        "SELECT seq, record_hash FROM audit_events \
+         WHERE seq IS NOT NULL AND created_at < $1 AND ($2::BIGINT IS NULL OR seq > $2) \
+         ORDER BY seq LIMIT {VERIFY_PAGE}"
+      ))
+      .bind(cutoff)
+      .bind(latest.as_ref().map(|(seq, _)| *seq))
+      .fetch_all(&mut *connection)
+      .await?;
+      if page.is_empty() {
         break;
       }
-      prefix.push(record);
+      for record in page {
+        let expected = latest.as_ref().map_or(minimum, |(seq, _)| Some(seq + 1));
+        if Some(record.0) != expected {
+          break 'walk;
+        }
+        first.get_or_insert(record.0);
+        records += 1;
+        latest = Some(record);
+      }
     }
-    let (Some(first), Some(latest)) = (prefix.first(), prefix.last()) else {
+    let (Some(from_seq), Some((through_seq, through_hash))) = (first, latest) else {
       return Ok(None);
     };
-    let through_hash = latest.1.clone().unwrap_or_default();
+    let through_hash = through_hash.unwrap_or_default();
     sqlx::query("DELETE FROM audit_events WHERE seq IS NOT NULL AND seq <= $1")
-      .bind(latest.0)
+      .bind(through_seq)
       .execute(&mut *connection)
       .await?;
     sqlx::query(
       "INSERT INTO audit_chain_anchor(id,pruned_seq,pruned_hash,pruned_at) VALUES('chain',$1,$2,$3) \
        ON CONFLICT(id) DO UPDATE SET pruned_seq=excluded.pruned_seq,pruned_hash=excluded.pruned_hash,pruned_at=excluded.pruned_at",
     )
-    .bind(latest.0)
+    .bind(through_seq)
     .bind(&through_hash)
     .bind(timestamp(chrono::Utc::now()))
     .execute(&mut *connection)
     .await?;
     Ok(Some(Pruned {
-      records: prefix.len() as u64,
-      from_seq: first.0,
-      through_seq: latest.0,
+      records,
+      from_seq,
+      through_seq,
       through_hash,
     }))
   }
+}
+
+/// The metadata of an `audit.pruned` record. [`pruning_is_evidenced`] reads
+/// `throughSeq` and `throughHash` back in SQL, so the names are part of how
+/// the chain verifies: renaming a field here means changing that query too.
+/// Fields are in alphabetical order, the order earlier records were written
+/// in.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PrunedMetadata<'a> {
+  from_seq: Option<i64>,
+  legacy_records: u64,
+  records: u64,
+  through_hash: Option<&'a str>,
+  through_seq: Option<i64>,
 }
 
 /// The run of chained records one retention pass removed.
