@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{IsTerminal, Read};
 
 use anyhow::{Context, Result, bail};
 use zeroize::Zeroizing;
@@ -26,7 +26,11 @@ pub async fn run(
   }
   let email = match args.email.or_else(|| std::env::var(ENV_ROOT_EMAIL).ok()) {
     Some(email) => email,
-    None => prompt(inquire::Text::new("Root email:").prompt())?,
+    None => ask(
+      "the root email",
+      &format!("pass --email or set {ENV_ROOT_EMAIL}"),
+      || inquire::Text::new("Root email:").prompt(),
+    )?,
   };
   let password = Zeroizing::new(read_password(args.password_stdin)?);
   let admin_id = bootstrap::service::create_root(&db, &email, &password).await?;
@@ -56,15 +60,30 @@ fn read_password(from_stdin: bool) -> Result<String> {
       .context("failed to read the password from standard input")?;
     return Ok(password.trim_end_matches(['\r', '\n']).to_owned());
   }
-  prompt(
-    inquire::Password::new("Root password:")
-      .with_display_mode(inquire::PasswordDisplayMode::Masked)
-      .prompt(),
+  ask(
+    "the root password",
+    &format!("pass --password-stdin or set {ENV_ROOT_PASSWORD}"),
+    || {
+      inquire::Password::new("Root password:")
+        .with_display_mode(inquire::PasswordDisplayMode::Masked)
+        .prompt()
+    },
   )
 }
 
-fn prompt<T>(result: Result<T, inquire::InquireError>) -> Result<T> {
-  result.map_err(|error| match error {
+/// Prompts on the terminal, or fails at once when standard input isn't one.
+/// Without the check, inquire falls back to /dev/tty where it exists, so a
+/// script run from a shell on macOS would draw a prompt nobody can answer
+/// and fail with a vague input-reader error.
+fn ask<T>(
+  what: &str,
+  instead: &str,
+  prompt: impl FnOnce() -> Result<T, inquire::InquireError>,
+) -> Result<T> {
+  if !std::io::stdin().is_terminal() {
+    bail!("no terminal to ask for {what} on: {instead}");
+  }
+  prompt().map_err(|error| match error {
     inquire::InquireError::OperationCanceled | inquire::InquireError::OperationInterrupted => {
       anyhow::Error::new(CliCancelled)
     }

@@ -287,18 +287,35 @@ test(
   {
     tag: ["@setup"],
     annotation: about(
-      "With no --email and no DOPGATE_ROOT_EMAIL, init would ask for the email. When there is no terminal to ask on, it exits 1 and says so.",
+      "With no --email and no DOPGATE_ROOT_EMAIL, init would ask for the email, and with no password source it would ask for the password. When standard input is not a terminal, it exits 1 before drawing a prompt and names the flag and the variable to use instead.",
     ),
   },
   async () => {
-    await withSchema(async (_schema, env) => {
-      const refused = await step("dopgate init with nothing to go on and no terminal", () =>
+    await withSchema(async (schema, env) => {
+      const noEmail = await step("dopgate init with no email and no terminal", () =>
         app
           .cli(["init"], { env: { ...env, DOPGATE_ROOT_PASSWORD: PASSWORD }, timeoutMs: 20_000 })
           .fails(1),
       );
-      await step("It says the input device is not a terminal", async () => {
-        expect(refused.stderr).toContain("The input device is not a TTY");
+      await step("It names --email and DOPGATE_ROOT_EMAIL, with no prompt drawn", async () => {
+        expect(noEmail.stderr).toContain(
+          "no terminal to ask for the root email on: pass --email or set DOPGATE_ROOT_EMAIL",
+        );
+        expect(noEmail.stderr).not.toContain("Root email:");
+      });
+      const noPassword = await step("dopgate init with an email, no password and no terminal", () =>
+        app
+          .cli(["init", "--email", "root@example.com"], { env, timeoutMs: 20_000 })
+          .fails(1),
+      );
+      await step("It names --password-stdin and DOPGATE_ROOT_PASSWORD", async () => {
+        expect(noPassword.stderr).toContain(
+          "no terminal to ask for the root password on: pass --password-stdin or set DOPGATE_ROOT_PASSWORD",
+        );
+        expect(noPassword.stderr).not.toContain("Root password:");
+      });
+      await step("No account was made", async () => {
+        expect(await query(schema, "SELECT id FROM admins")).toEqual([]);
       });
     });
   },

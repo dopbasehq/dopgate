@@ -21,6 +21,9 @@ Nothing below has shipped before.
   database.
 - Root setup: `DOPGATE_ROOT_EMAIL` on a fresh database prints a generated
   password once; otherwise a one-time setup token, `/setup`, or `dopgate init`.
+  `init` asks for the email and password on a terminal. Without one, as in a
+  script or CI, it exits 1 and names the flag or variable to use instead of
+  waiting for an answer.
 - Sign-up, sign-in by password or emailed 6-digit code, sign-out, profile
   (`displayName`, `avatarUrl`, `userMetadata`), password change, and email
   change.
