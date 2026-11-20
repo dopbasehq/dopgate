@@ -104,8 +104,8 @@ pub async fn build_state_with_setup(config: ServerConfig) -> Result<(AppState, R
       },
       Ok(_) => RootSetup::Exists,
       // Another instance created root at the same moment.
-      Err(error) if error.status == StatusCode::CONFLICT => RootSetup::Exists,
-      Err(error) => anyhow::bail!("failed to create the root account: {:?}", error.errors),
+      Err(modules::bootstrap::service::CreateRootError::AlreadyInitialized) => RootSetup::Exists,
+      Err(error) => return Err(error).context("failed to create the root account"),
     }
   } else {
     RootSetup::SetupToken(token::generate(SETUP_TOKEN_PREFIX)?)

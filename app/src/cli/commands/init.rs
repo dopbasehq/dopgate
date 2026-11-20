@@ -29,9 +29,7 @@ pub async fn run(
     None => prompt(inquire::Text::new("Root email:").prompt())?,
   };
   let password = Zeroizing::new(read_password(args.password_stdin)?);
-  let admin_id = bootstrap::service::create_root(&db, &email, &password)
-    .await
-    .map_err(|error| anyhow::anyhow!("{error}"))?;
+  let admin_id = bootstrap::service::create_root(&db, &email, &password).await?;
   let email = crate::utils::email::normalize(&email).unwrap_or(email);
   let schema = db.schema().to_owned();
   db.close().await;

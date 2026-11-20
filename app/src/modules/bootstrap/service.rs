@@ -60,32 +60,84 @@ pub async fn bootstrap_root(
   })
 }
 
-/// Create the root account. Shared by the API and `dopgate init`.
+/// Why the root account was not created. The API turns it into a response;
+/// startup and `dopgate init` read the variant or print the message.
+#[derive(Debug)]
+pub enum CreateRootError {
+  InvalidEmail,
+  /// The password broke the policy. The message says how.
+  WeakPassword(String),
+  /// A root account already exists.
+  AlreadyInitialized,
+  Hash(anyhow::Error),
+  Database(sqlx::Error),
+}
+
+impl std::fmt::Display for CreateRootError {
+  fn fmt(
+    &self,
+    formatter: &mut std::fmt::Formatter<'_>,
+  ) -> std::fmt::Result {
+    match self {
+      Self::InvalidEmail => formatter.write_str(EMAIL_INVALID_MESSAGE),
+      Self::WeakPassword(message) => formatter.write_str(message),
+      Self::AlreadyInitialized => formatter.write_str(ALREADY_INITIALIZED_MESSAGE),
+      Self::Hash(error) => write!(formatter, "the password could not be hashed: {error}"),
+      Self::Database(error) => write!(formatter, "the database refused the change: {error}"),
+    }
+  }
+}
+
+impl std::error::Error for CreateRootError {
+  fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    match self {
+      Self::Hash(error) => Some(error.as_ref()),
+      Self::Database(error) => Some(error),
+      Self::InvalidEmail | Self::WeakPassword(_) | Self::AlreadyInitialized => None,
+    }
+  }
+}
+
+impl From<sqlx::Error> for CreateRootError {
+  fn from(error: sqlx::Error) -> Self {
+    Self::Database(error)
+  }
+}
+
+impl From<CreateRootError> for HttpError {
+  fn from(error: CreateRootError) -> Self {
+    match error {
+      CreateRootError::InvalidEmail => HttpError::new(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        EMAIL_INVALID,
+        EMAIL_INVALID_MESSAGE,
+      ),
+      CreateRootError::WeakPassword(message) => {
+        HttpError::new(StatusCode::UNPROCESSABLE_ENTITY, PASSWORD_INVALID, message)
+      }
+      CreateRootError::AlreadyInitialized => already_initialized(),
+      CreateRootError::Hash(error) => {
+        tracing::error!(%error, "failed to hash the root password");
+        HttpError::internal()
+      }
+      // Logs the error, like every other database failure.
+      CreateRootError::Database(error) => error.into(),
+    }
+  }
+}
+
+/// Create the root account. Shared by the API, startup, and `dopgate init`.
 pub async fn create_root(
   db: &DbClient,
   email_address: &str,
   new_password: &str,
-) -> Result<String, HttpError> {
-  let email = email::normalize(email_address).ok_or_else(|| {
-    HttpError::new(
-      StatusCode::UNPROCESSABLE_ENTITY,
-      EMAIL_INVALID,
-      EMAIL_INVALID_MESSAGE,
-    )
-  })?;
-  password::check_policy(new_password).map_err(|violation| {
-    HttpError::new(
-      StatusCode::UNPROCESSABLE_ENTITY,
-      PASSWORD_INVALID,
-      violation.0,
-    )
-  })?;
+) -> Result<String, CreateRootError> {
+  let email = email::normalize(email_address).ok_or(CreateRootError::InvalidEmail)?;
+  password::check_policy(new_password)
+    .map_err(|violation| CreateRootError::WeakPassword(violation.0))?;
   let password_hash = password::hash_async(new_password.to_owned())
     .await
-    .map_err(|error| {
-      tracing::error!(%error, "failed to hash the root password");
-      HttpError::internal()
-    })?;
+    .map_err(CreateRootError::Hash)?;
   let id = token::public_id(ADMIN_ID_PREFIX);
   let mut tx = db.pool().begin().await?;
   if let Err(error) = repository::insert_root(&mut tx, &id, &email, &password_hash).await {
@@ -93,7 +145,7 @@ pub async fn create_root(
       .as_database_error()
       .is_some_and(|database| database.is_unique_violation())
     {
-      return Err(already_initialized());
+      return Err(CreateRootError::AlreadyInitialized);
     }
     return Err(error.into());
   }
@@ -114,9 +166,8 @@ pub async fn create_root(
   Ok(id)
 }
 
+const ALREADY_INITIALIZED_MESSAGE: &str = "This instance already has a root account.";
+
 fn already_initialized() -> HttpError {
-  HttpError::conflict(
-    ALREADY_INITIALIZED,
-    "This instance already has a root account.",
-  )
+  HttpError::conflict(ALREADY_INITIALIZED, ALREADY_INITIALIZED_MESSAGE)
 }
