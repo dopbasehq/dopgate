@@ -1,3 +1,4 @@
+pub mod allocator;
 pub mod audit_chain;
 pub mod authz;
 pub mod client_ip;

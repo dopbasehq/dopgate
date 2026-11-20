@@ -7,6 +7,11 @@ async fn main() {
         .unwrap_or_else(|_| "app=info,tower_http=info".into()),
     )
     .init();
+  if !app::services::allocator::pin_mmap_threshold() {
+    tracing::warn!(
+      "could not pin the allocator's mmap threshold; memory used by password hashes may stay resident"
+    );
+  }
   let cli = app::cli::Cli::parse_args();
   let json = cli.json;
   match app::cli::execute(cli).await {

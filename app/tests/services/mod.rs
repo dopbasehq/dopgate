@@ -1,3 +1,4 @@
+mod allocator;
 mod audit_chain;
 mod authz;
 mod client_ip;
