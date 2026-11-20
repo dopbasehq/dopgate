@@ -5,6 +5,14 @@ import { mountController, settle } from "~/tests/mount-controller";
 import { signInAs } from "~/tests/fixtures";
 import { describeVerification, useAuditController } from "./Audit.controller";
 
+const { replace, route } = vi.hoisted(() => ({
+  replace: vi.fn(),
+  route: { query: {} as Record<string, string> },
+}));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ replace }),
+  useRoute: () => route,
+}));
 vi.mock("~/services/admin.api");
 
 const event = (id: string, seq: number): AuditEvent => ({
@@ -42,6 +50,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  route.query = {};
   signInAs();
   vi.mocked(adminApi.listAuditEvents).mockResolvedValue({
     items: [event("evt_2", 2), event("evt_1", 1)],
@@ -73,9 +82,9 @@ describe("useAuditController", () => {
     expect(c.hasMore.value).toBe(false);
   });
 
-  it("filters by action and actor", async () => {
+  it("filters by action and actor and keeps both in the address", async () => {
     const c = await mount();
-    c.action.value = "user.deleted";
+    c.setAction(" user.deleted ");
     c.actor.value = "root@example.com";
     await wait(350);
     await settle();
@@ -84,16 +93,47 @@ describe("useAuditController", () => {
       null,
       expect.any(AbortSignal),
     );
+    expect(replace).toHaveBeenLastCalledWith({
+      query: { action: "user.deleted", actor: "root@example.com" },
+    });
     c.clearFilters();
+    await wait(350);
     expect(c.action.value).toBe("");
+    expect(replace).toHaveBeenLastCalledWith({ query: {} });
   });
 
-  it("expands and collapses rows", async () => {
+  it("starts from the filters in the address", async () => {
+    route.query = { actor: "usr_maya" };
     const c = await mount();
-    c.toggle("evt_1");
-    expect(c.expanded.value.has("evt_1")).toBe(true);
-    c.toggle("evt_1");
-    expect(c.expanded.value.has("evt_1")).toBe(false);
+    expect(c.actor.value).toBe("usr_maya");
+    expect(adminApi.listAuditEvents).toHaveBeenCalledWith(
+      { action: "", actor: "usr_maya" },
+      null,
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("opens an event in the drawer and closes it", async () => {
+    const c = await mount();
+    const second = c.events.value[1]!;
+    c.openEvent(second);
+    expect(c.selected.value?.id).toBe("evt_1");
+    c.closeEvent();
+    expect(c.selected.value).toBeNull();
+  });
+
+  it("says where an open record stands after a check", async () => {
+    vi.mocked(adminApi.verifyAuditChain).mockResolvedValue(
+      verification({ headSeq: 2 }),
+    );
+    const c = await mount();
+    const record = c.events.value[0]!;
+    expect(c.chainLine(record).tone).toBe("neutral");
+    await c.verify();
+    expect(c.chainLine(record)).toEqual({
+      tone: "ok",
+      text: "Inside the verified chain, checked up to #2.",
+    });
   });
 
   it("verifies the chain", async () => {

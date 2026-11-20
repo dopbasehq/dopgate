@@ -6,8 +6,33 @@ import { seeHeading } from "./instance.support.ts";
 
 const app = useServer();
 
-const entries = (page: Page) => page.getByTestId("audit-list").getByRole("listitem");
+const entries = (page: Page) => page.getByTestId("audit-table").getByTestId("audit-row");
 const entry = (page: Page, text: string) => entries(page).filter({ hasText: text }).first();
+/** The open event's drawer. */
+const drawer = (page: Page) => page.getByTestId("audit-event");
+/** The action in each listed row, top to bottom. */
+const actionsShown = (page: Page) =>
+  entries(page).evaluateAll((rows) =>
+    rows.map((row) => row.querySelector("td:nth-child(2)")?.textContent?.trim()),
+  );
+
+/**
+ * Sets the Action filter: opens the chip, types the action and presses
+ * Enter, which takes any action, listed or not. An action already set is
+ * cleared first. The page goes back to the top first: the menu closes when
+ * the page scrolls, and a scroll Playwright starts to reach the chip can
+ * land just after the click that opened it.
+ */
+async function filterAction(page: Page, action: string) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const clear = page.getByRole("button", { name: "Clear Action filter" });
+  if (await clear.isVisible()) await clear.click();
+  await page.getByRole("button", { name: "Action", exact: true }).click();
+  const box = page.getByLabel("Filter by action");
+  await box.fill(action);
+  await box.press("Enter");
+  await expect(page.getByTestId("action-filter")).toContainText(action);
+}
 
 test(
   "the list shows recent events newest first with who, what and when",
@@ -31,14 +56,12 @@ test(
     await step("Open the Audit log page", async () => {
       await openAs(page, root, "/audit");
       await seeHeading(page, "Audit log");
-      await expect(page.getByTestId("audit-list")).toBeVisible();
+      await expect(page.getByTestId("audit-table")).toBeVisible();
     });
     await step("The first rows follow the server's order", async () => {
       const listed = await root.api.get("/admin/audit-events?limit=8", { record: false });
       const expected = listed.data.items.map((item: any) => item.action);
-      const shown = await entries(page).evaluateAll((items) =>
-        items.slice(0, 8).map((item) => item.querySelector("button span")?.textContent?.trim()),
-      );
+      const shown = (await actionsShown(page)).slice(0, 8);
       expect(shown).toEqual(expected);
       expect(expected[0]).toBe("admin.signed_in");
     });
@@ -63,7 +86,7 @@ test(
   {
     tag: ["@audit", "@console"],
     annotation: about(
-      "Clicking a row expands it with the time, the actor, the resource, the position in the chain and the hash, plus the metadata as JSON. Clicking again folds it.",
+      "Clicking a row opens the event in a drawer on the right with the time in local time and UTC, the actor, the resource, the position in the chain and the hash, plus the metadata as JSON. Escape closes it.",
     ),
   },
   async ({ page }) => {
@@ -76,40 +99,44 @@ test(
     );
     await step("Open the Audit log and filter to failed sign-ins", async () => {
       await openAs(page, root, "/audit");
-      await page.getByLabel("Filter by action").fill("user.sign_in_failed");
+      await filterAction(page, "user.sign_in_failed");
       await expect(entries(page).first()).toContainText("user.sign_in_failed");
     });
     const row = () => entries(page).filter({ hasText: user.email }).first();
-    await step("The metadata is hidden until the row opens", async () => {
+    await step("The metadata is hidden until a row opens", async () => {
       await expect(row()).toBeVisible();
+      await expect(drawer(page)).toHaveCount(0);
       await expect(page.getByTestId("audit-metadata")).toHaveCount(0);
-      await expect(row().getByRole("button")).toHaveAttribute("aria-expanded", "false");
     });
     await step("Open the row", async () => {
-      await row().getByRole("button").click();
-      await expect(row().getByRole("button")).toHaveAttribute("aria-expanded", "true");
+      await row().click();
+      await expect(page.getByRole("dialog", { name: "user.sign_in_failed" })).toBeVisible();
     });
-    await step("It shows the actor, resource, sequence and hash", async () => {
-      await expect(row()).toContainText(`user ${user.id}`);
-      await expect(row()).toContainText("Resource");
-      await expect(row()).toContainText(/Sequence\s*#\d+/);
-      await expect(row()).toContainText("Hash");
-      await expect(row()).toContainText("When");
+    await step("It shows the time, actor, resource, sequence and hash", async () => {
+      await expect(drawer(page)).toContainText("When");
+      await expect(drawer(page)).toContainText(/UTC\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+      await expect(drawer(page)).toContainText(user.email);
+      await expect(drawer(page)).toContainText(`user ${user.id}`);
+      await expect(drawer(page)).toContainText(/Sequence\s*#\d+/);
+      await expect(drawer(page)).toContainText("Hash");
     });
     await step("The metadata says why it failed", async () => {
-      const metadata = row().getByTestId("audit-metadata");
+      const metadata = page.getByTestId("audit-metadata");
       await expect(metadata).toContainText('"reason": "password"');
       await expect(metadata).toContainText('"locked": false');
     });
-    await step("Clicking again folds it", async () => {
-      await row().getByRole("button").click();
-      await expect(page.getByTestId("audit-metadata")).toHaveCount(0);
+    await step("Before a check, the drawer says the chain isn't checked yet", async () => {
+      await expect(page.getByTestId("audit-chain")).toContainText("Not checked yet");
     });
-    await step("An entry with no metadata shows an empty object", async () => {
-      await page.getByLabel("Filter by action").fill("user.created");
-      const created = entries(page).filter({ hasText: "user.created" }).filter({ hasText: user.id });
-      await created.first().getByRole("button").click();
-      await expect(created.first().getByTestId("audit-metadata")).toContainText(user.email);
+    await step("Escape closes it", async () => {
+      await page.keyboard.press("Escape");
+      await expect(drawer(page)).toHaveCount(0);
+    });
+    await step("An entry with no metadata of its own shows what was made", async () => {
+      await filterAction(page, "user.created");
+      const created = entries(page).filter({ hasText: user.id });
+      await created.first().click();
+      await expect(page.getByTestId("audit-metadata")).toContainText(user.email);
     });
   },
 );
@@ -138,15 +165,10 @@ test(
       await expect(entries(page).first()).toBeVisible();
     });
     await step("Filter by action", async () => {
-      await page.getByLabel("Filter by action").fill("user.sign_in_failed");
+      await filterAction(page, "user.sign_in_failed");
       await expect(entry(page, ana.email)).toBeVisible();
       await expect
-        .poll(async () => {
-          const actions = await entries(page).evaluateAll((items) =>
-            items.map((item) => item.querySelector("button span")?.textContent?.trim()),
-          );
-          return [...new Set(actions)];
-        })
+        .poll(async () => [...new Set(await actionsShown(page))])
         .toEqual(["user.sign_in_failed"]);
       expect(await entries(page).count()).toBeGreaterThanOrEqual(2);
     });
@@ -162,13 +184,13 @@ test(
       await expect(entries(page).first()).not.toContainText(ana.email);
     });
     await step("A filter with no match says so", async () => {
-      await page.getByLabel("Filter by action").fill("no.such_action");
+      await filterAction(page, "no.such_action");
       await expect(page.getByText("No events match these filters.")).toBeVisible();
-      await expect(page.getByTestId("audit-list")).toHaveCount(0);
+      await expect(page.getByTestId("audit-table")).toHaveCount(0);
     });
     await step("Clear removes both filters", async () => {
-      await page.getByRole("button", { name: "Clear" }).click();
-      await expect(page.getByLabel("Filter by action")).toHaveValue("");
+      await page.getByRole("button", { name: "Clear", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Action", exact: true })).toBeVisible();
       await expect(page.getByLabel("Filter by actor")).toHaveValue("");
       await expect(page.getByText("No events match these filters.")).toHaveCount(0);
       await expect(entries(page).first()).toBeVisible();
@@ -214,7 +236,7 @@ test(
       await expect(page.getByTestId("load-more")).toHaveCount(0);
     });
     await step("Filtering to one action shows a short list with no Load more", async () => {
-      await page.getByLabel("Filter by action").fill("admin.signed_in");
+      await filterAction(page, "admin.signed_in");
       const signIns = await root.api.get("/admin/audit-events?action=admin.signed_in", {
         record: false,
       });
@@ -308,13 +330,14 @@ test(
       expect(String(report.data.broken.seq)).toBe(victim!.seq);
     });
     await step("The forged value shows in the list, which is why the chain exists", async () => {
-      await page.getByLabel("Filter by action").fill("user.created");
-      const forged = entries(page)
-        .filter({ hasText: "user.created" })
-        .filter({ hasText: victim!.resource_id });
-      await forged.first().getByRole("button").click();
-      await expect(forged.first().getByTestId("audit-metadata")).toContainText(
-        "forged@example.com",
+      await filterAction(page, "user.created");
+      const forged = entries(page).filter({ hasText: victim!.resource_id });
+      await forged.first().click();
+      await expect(page.getByTestId("audit-metadata")).toContainText("forged@example.com");
+    });
+    await step("The drawer says this record is where the chain breaks", async () => {
+      await expect(page.getByTestId("audit-chain")).toContainText(
+        "The chain breaks at this record",
       );
     });
   },
