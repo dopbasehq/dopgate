@@ -1,11 +1,11 @@
 ---
 title: "Introduction"
-description: "What Dopgate is, how it sits between your app's frontend and backend, and what it leaves to your app."
+description: "What Dopgate is, how it signs in your users and their AI agents, how it sits between your app's frontend and backend, and what it leaves to your app."
 ---
 
 # Introduction
 
-Dopgate is an authentication server for one app, and you run it yourself. It keeps your user accounts, signs people in, and gives your app short-lived tokens that prove who the user is. It does the job Firebase Authentication or Clerk would do, with a smaller feature set and no hosted service.
+Dopgate is an auth server for one app. It keeps your user accounts, signs people in, and gives [AI agents](/ai-agents/) accounts of their own. Every sign-in ends in a short-lived token that tells your backend who is calling and whether it is a person or an agent. It does the job Firebase Authentication or Clerk would do, with a smaller feature set, inside your own infrastructure.
 
 Dopgate is a standalone app. It runs in its own container, usually in the same Docker Compose stack as your app, and stores everything in PostgreSQL. The smallest setup is a PostgreSQL server and Dopgate. All of Dopgate's tables live in one schema (`dopgate` unless you pick another name), so it can share your app's database without touching your tables.
 
@@ -45,8 +45,9 @@ When your backend needs to do something to an account, such as set a plan in the
 - Email verification, password reset, and email change, all by 6-digit code
 - Profiles with a display name, an avatar URL, and three kinds of JSON metadata
 - Access and refresh tokens, with refresh token rotation and reuse detection, and a list of signed-in devices each user can end
+- Accounts for AI agents and bots, each with an owner and capabilities signed into its token
+- Personal tokens a user makes to sign in from a script
 - Admins who run Dopgate from the console, kept apart from the users who sign in to your app
-- Personal tokens a user makes to sign in from a script, and agents: accounts for bots that sign in with a token
 - An admin API for users, admins, agents, settings, email templates, signing keys, and the audit log
 - Rate limits per address and per email, and account lockout after wrong passwords
 - Six email templates you can rewrite from the console or the API
@@ -61,5 +62,6 @@ Dopgate answers "who is this user". Your app decides what they may do. Organizat
 
 - [Quick start](/guide/quick-start) runs Dopgate with Docker Compose and signs you in to the console.
 - [Add Dopgate to your app](/guide/add-to-your-app) wires up a frontend and a backend.
+- [Auth for AI agents](/ai-agents/) shows how an agent gets its own account and signs in.
 - [Sign-in through your backend](/guide/backend-sessions) keeps every token on your server, in an encrypted cookie, for web apps with a backend.
 - [Running with your app's stack](/self-hosting/with-your-app) covers a real deployment next to your app.

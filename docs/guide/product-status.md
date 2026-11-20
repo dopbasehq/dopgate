@@ -23,7 +23,7 @@ This page lists what works in Dopgate {{version}}. Planned endpoints are already
 | User management | `/api/v1/admin/users` and everything under it |
 | Admin management | `/api/v1/admin/admins` and everything under it |
 | Personal tokens | `/api/v1/auth/personal-tokens`, `/api/v1/auth/token`, `/api/v1/admin/users/{id}/personal-tokens` |
-| Agents | `/api/v1/auth/agents`, `/api/v1/admin/agents`, and agent tokens at `/api/v1/auth/token` |
+| Accounts for AI agents | `/api/v1/auth/agents`, `/api/v1/admin/agents`, and agent tokens at `/api/v1/auth/token` |
 | Settings | `/api/v1/admin/settings`, `/api/v1/admin/settings/smtp/test` |
 | Email templates | `/api/v1/admin/email-templates` and everything under it |
 | Audit log with hash chain and retention | `/api/v1/admin/audit-events`, `/api/v1/admin/audit-events/verify` |
@@ -40,6 +40,7 @@ This page lists what works in Dopgate {{version}}. Planned endpoints are already
 | Single sign-on with OpenID Connect providers | `GET /api/v1/admin/sso/presets` returns the preset catalog. Every other route under `/api/v1/auth/sso` and `/api/v1/admin/sso/providers` answers `501`. |
 | Multi-factor authentication with an authenticator app | Every route under `/api/v1/auth/mfa` answers `501`. |
 | Webhooks | Not in the API yet. |
+| OAuth for MCP servers | Not in the API yet. Agents sign in with their token. |
 
 The [roadmap](/about/roadmap) has the order these come in.
 

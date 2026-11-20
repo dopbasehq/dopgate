@@ -4,9 +4,18 @@
 
 <h1 align="center">Dopgate</h1>
 
-<p align="center">Authentication you host yourself. Part of the Dopbase family.</p>
+<p align="center">Modern auth for people and AI agents. Dopgate by <a href="https://dopbase.com">Dopbase</a>.</p>
 
-Dopgate is an authentication server for one app, and you host it yourself. It signs users up and in, confirms their email with 6-digit codes, resets passwords, and gives your app ES256 JWTs that your backend verifies offline against a public key set. It runs as its own container next to your app, usually in the same Docker Compose stack, and keeps every table in a PostgreSQL schema (`dopgate` by default), so it can share your app's database. The binary has an admin console built in for root and admins.
+Dopgate is an auth server for one app. It signs users up and in, confirms their email with 6-digit codes, resets passwords, and gives AI agents accounts of their own. Every access token is an ES256 JWT that says whether a person or an agent is calling, and your backend verifies it offline against a public key set. Dopgate runs in your infrastructure as its own container next to your app, usually in the same Docker Compose stack, and keeps every table in a PostgreSQL schema (`dopgate` by default), so it can share your app's database.
+
+## What you get
+
+- Accounts for AI agents. Each agent signs in with its own token and gets a JWT with `kind: agent`, its owner, and the capabilities the owner gave it. See [auth for AI agents](docs/ai-agents/index.md).
+- Sign-up and sign-in for people, by password or emailed 6-digit code, with sessions and refresh token rotation.
+- A hash-chained audit log, so an edited or deleted record shows up when you verify the chain.
+- Argon2id password hashes, tokens and codes stored only as hashes, rate limits, and account lockout.
+- An admin console built into the binary, for root and admins.
+- A small footprint, measured: 14 MiB of memory at rest, and 5,803 agent token trades a second on two Apple M3 Pro cores shared with PostgreSQL. See the [benchmarks](docs/reference/benchmarks.md).
 
 Single sign-on and multi-factor authentication are planned; their routes answer `501` for now. See [product status](docs/guide/product-status.md).
 
@@ -39,8 +48,8 @@ bun run dev      # API, console, and docs together; Ctrl-C stops all three
 | --- | --- |
 | API | http://localhost:8850/api/v1 |
 | Swagger UI | http://localhost:8850/api/docs |
-| Admin console (Vite) | http://localhost:5174 |
-| Docs (VitePress) | http://localhost:5173 |
+| Admin console (Vite) | http://localhost:9000 |
+| Docs (VitePress) | http://localhost:9001 |
 
 `bun run dev` points the API at the `dev:db` database, allows the console's origin, and sets `DOPGATE_ROOT_EMAIL=admin@example.com`, so the first start prints a root password in the terminal. Emails go to the same terminal.
 
@@ -72,8 +81,8 @@ If you ran a 0.1.0 preview, delete the old `.dev-data` folder. It held SQLite fi
 | `bun run dev` | API, console, and docs together |
 | `bun run dev:db` | Start the development PostgreSQL container on port 55433 |
 | `bun run dev:app` | Only the API (`cargo run -- serve`) |
-| `bun run dev:ui` | Only the console, with Vite on port 5174 |
-| `bun run dev:docs` | Only the docs, with VitePress on port 5173 |
+| `bun run dev:ui` | Only the console, with Vite on port 9000 |
+| `bun run dev:docs` | Only the docs, with VitePress on port 9001 |
 | `bun run build` | The release binary (console included) and the static docs |
 | `bun run build:app` | Build the console, then the release binary that embeds it |
 | `bun run build:ui` | Only the console, into `ui/dist` |
@@ -112,7 +121,7 @@ If you ran a 0.1.0 preview, delete the old `.dev-data` folder. It held SQLite fi
 
 ## Documentation
 
-Run `bun run dev:docs` and open http://localhost:5173, or read the Markdown in `docs/`. Good places to start: [introduction](docs/guide/index.md), [add Dopgate to your app](docs/guide/add-to-your-app.md), [environment variables](docs/reference/environment-variables.md), and the [REST API](docs/reference/api.md).
+Run `bun run dev:docs` and open http://localhost:9001, or read the Markdown in `docs/`. Good places to start: [introduction](docs/guide/index.md), [auth for AI agents](docs/ai-agents/index.md), [add Dopgate to your app](docs/guide/add-to-your-app.md), [environment variables](docs/reference/environment-variables.md), and the [REST API](docs/reference/api.md).
 
 ## License
 

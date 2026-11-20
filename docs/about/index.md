@@ -5,11 +5,15 @@ description: "The choices behind Dopgate and the limits it keeps."
 
 # Principles
 
+## People and agents are different callers
+
+An AI agent that works for a user shouldn't borrow the user's password or session. In Dopgate an agent is an account of its own, with an owner who answers for it and capabilities signed into its token. Every access token says `kind: human` or `kind: agent`, so your backend always knows which one is calling. [Auth for AI agents](/ai-agents/) has the details.
+
 ## One app, one Dopgate
 
 Dopgate serves a single app. It runs as its own container next to that app, usually in the same Compose stack, and keeps its data in a PostgreSQL schema of its own. A second app gets a second Dopgate. That keeps the model small: one set of users, one set of settings, one key set.
 
-## Use the database you already run
+## Your data stays in your infrastructure
 
 Your app most likely has PostgreSQL already. Dopgate puts every table in the `dopgate` schema, so it can live in the same database without touching your tables, and you back it up and restore it with the tools you already use.
 

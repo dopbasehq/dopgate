@@ -1,6 +1,6 @@
 ---
 title: "Roadmap"
-description: "What Dopgate has built so far and what comes next: single sign-on, multi-factor authentication, and webhooks."
+description: "What Dopgate has built so far and what comes next: single sign-on, multi-factor authentication, webhooks, and OAuth for MCP servers."
 ---
 
 # Roadmap
@@ -29,6 +29,7 @@ Dopgate is built in phases. Each phase replaces placeholder endpoints with worki
 | Single sign-on | Sign in with Google, Microsoft, Okta, or any OpenID Connect provider, with presets and account linking. The routes exist and answer `501`, except the list of presets. |
 | Multi-factor authentication | A second factor with an authenticator app (TOTP), with recovery codes. The routes exist and answer `501`. |
 | Webhooks | Tell your backend about events such as `user.signed_up` and `user.deleted`. |
+| OAuth for MCP servers | Let an agent connect to your MCP server through the standard MCP sign-in flow. Not started. Today an agent signs in with its token. |
 | Hosted pages | Maybe: ready-made sign-in and sign-up pages for apps that don't want to build their own forms. |
 
 The order can change as people use Dopgate and report what they need.

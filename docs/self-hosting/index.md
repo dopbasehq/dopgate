@@ -1,9 +1,9 @@
 ---
-title: "Self-hosting"
+title: "Deploying Dopgate"
 description: "What a Dopgate deployment looks like: one container, one PostgreSQL schema, a public URL, and a few environment variables."
 ---
 
-# Self-hosting
+# Deploying Dopgate
 
 A Dopgate deployment is a PostgreSQL database and one Dopgate container. Dopgate keeps no files on disk: accounts, sessions, codes, signing keys, settings, templates, and the audit log all live in its PostgreSQL schema. You can restart, replace, or move the container freely as long as it points at the same database.
 
