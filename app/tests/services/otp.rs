@@ -17,8 +17,17 @@ fn typed_codes_ignore_spaces_and_dashes() {
 
 #[test]
 fn each_purpose_has_its_template() {
-  assert_eq!(Purpose::EmailVerify.template(), "verify_email");
-  assert_eq!(Purpose::Login.template(), "login_code");
-  assert_eq!(Purpose::PasswordReset.template(), "password_reset");
-  assert_eq!(Purpose::EmailChange.template(), "email_change");
+  assert_eq!(
+    Purpose::EmailVerify.template().builtin().name,
+    "verify_email"
+  );
+  assert_eq!(Purpose::Login.template().builtin().name, "login_code");
+  assert_eq!(
+    Purpose::PasswordReset.template().builtin().name,
+    "password_reset"
+  );
+  assert_eq!(
+    Purpose::EmailChange.template().builtin().name,
+    "email_change"
+  );
 }

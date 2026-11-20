@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::constants::limits::VERIFICATION_CODE_DIGITS;
+use crate::{constants::limits::VERIFICATION_CODE_DIGITS, modules::email_templates::Template};
 
 /// What a code proves.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
@@ -34,12 +34,12 @@ impl Purpose {
   }
 
   /// The email template that carries this code.
-  pub fn template(self) -> &'static str {
+  pub fn template(self) -> Template {
     match self {
-      Self::EmailVerify => "verify_email",
-      Self::Login => "login_code",
-      Self::EmailChange => "email_change",
-      Self::PasswordReset => "password_reset",
+      Self::EmailVerify => Template::VerifyEmail,
+      Self::Login => Template::LoginCode,
+      Self::EmailChange => Template::EmailChange,
+      Self::PasswordReset => Template::PasswordReset,
     }
   }
 }

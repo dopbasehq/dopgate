@@ -509,7 +509,13 @@ pub async fn change_password(
   let values =
     email_templates::service::base_values(state, &account.email, account.display_name.as_deref())
       .await?;
-  email_templates::service::send(state, "password_changed", &account.email, values).await
+  email_templates::service::send(
+    state,
+    email_templates::Template::PasswordChanged,
+    &account.email,
+    values,
+  )
+  .await
 }
 
 /// Start an email change: a code goes to the new address. The account moves

@@ -98,5 +98,11 @@ pub async fn reset(
   tx.commit().await?;
   let values =
     email_templates::service::base_values(state, &user.email, user.display_name.as_deref()).await?;
-  email_templates::service::send(state, "password_changed", &user.email, values).await
+  email_templates::service::send(
+    state,
+    email_templates::Template::PasswordChanged,
+    &user.email,
+    values,
+  )
+  .await
 }

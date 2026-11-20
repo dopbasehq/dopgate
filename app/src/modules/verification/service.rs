@@ -396,8 +396,14 @@ pub async fn confirm_email_change(
   let mut values =
     email_templates::service::base_values(state, &account.email, account.display_name.as_deref())
       .await?;
-  values.insert("new_email", new_email.clone());
-  email_templates::service::send(state, "email_changed", &account.email, values).await?;
+  values.insert("new_email", new_email);
+  email_templates::service::send(
+    state,
+    email_templates::Template::EmailChanged,
+    &account.email,
+    values,
+  )
+  .await?;
   Ok(account.id)
 }
 

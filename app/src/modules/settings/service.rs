@@ -342,15 +342,13 @@ pub async fn test_smtp(
     ),
     html: None,
   };
-  mailer::send(Some(&config), &message)
-    .await
-    .map_err(|error| {
-      HttpError::new(
-        StatusCode::BAD_GATEWAY,
-        SMTP_SEND_FAILED,
-        format!("The message was not sent: {error}"),
-      )
-    })
+  mailer::send(Some(&config), message).await.map_err(|error| {
+    HttpError::new(
+      StatusCode::BAD_GATEWAY,
+      SMTP_SEND_FAILED,
+      format!("The message was not sent: {error}"),
+    )
+  })
 }
 
 /// A stored section, or its defaults when it was never saved.

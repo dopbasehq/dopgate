@@ -14,7 +14,7 @@ fn message(to: &str) -> Message {
 
 #[tokio::test]
 async fn without_smtp_the_message_goes_to_the_log() {
-  mailer::send(None, &message("user@example.com"))
+  mailer::send(None, message("user@example.com"))
     .await
     .unwrap();
 }
@@ -31,7 +31,7 @@ async fn a_bad_recipient_is_refused_before_connecting() {
     from_email: "no-reply@example.com".into(),
     from_name: None,
   };
-  let error = mailer::send(Some(&config), &message("not an address"))
+  let error = mailer::send(Some(&config), message("not an address"))
     .await
     .unwrap_err();
   assert!(error.0.contains("recipient"), "{error}");
