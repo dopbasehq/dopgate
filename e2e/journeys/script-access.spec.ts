@@ -34,11 +34,11 @@ test(
       await openAs(page, await app.root(), "/settings");
       const section = page.getByTestId("settings-selfService");
       await section
-        .getByText("Users can create personal tokens that sign in as themselves")
+        .getByText("Users can create personal tokens", { exact: true })
         .click();
       await section.getByText("Users can create agents of their own").click();
-      await section.getByRole("button", { name: "Save" }).click();
-      await expect(section.getByText("Saved")).toBeVisible();
+      await section.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(section.getByText("Saved", { exact: true })).toBeVisible();
     });
     await step("The user makes a personal token for a script", async () => {
       const created = await user.api.post("/auth/personal-tokens", {

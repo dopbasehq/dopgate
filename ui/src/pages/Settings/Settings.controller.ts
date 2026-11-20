@@ -20,63 +20,112 @@ export type SectionName = keyof EditableSettings;
 export interface NumberField<K extends string> {
   key: K;
   label: string;
-  hint: string;
+  /** Shown after the value; screen readers hear it with the label. */
+  unit?: string;
+  hint?: string;
 }
 
-export const LIMIT_FIELDS: NumberField<keyof LimitSettings>[] = [
+/** A row of number fields on the Settings page. */
+export interface FieldGroup<K extends string> {
+  title: string;
+  description: string;
+  fields: NumberField<K>[];
+}
+
+export const LIMIT_GROUPS: FieldGroup<keyof LimitSettings>[] = [
   {
-    key: "codeMinutes",
-    label: "Code lifetime (minutes)",
-    hint: "How long an emailed code works.",
+    title: "Email codes",
+    description:
+      "The 6-digit codes Dopgate emails for sign-in, sign-up and resets.",
+    fields: [
+      {
+        key: "codeMinutes",
+        label: "Code lifetime",
+        unit: "minutes",
+        hint: "How long an emailed code works.",
+      },
+      {
+        key: "codeMaxAttempts",
+        label: "Tries per code",
+        hint: "Wrong guesses before a code stops working.",
+      },
+      {
+        key: "codeResendSeconds",
+        label: "Resend wait",
+        unit: "seconds",
+        hint: "Time before another code can be sent. 0 turns the wait off.",
+      },
+      {
+        key: "codesPerHour",
+        label: "Codes per hour",
+        hint: "Per email address.",
+      },
+    ],
   },
   {
-    key: "codeMaxAttempts",
-    label: "Tries per code",
-    hint: "Wrong guesses before a code stops working.",
+    title: "Lockout",
+    description: "What happens after wrong passwords in a row.",
+    fields: [
+      { key: "lockoutAttempts", label: "Failed sign-ins before lockout" },
+      {
+        key: "lockoutMinutes",
+        label: "Lockout length",
+        unit: "minutes",
+        hint: "How long a locked account waits.",
+      },
+    ],
   },
   {
-    key: "codeResendSeconds",
-    label: "Resend wait (seconds)",
-    hint: "Time before another code can be sent. 0 turns the wait off.",
-  },
-  { key: "codesPerHour", label: "Codes per hour", hint: "Per email address." },
-  {
-    key: "lockoutAttempts",
-    label: "Failed sign-ins before lockout",
-    hint: "Wrong passwords in a row.",
-  },
-  {
-    key: "lockoutMinutes",
-    label: "Lockout length (minutes)",
-    hint: "How long a locked account waits.",
-  },
-  {
-    key: "ipRequestsPerMinute",
-    label: "Requests per minute per IP",
-    hint: "For the sign-in endpoints.",
+    title: "Rate limit",
+    description: "Requests one address can make to the sign-in endpoints.",
+    fields: [
+      { key: "ipRequestsPerMinute", label: "Requests per minute per IP" },
+    ],
   },
 ];
 
-export const TOKEN_FIELDS: NumberField<keyof TokenSettings>[] = [
+export const TOKEN_GROUPS: FieldGroup<keyof TokenSettings>[] = [
   {
-    key: "accessTokenMinutes",
-    label: "Access token lifetime (minutes)",
-    hint: "Short, since access tokens can't be revoked.",
+    title: "Access tokens",
+    description: "Keep this short, since access tokens can't be revoked.",
+    fields: [
+      {
+        key: "accessTokenMinutes",
+        label: "Access token lifetime",
+        unit: "minutes",
+      },
+    ],
   },
   {
-    key: "refreshTokenIdleDays",
-    label: "Idle sign-out (days)",
-    hint: "A session unused this long ends.",
+    title: "Sessions",
+    description: "When a signed-in session ends.",
+    fields: [
+      {
+        key: "refreshTokenIdleDays",
+        label: "Idle sign-out",
+        unit: "days",
+        hint: "A session unused this long ends.",
+      },
+      {
+        key: "sessionAbsoluteDays",
+        label: "Session length",
+        unit: "days",
+        hint: "Every session ends after this, used or not.",
+      },
+    ],
   },
   {
-    key: "sessionAbsoluteDays",
-    label: "Session length (days)",
-    hint: "Every session ends after this, used or not.",
-  },
-  {
-    key: "refreshReuseSeconds",
-    label: "Repeat refresh window (seconds)",
-    hint: "A refresh sent twice this soon gets the same answer. 0 turns it off.",
+    title: "Repeat refresh",
+    description:
+      "A refresh sent twice this soon gets the same answer, so two tabs don't sign anyone out.",
+    fields: [
+      {
+        key: "refreshReuseSeconds",
+        label: "Repeat refresh window",
+        unit: "seconds",
+        hint: "0 turns it off.",
+      },
+    ],
   },
 ];
 
