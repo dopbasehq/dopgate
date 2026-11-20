@@ -10,11 +10,12 @@ import {
 const siteUrl = (process.env.DOPGATE_DOCS_URL ?? "http://localhost:5173").replace(/\/$/, "");
 const siteName = "Dopgate";
 const siteDescription =
-  "Dopgate is a self-hosted auth server for one app. It runs next to your app with PostgreSQL and handles sign-up, sign-in, email codes, password resets, and JWTs your backend verifies offline.";
+  "Dopgate is an auth server for apps with users and AI agents. Agents get their own account, an owner, and signed permissions, and your backend verifies every token offline.";
 const sectionNames: Record<string, string> = {
   guide: "Guide",
+  "ai-agents": "AI agents",
   cli: "CLI",
-  "self-hosting": "Self-hosting",
+  "self-hosting": "Deploy",
   reference: "Reference",
   about: "About",
 };
@@ -101,7 +102,12 @@ const config = defineConfig({
   lang: "en-US",
   cleanUrls: true,
   lastUpdated: true,
-  sitemap: { hostname: siteUrl },
+  sitemap: {
+    hostname: siteUrl,
+    // guide/agents only redirects to the AI agents section.
+    transformItems: (items) =>
+      items.filter((item) => !item.url.replace(/^\//, "").startsWith("guide/agents")),
+  },
   mermaid: {
     startOnLoad: false,
     securityLevel: "strict",
@@ -190,9 +196,10 @@ const config = defineConfig({
     search: { provider: "local" },
     nav: [
       { text: "Guide", link: "/guide/", activeMatch: "^/guide/" },
+      { text: "AI agents", link: "/ai-agents/", activeMatch: "^/ai-agents/" },
       { text: "CLI", link: "/cli/", activeMatch: "^/cli/" },
       {
-        text: "Self-hosting",
+        text: "Deploy",
         link: "/self-hosting/",
         activeMatch: "^/self-hosting/",
       },
@@ -233,11 +240,29 @@ const config = defineConfig({
           items: [
             { text: "Tokens and sessions", link: "/guide/tokens-and-sessions" },
             { text: "Personal tokens", link: "/guide/personal-tokens" },
-            { text: "Agents", link: "/guide/agents" },
+            { text: "AI agents", link: "/ai-agents/" },
             { text: "Calling the admin API", link: "/guide/admin-api" },
             { text: "Email templates", link: "/guide/email-templates" },
             { text: "Rate limits and lockout", link: "/guide/rate-limits" },
             { text: "Admin console", link: "/guide/admin-console" },
+          ],
+        },
+      ],
+      "/ai-agents/": [
+        {
+          text: "AI agents",
+          items: [
+            { text: "Auth for AI agents", link: "/ai-agents/" },
+            { text: "Create an agent", link: "/ai-agents/create-an-agent" },
+            { text: "Capabilities in the token", link: "/ai-agents/capabilities" },
+            { text: "Check an agent in your backend", link: "/ai-agents/verify-in-your-backend" },
+          ],
+        },
+        {
+          text: "Related",
+          items: [
+            { text: "Personal tokens", link: "/guide/personal-tokens" },
+            { text: "Token claims", link: "/reference/token-claims" },
           ],
         },
       ],
@@ -318,8 +343,9 @@ const config = defineConfig({
     sidebarMenuLabel: "Menu",
     darkModeSwitchLabel: "Appearance",
     footer: {
-      message: "Self-hosted authentication for your app, on PostgreSQL.",
-      copyright: "Apache-2.0",
+      message: "Modern auth for people and AI agents.",
+      copyright:
+        'Dopgate by <a href="https://dopbase.com">Dopbase</a>. Apache-2.0.',
     },
   },
 });

@@ -31,7 +31,7 @@ An access token is a JWT signed with ES256. Its header names the signing key in 
 | `iat`, `exp` | `1762700000` | Issued at and expiry, in Unix seconds |
 | `jti` | `jti_01JC8Z...` | This token's own ID, different for every token |
 
-A token traded from a [personal token](/guide/personal-tokens) carries `via: "pat"` and `tid`, the token's ID, in place of `sid`. An [agent's](/guide/agents) token has `kind: "agent"`, with `owner` and `capabilities` in place of the email claims.
+A token traded from a [personal token](/guide/personal-tokens) carries `via: "pat"` and `tid`, the token's ID, in place of `sid`. An [agent's](/ai-agents/verify-in-your-backend) token has `kind: "agent"`, with `owner` and `capabilities` in place of the email claims.
 
 Admins never get one of these tokens: the console signs them in with tokens that only Dopgate can verify. [Token claims](/reference/token-claims) has the full reference.
 

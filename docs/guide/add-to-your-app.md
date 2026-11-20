@@ -150,7 +150,7 @@ export async function currentUserId(authorizationHeader) {
 }
 ```
 
-Store `sub` as the foreign key in your own tables. It never changes, even when the user changes their email. If you use [agents](/guide/agents), their tokens pass the same check with an `agt_` ID in `sub` and `kind: "agent"`, so check `kind` on routes that only people should reach. The token also carries `email`, `email_verified`, `kind`, and `sid`. [Token claims](/reference/token-claims) describes each one, and [Tokens and sessions](/guide/tokens-and-sessions) has the same check in Go and Python.
+Store `sub` as the foreign key in your own tables. It never changes, even when the user changes their email. If you use [agents](/ai-agents/), their tokens pass the same check with an `agt_` ID in `sub` and `kind: "agent"`, so check `kind` on routes that only people should reach. The token also carries `email`, `email_verified`, `kind`, and `sid`. [Token claims](/reference/token-claims) describes each one, and [Tokens and sessions](/guide/tokens-and-sessions) has the same check in Go and Python.
 
 ## Backend: call the admin API
 

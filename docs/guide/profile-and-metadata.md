@@ -49,7 +49,7 @@ Three things to know before you rely on it:
 - A token issued before you set the value doesn't have it. After a sign-up, set the metadata and have your app call `POST /api/v1/auth/refresh` once, or create the user through the admin API with `publicMetadata` already filled in.
 - Anyone who holds the token can decode it. Keep secrets in `privateMetadata`.
 
-Tokens traded from a [personal token](/guide/personal-tokens) carry the claim too. An [agent's](/guide/agents) token never does.
+Tokens traded from a [personal token](/guide/personal-tokens) carry the claim too. An [agent's](/ai-agents/) token never does.
 
 ## The user's own profile
 

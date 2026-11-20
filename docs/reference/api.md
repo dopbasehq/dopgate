@@ -221,7 +221,7 @@ Answers `200 EMAIL_CHANGE_CODE_SENT`. Errors: `401 AUTHENTICATION_INVALID` (wron
 
 ### `POST /api/v1/auth/token`
 
-Public. Trades a personal token for an access token that signs in as its user, or an agent token for one that signs in as the agent. See [Personal tokens](/guide/personal-tokens) and [Agents](/guide/agents).
+Public. Trades a personal token for an access token that signs in as its user, or an agent token for one that signs in as the agent. See [Personal tokens](/guide/personal-tokens) and [AI agents](/ai-agents/).
 
 | Request field | Required | Notes |
 | --- | --- | --- |
@@ -243,7 +243,7 @@ Every `/auth/personal-tokens` endpoint needs User from a password or code sign-i
 
 ## Agents
 
-An agent, as these endpoints return it: `id` (`agt_`), `name`, `description`, `owner` (`id`, `kind` of `admin` or `user`, and `email`), `capabilities`, `status`, `lastFour`, `lastUsedAt`, `createdAt`, `updatedAt`. Creating or regenerating also returns `token`, shown once. See [Agents](/guide/agents) for the rules on names and capabilities.
+An agent, as these endpoints return it: `id` (`agt_`), `name`, `description`, `owner` (`id`, `kind` of `admin` or `user`, and `email`), `capabilities`, `status`, `lastFour`, `lastUsedAt`, `createdAt`, `updatedAt`. Creating or regenerating also returns `token`, shown once. See [Create an agent](/ai-agents/create-an-agent) and [Capabilities in the token](/ai-agents/capabilities) for the rules on names and capabilities.
 
 Your own agents, for users. Every endpoint needs User from a password or code sign-in. `POST`, `PATCH`, and `regenerate` also need `selfService.agents` on (`403 FEATURE_DISABLED`). Another owner's agent answers `404 NOT_FOUND`.
 
@@ -460,7 +460,7 @@ Admin. Answers `200 SETTINGS_FETCHED` with every section.
 | `password` | `minLength` (`8`, allowed 8 to 128), `rejectLeaked` (`true`). See [leaked passwords](/reference/security#leaked-passwords). |
 | `tokens` | `accessTokenMinutes` (`15`, 1 to 1440), `refreshTokenIdleDays` (`30`, 1 to 3650), `sessionAbsoluteDays` (`90`, 1 to 3650, not less than the idle limit), `refreshReuseSeconds` (`10`, 0 to 60, 0 turns it off) |
 | `limits` | `codeMinutes` (`10`), `codeMaxAttempts` (`5`), `codeResendSeconds` (`60`), `codesPerHour` (`5`), `lockoutAttempts` (`5`), `lockoutMinutes` (`15`), `ipRequestsPerMinute` (`20`). Ranges in [Rate limits](/guide/rate-limits). |
-| `selfService` | `agents` (`false`), `maxAgentsPerUser` (`10`, 1 to 1000), `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [Agents](/guide/agents) and [Personal tokens](/guide/personal-tokens). |
+| `selfService` | `agents` (`false`), `maxAgentsPerUser` (`10`, 1 to 1000), `personalTokens` (`false`), `maxPersonalTokensPerUser` (`10`, 1 to 1000). See [AI agents](/ai-agents/) and [Personal tokens](/guide/personal-tokens). |
 | `branding` | `appName` (`Dopgate`, one line up to 255 characters), `logoUrl` (`null`, an `http(s)` URL) |
 | `smtp` | `host` (`null`), `port` (`587`, `465`, or `25` by security), `security` (`starttls`), `username`, `passwordSet`, `fromEmail` (`no-reply@dopgate.com`), `fromName`, `source` (`server_config`, `database`, or `log`), `canStorePassword`. See [Email (SMTP)](/self-hosting/smtp#where-the-settings-come-from). |
 

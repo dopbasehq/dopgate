@@ -5,7 +5,7 @@ description: "The two kinds of account in Dopgate: admins who run it from the co
 
 # Admins and users
 
-Dopgate keeps two kinds of person, and they never mix. Each of them can also own [agents](/guide/agents), accounts for bots that sign in with a token.
+Dopgate keeps two kinds of person, and they never mix. Each of them can also own [agents](/ai-agents/), accounts for bots that sign in with a token.
 
 | Kind | ID | Who it is for | Signs in at |
 | --- | --- | --- | --- |

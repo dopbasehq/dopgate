@@ -16,7 +16,7 @@ curl -X PATCH https://auth.example.com/api/v1/admin/settings \
   -d '{"selfService":{"personalTokens":true,"maxPersonalTokensPerUser":10,"agents":false,"maxAgentsPerUser":10}}'
 ```
 
-The API replaces the whole `selfService` section, and a field you leave out goes back to its default. Send the [agent](/guide/agents) fields too, or saving this turns user agents off.
+The API replaces the whole `selfService` section, and a field you leave out goes back to its default. Send the [agent](/ai-agents/create-an-agent) fields too, or saving this turns user agents off.
 
 ## Making a token
 

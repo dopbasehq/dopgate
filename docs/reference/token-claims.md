@@ -5,7 +5,7 @@ description: "The header and claims of a Dopgate access token, and the checks yo
 
 # Token claims
 
-A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256). Your app's users and [agents](/guide/agents) get these tokens. Admins sign in to the console and get [console tokens](#console-tokens) that only Dopgate can verify; see [Admins and users](/guide/admins-and-users).
+A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256). Your app's users and [agents](/ai-agents/) get these tokens. Admins sign in to the console and get [console tokens](#console-tokens) that only Dopgate can verify; see [Admins and users](/guide/admins-and-users).
 
 ## Header
 
@@ -42,7 +42,7 @@ A Dopgate access token is a JWT signed with ES256 (ECDSA on P-256 with SHA-256).
 | `iat` | number | When the token was issued, in Unix seconds |
 | `jti` | string | The token's own ID, `jti_` followed by a ULID. Every token gets a new one, on a refresh too. Dopgate doesn't store it. |
 | `sid` | string | The session ID, `ses_` followed by a ULID. It matches the `id` in the session list. Absent on a token from a personal token. |
-| `kind` | string | `human` for a person who signed in, `agent` for an [agent](/guide/agents). Check it first. |
+| `kind` | string | `human` for a person who signed in, `agent` for an [agent](/ai-agents/). Check it first. |
 | `via` | string | `pat` when the token came from a [personal token](/guide/personal-tokens). Absent after a password or code sign-in. |
 | `tid` | string | The personal token's ID, `pat_` followed by a ULID, when `via` is `pat` |
 | `owner` | string | An agent's owner, an admin (`adm_`) or a user (`usr_`). Agents only. |
