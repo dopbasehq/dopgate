@@ -138,15 +138,3 @@ opt-level = 3
 # release binary needs stripping.
 [profile.release.build-override]
 strip = false
-
-[lints.clippy]
-# Flag unnecessary clones and locks
-clone_on_ref_ptr = "warn"
-mutex_atomic = "warn"
-mutex_integer = "warn"
-rc_mutex = "warn"
-
-# Force cleaner ownership and borrowing patterns
-needless_pass_by_value = "warn"
-trivially_copy_pass_by_ref = "warn"
-implicit_clone = "warn"
