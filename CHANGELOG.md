@@ -6,8 +6,11 @@ All notable changes to Dopgate are documented in this file. The format follows
 
 ## Unreleased
 
-The first release: an authentication server for one app, backed by PostgreSQL,
-with an admin console and Docker images. Nothing below has shipped before.
+## 0.1.0 - 2026-11-20
+
+The first release: an auth server for one app that signs in people and AI
+agents, backed by PostgreSQL, with an admin console and a Docker image.
+Nothing below has shipped before.
 
 ### Added
 
@@ -82,6 +85,9 @@ with an admin console and Docker images. Nothing below has shipped before.
   account lockout after five wrong passwords, all editable in settings.
   Sending a code answers with `retryAfter`, the seconds until the next one,
   and the console's sign-in page counts it down.
+- Password hashes run one per CPU at a time and the rest wait in line, so a
+  burst of sign-ins doesn't take 19 MiB each at once. On glibc the memory of
+  a finished hash goes back to the system.
 - `GET /api/v1/admin/users?email=` finds the one user with that email.
   `search` matches part of an email, so it can't tell `ana@` from `hana@`.
 - A backend that signs people in for them can send the service key in
@@ -110,26 +116,25 @@ with an admin console and Docker images. Nothing below has shipped before.
   drawer with its UTC time, metadata and place in the hash chain, and user and
   agent pages link to what they did in the audit log.
 - The Dopgate brand: the Hash D logo, Gate Red, and the Geist wordmark across
-  the console, docs, README, and favicons.
+  the console, docs, README, and favicons. The server banner and
+  `dopgate --help` print the line "Modern auth for people and AI agents".
 - CORS for the origins in `DOPGATE_ALLOWED_ORIGINS`.
 - A `Dockerfile` and a `docker-compose.yml` with PostgreSQL 18 and Dopgate.
+  The image carries OCI labels for its title, source, and license.
 - Release archives of the `dopgate` binary for Linux and macOS, on amd64 and
   arm64, with a `checksums.txt` to verify them. Each GitHub release takes its
   notes from this file.
-- Documentation site and README for the setup above. The docs cover personal
-  tokens, agents, console tokens, and starting over from a development
-  build. The home page links each feature to its guide and walks through the
-  four steps from an empty database to a verified token.
+- Documentation site and README for the setup above. The docs have an AI
+  agents section and cover personal tokens, console tokens, and starting over
+  from a development build. The home page links each feature to its guide and
+  walks through the four steps from an empty database to a verified token.
+- A [benchmarks page](docs/reference/benchmarks.md) with measured requests per
+  second, latency, and memory. `bun run bench` repeats the run in Docker.
 - A guide for web apps with a backend: the backend signs people in through
   Dopgate and keeps both tokens in an encrypted HttpOnly cookie, so no
   long-lived token reaches the browser and Dopgate can run on any domain.
 - Single sign-on and MFA routes answer `501 NOT_IMPLEMENTED` until they are
   built. They are hidden from the API docs at `/api/docs` for now.
-- Password hashes run one per CPU at a time and the rest wait in line, so a
-  burst of sign-ins doesn't take 19 MiB each at once. On glibc the memory of
-  a finished hash goes back to the system.
-- A [benchmarks page](docs/reference/benchmarks.md) with measured requests per
-  second, latency, and memory. `bun run bench` repeats the run in Docker.
 
 ### Security
 
