@@ -6,8 +6,8 @@ use clap::{Args, Parser, Subcommand};
 #[command(
   name = "dopgate",
   version,
-  about = "Authentication you host yourself",
-  long_about = "Dopgate signs users up and in, verifies email addresses, resets passwords, and issues JWTs.\nOne binary next to your app, with its tables in a PostgreSQL schema."
+  about = "Modern auth for people and AI agents",
+  long_about = "Dopgate signs users up and in, gives AI agents accounts of their own, and issues JWTs your backend verifies offline.\nOne binary next to your app, with its tables in a PostgreSQL schema."
 )]
 pub struct Cli {
   /// Print results and errors as JSON.

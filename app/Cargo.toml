@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 # File::try_lock (InstanceLock) is stable from 1.89.
 rust-version = "1.89"
-description = "Self-hosted authentication server for one app, backed by PostgreSQL."
+description = "Auth server for one app, with accounts for people and AI agents, backed by PostgreSQL."
 license = "Apache-2.0"
 
 [[bin]]

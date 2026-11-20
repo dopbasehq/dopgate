@@ -165,7 +165,7 @@ test(
         const log = server.output();
         await step("The banner has the product line and the version", async () => {
           expect(log).toContain("Dopgate");
-          expect(log).toContain("Authentication you host yourself");
+          expect(log).toContain("Modern auth for people and AI agents");
           expect(log).toContain(`Version ${pkg.version}`);
         });
         await step("The public URL defaults to localhost on that port", async () => {

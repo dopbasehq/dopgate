@@ -258,7 +258,7 @@ pub fn startup_banner(
   let heading = Style::new().effects(Effects::BOLD);
   let mut rows = vec![
     format!("{heading}Dopgate{heading:#}"),
-    "Authentication you host yourself".to_string(),
+    "Modern auth for people and AI agents".to_string(),
     format!("Version {}", env!("CARGO_PKG_VERSION")),
     String::new(),
     format!("Public URL: {public_url}"),
