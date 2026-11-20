@@ -121,14 +121,15 @@ pub async fn refresh(
   let request = request.map(|Json(request)| request).unwrap_or_default();
   let token = request
     .refresh_token
-    .or_else(|| context.refresh_cookie.clone())
+    .as_deref()
+    .or(context.refresh_cookie.as_deref())
     .ok_or_else(|| {
       HttpError::unauthorized(
         crate::constants::errors::TOKEN_INVALID,
         "Your session has ended. Sign in again.",
       )
     })?;
-  let (user, grant) = sessions::service::refresh(&state, Realm::App, &token).await?;
+  let (user, grant) = sessions::service::refresh(&state, Realm::App, token).await?;
   let tokens = service::app_tokens(&state, &user.id, grant).await?;
   sessions::service::deliver(
     &state,
@@ -166,7 +167,8 @@ pub async fn logout(
   let request = request.map(|Json(request)| request).unwrap_or_default();
   let refresh_token = request
     .refresh_token
-    .or_else(|| context.refresh_cookie.clone());
+    .as_deref()
+    .or(context.refresh_cookie.as_deref());
   let current = user
     .as_ref()
     .ok()
@@ -175,7 +177,7 @@ pub async fn logout(
     &state,
     Realm::App,
     current,
-    refresh_token.as_deref(),
+    refresh_token,
     request.all_sessions,
   )
   .await;

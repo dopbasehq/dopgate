@@ -50,18 +50,21 @@ impl Limits {
     if buckets.len() >= SWEEP_AT {
       buckets.retain(|_, bucket| !bucket.expired());
     }
-    let bucket = buckets.entry(key.to_owned()).or_insert(Bucket {
+    let fresh = || Bucket {
       count: 0,
       started: Instant::now(),
       window,
-    });
-    if bucket.expired() {
-      *bucket = Bucket {
-        count: 0,
-        started: Instant::now(),
-        window,
-      };
-    }
+    };
+    // The key is copied only for a bucket that isn't there yet.
+    let bucket = match buckets.get_mut(key) {
+      Some(bucket) => {
+        if bucket.expired() {
+          *bucket = fresh();
+        }
+        bucket
+      }
+      None => buckets.entry(key.to_owned()).or_insert_with(fresh),
+    };
     if bucket.count >= max.max(1) {
       let left = bucket.window.saturating_sub(bucket.started.elapsed());
       return Err(Limited {

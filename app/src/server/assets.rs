@@ -58,7 +58,13 @@ fn embedded_asset(path: &str) -> Option<Response> {
   let key = if key.is_empty() { "index.html" } else { key };
   let asset = AdminAssets::get(key)?;
   let mime = mime_guess::from_path(key).first_or_octet_stream();
-  let mut response = asset.data.into_owned().into_response();
+  // A release build embeds the files, so the body points at them and copies
+  // nothing. A debug build reads them from disk and owns what it read.
+  let body = match asset.data {
+    std::borrow::Cow::Borrowed(bytes) => axum::body::Body::from(bytes),
+    std::borrow::Cow::Owned(bytes) => axum::body::Body::from(bytes),
+  };
+  let mut response = body.into_response();
   response.headers_mut().insert(
     header::CONTENT_TYPE,
     HeaderValue::from_str(mime.as_ref()).ok()?,

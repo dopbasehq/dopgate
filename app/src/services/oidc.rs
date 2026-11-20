@@ -263,7 +263,7 @@ pub async fn exchange(
     .id_token_verifier()
     .set_allowed_algs(ALLOWED_ALGORITHMS);
   let claims = match id_token.claims(&verifier, &nonce) {
-    Ok(claims) => claims.clone(),
+    Ok(claims) => claims,
     Err(openidconnect::ClaimsVerificationError::SignatureVerification(_)) => {
       // The provider may have rotated its keys since discovery. Refetch
       // once and verify again; a second failure is final.
@@ -279,7 +279,6 @@ pub async fn exchange(
       id_token
         .claims(&verifier, &nonce)
         .map_err(|_| OidcError::InvalidToken)?
-        .clone()
     }
     Err(error) => {
       tracing::warn!(%error, "OIDC ID token rejected");

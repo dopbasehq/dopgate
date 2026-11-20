@@ -86,11 +86,12 @@ pub async fn refresh(
   let request = request.map(|Json(request)| request).unwrap_or_default();
   let token = request
     .refresh_token
-    .or_else(|| context.console_refresh_cookie.clone())
+    .as_deref()
+    .or(context.console_refresh_cookie.as_deref())
     .ok_or_else(|| {
       HttpError::unauthorized(TOKEN_INVALID, "Your session has ended. Sign in again.")
     })?;
-  let (admin, grant) = sessions::service::refresh(&state, Realm::Console, &token).await?;
+  let (admin, grant) = sessions::service::refresh(&state, Realm::Console, token).await?;
   let tokens = service::console_tokens(&state, &admin.id, grant).await?;
   sessions::service::deliver(
     &state,
@@ -127,7 +128,8 @@ pub async fn logout(
   let request = request.map(|Json(request)| request).unwrap_or_default();
   let refresh_token = request
     .refresh_token
-    .or_else(|| context.console_refresh_cookie.clone());
+    .as_deref()
+    .or(context.console_refresh_cookie.as_deref());
   let current = admin
     .as_ref()
     .ok()
@@ -136,7 +138,7 @@ pub async fn logout(
     &state,
     Realm::Console,
     current,
-    refresh_token.as_deref(),
+    refresh_token,
     request.all_sessions,
   )
   .await;
