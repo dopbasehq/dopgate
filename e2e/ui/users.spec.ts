@@ -21,7 +21,7 @@ test(
       await expect(page.getByPlaceholder("Search by email or name")).toBeVisible();
       await expect(page.getByRole("button", { name: "Filter by Status" })).toBeVisible();
       const table = page.getByTestId("users-table");
-      for (const head of ["Email", "Name", "Status", "Last sign-in"]) {
+      for (const head of ["Person", "Status", "Created", "Last sign-in"]) {
         await expect(table.getByRole("columnheader", { name: head })).toBeVisible();
       }
     });
@@ -104,7 +104,7 @@ test(
   {
     tag: ["@console", "@users"],
     annotation: about(
-      "Leaving the password empty and the switch off makes an account that signs in with codes and has not confirmed its email. The table flags it unverified, and its page says No password.",
+      "Leaving the password empty and the switch off makes an account that signs in with codes and has not confirmed its email. The table flags it unverified and shows only the email, and its page says No password.",
     ),
   },
   async ({ page }) => {
@@ -126,7 +126,12 @@ test(
       await nav(page, "Users").click();
       const row = userRow(page, email);
       await expect(row.getByText("unverified")).toBeVisible();
-      await expect(row.getByText("None")).toBeVisible();
+      // The person cell holds the avatar's initial, the email and the badge,
+      // with no name line above the email.
+      const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      await expect(row.getByRole("cell").first()).toHaveText(
+        new RegExp(`^.\\s*${escaped}\\s*unverified\\s*$`),
+      );
     });
   },
 );
@@ -208,7 +213,7 @@ test(
   {
     tag: ["@console", "@users"],
     annotation: about(
-      "Status offers Active and Disabled. Choosing one turns the button into a chip that names it and shows only matching users. The chip's cross clears the filter. It combines with search.",
+      "Status offers Active and Turned off. Choosing one turns the button into a chip that names it and shows only matching users. The chip's cross clears the filter. It combines with search.",
     ),
   },
   async ({ page }) => {
@@ -220,12 +225,12 @@ test(
     const search = page.getByPlaceholder("Search by email or name");
     await search.fill(tag);
     await expect(page.getByTestId("user-row")).toHaveCount(2);
-    await step("Choose Disabled", async () => {
+    await step("Choose Turned off", async () => {
       await page.getByRole("button", { name: "Filter by Status" }).click();
-      await page.getByRole("menuitem", { name: "Disabled" }).click();
-      await expect(page.getByTestId("filter-chip")).toContainText("Status: Disabled");
+      await page.getByRole("menuitem", { name: "Turned off" }).click();
+      await expect(page.getByTestId("filter-chip")).toContainText("Status: Turned off");
       await expect(page.getByTestId("user-row")).toHaveCount(1);
-      await expect(userRow(page, off.email)).toContainText("Disabled");
+      await expect(userRow(page, off.email)).toContainText("Turned off");
     });
     await step("Clear the chip", async () => {
       await page.getByRole("button", { name: "Clear Status filter" }).click();
@@ -251,7 +256,7 @@ test(
   {
     tag: ["@console", "@users"],
     annotation: about(
-      "Clicking a user's email opens /users/{id} with that account. The breadcrumb above the title leads back to the list.",
+      "Clicking a user's email opens /users/{id} with that account, and so does clicking anywhere else in the row or pressing Enter on it. The breadcrumb above the title leads back to the list.",
     ),
   },
   async ({ page }) => {
@@ -266,6 +271,17 @@ test(
       await page.getByTestId("breadcrumb").getByRole("link", { name: "Users" }).click();
       await expect(page).toHaveURL(/\/users$/);
       await expect(userRow(page, pat.email)).toBeVisible();
+    });
+    await step("Clicking the row outside the email opens the user too", async () => {
+      await userRow(page, pat.email).getByText("Active", { exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`/users/${pat.id}$`));
+      await page.goBack();
+      await expect(userRow(page, pat.email)).toBeVisible();
+    });
+    await step("Enter on a focused row opens the user", async () => {
+      await userRow(page, pat.email).focus();
+      await page.keyboard.press("Enter");
+      await expect(page).toHaveURL(new RegExp(`/users/${pat.id}$`));
     });
   },
 );

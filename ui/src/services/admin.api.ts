@@ -111,6 +111,15 @@ export function revokeUserSessions(id: string): Promise<null> {
   return api(`${userPath(id)}/sessions`, { method: "DELETE" });
 }
 
+export function revokeUserSession(
+  id: string,
+  sessionId: string,
+): Promise<null> {
+  return api(`${userPath(id)}/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+}
+
 // Admins. Everyone on the admin side can read the list; changes are
 // root-only, and root itself can't be changed here.
 

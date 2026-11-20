@@ -16,13 +16,26 @@ import { isValidEmail } from "~/utils/validation";
 
 export const STATUS_FILTERS: { value: UserStatus; label: string }[] = [
   { value: "active", label: "Active" },
-  { value: "disabled", label: "Disabled" },
+  { value: "disabled", label: "Turned off" },
 ];
 
 export interface UserRow {
   user: AdminUser;
   name: string | null;
+  active: boolean;
+  /** The day the account was made, without the time. */
+  created: string;
   lastSignIn: string;
+}
+
+function formatDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export interface NewUserDraft {
@@ -88,9 +101,16 @@ export function useUsersController() {
     users.value.map((user) => ({
       user,
       name: user.displayName,
+      active: user.status === "active",
+      created: formatDay(user.createdAt),
       lastSignIn: formatRelativeTime(user.lastSignInAt),
     })),
   );
+
+  /** The whole row opens the user, not only the email link. */
+  function openUser(row: UserRow): void {
+    void router.push({ name: "user", params: { id: row.user.id } });
+  }
 
   async function reload(): Promise<void> {
     moreError.value = null;
@@ -181,6 +201,7 @@ export function useUsersController() {
     statusFilter,
     filtered,
     rows,
+    openUser,
     loading,
     loadError,
     hasMore,
