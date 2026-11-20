@@ -47,6 +47,7 @@ const settings: Settings = {
     canStorePassword: true,
   },
   branding: { appName: "Acme", logoUrl: null },
+  testEmail: { recipient: null, rootEmail: "root@example.com" },
 };
 
 beforeEach(() => {
@@ -295,14 +296,62 @@ describe("useSettingsController", () => {
   });
 
   describe("SMTP test", () => {
-    it("sends to your own address by default", async () => {
+    it("sends to root by default", async () => {
       vi.mocked(adminApi.sendSmtpTest).mockResolvedValue(null);
       const c = await mount();
       await c.sendTest();
-      expect(adminApi.sendSmtpTest).toHaveBeenCalledWith(undefined);
+      expect(adminApi.sendSmtpTest).toHaveBeenCalledWith();
+      expect(adminApi.updateSettings).not.toHaveBeenCalled();
       expect(c.testResult.value).toEqual({
         ok: true,
-        message: "Test email sent to your address.",
+        message: "Test email sent to root@example.com.",
+      });
+    });
+
+    it("saves a new test address before sending to it", async () => {
+      const saved = {
+        ...settings,
+        testEmail: { ...settings.testEmail, recipient: "qa@example.com" },
+      };
+      vi.mocked(adminApi.sendSmtpTest).mockResolvedValue(null);
+      vi.mocked(adminApi.updateSettings).mockResolvedValue(saved);
+      const c = await mount();
+      vi.mocked(adminApi.fetchSettings).mockResolvedValue(saved);
+      c.drafts.value!.testEmail.recipient = " qa@example.com ";
+      await c.sendTest();
+      expect(adminApi.updateSettings).toHaveBeenCalledWith({
+        testEmail: { recipient: "qa@example.com" },
+      });
+      expect(c.dirty.value.testEmail).toBe(false);
+      expect(c.testResult.value).toEqual({
+        ok: true,
+        message: "Test email sent to qa@example.com.",
+      });
+    });
+
+    it("refuses a malformed test address without sending", async () => {
+      const c = await mount();
+      c.drafts.value!.testEmail.recipient = "nope";
+      await c.sendTest();
+      expect(c.state.testEmail.fieldErrors.recipient).toBe(
+        "Enter a valid email address.",
+      );
+      expect(adminApi.updateSettings).not.toHaveBeenCalled();
+      expect(adminApi.sendSmtpTest).not.toHaveBeenCalled();
+    });
+
+    it("clearing the address goes back to root", async () => {
+      vi.mocked(adminApi.updateSettings).mockResolvedValue(settings);
+      vi.mocked(adminApi.fetchSettings).mockResolvedValue({
+        ...settings,
+        testEmail: { ...settings.testEmail, recipient: "qa@example.com" },
+      });
+      const c = await mount();
+      expect(c.drafts.value!.testEmail.recipient).toBe("qa@example.com");
+      c.drafts.value!.testEmail.recipient = "";
+      await c.save("testEmail");
+      expect(adminApi.updateSettings).toHaveBeenCalledWith({
+        testEmail: { recipient: null },
       });
     });
 
@@ -315,9 +364,7 @@ describe("useSettingsController", () => {
         ),
       );
       const c = await mount();
-      c.testTo.value = "ops@example.com";
       await c.sendTest();
-      expect(adminApi.sendSmtpTest).toHaveBeenCalledWith("ops@example.com");
       expect(c.testResult.value).toEqual({
         ok: false,
         message: "Connection refused by smtp.example.com.",

@@ -9,10 +9,9 @@ import {
   sendTemplateTest,
 } from "~/services/admin.api";
 import type { Template, TemplateContent, TemplateName } from "~/services/types";
-import { templateQuery } from "~/queries/admin";
+import { settingsQuery, templateQuery } from "~/queries/admin";
 import { keys } from "~/queries/keys";
 import { useInvalidate } from "~/queries/invalidate";
-import { useAuthStore } from "~/stores/auth.store";
 import { copyText } from "~/utils/clipboard";
 
 export const LEAVE_PROMPT =
@@ -38,12 +37,17 @@ const same = (a: TemplateContent | null, b: TemplateContent | null) =>
  */
 export function useTemplateController({ previewDelay = 400 } = {}) {
   const route = useRoute();
-  const auth = useAuthStore();
   const cache = useQueryCache();
   const invalidate = useInvalidate();
 
   const name = computed(() => String(route.params.name ?? "") as TemplateName);
   const read = useQuery(() => templateQuery(name.value));
+  const settings = useQuery(settingsQuery);
+  /** Where test emails go: the address in Settings, or root's email. */
+  const testRecipient = computed(() => {
+    const testEmail = settings.data.value?.testEmail;
+    return testEmail?.recipient ?? testEmail?.rootEmail ?? null;
+  });
   const template = computed<Template | null>(() => read.data.value ?? null);
   const loadError = computed(() =>
     read.error.value && !read.isLoading.value && !read.data.value
@@ -156,7 +160,9 @@ export function useTemplateController({ previewDelay = 400 } = {}) {
       "test",
       async () => {
         await sendTemplateTest(name.value, contentOf(draft.value!));
-        notice.value = `Sent a test email to ${auth.admin?.email ?? "your address"}.`;
+        notice.value = testRecipient.value
+          ? `Sent a test email to ${testRecipient.value}.`
+          : "Sent a test email.";
       },
       "Couldn't send the test email.",
     );

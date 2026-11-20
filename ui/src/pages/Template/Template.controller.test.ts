@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as adminApi from "~/services/admin.api";
-import type { Template } from "~/services/types";
+import type { Settings, Template } from "~/services/types";
 import { copyText } from "~/utils/clipboard";
 import { mountController, settle } from "~/tests/mount-controller";
 import { apiError, root, signInAs } from "~/tests/fixtures";
@@ -107,8 +107,11 @@ describe("useTemplateController", () => {
     expect(c.notice.value).toBe("Template saved.");
   });
 
-  it("sends a test to your own address", async () => {
+  it("sends a test to root by default", async () => {
     vi.mocked(adminApi.sendTemplateTest).mockResolvedValue(null);
+    vi.mocked(adminApi.fetchSettings).mockResolvedValue({
+      testEmail: { recipient: null, rootEmail: root.email },
+    } as Settings);
     const c = await mount();
     await c.sendTest();
     expect(adminApi.sendTemplateTest).toHaveBeenCalledWith(
@@ -116,6 +119,16 @@ describe("useTemplateController", () => {
       builtIn,
     );
     expect(c.notice.value).toBe(`Sent a test email to ${root.email}.`);
+  });
+
+  it("names the test address saved in Settings", async () => {
+    vi.mocked(adminApi.sendTemplateTest).mockResolvedValue(null);
+    vi.mocked(adminApi.fetchSettings).mockResolvedValue({
+      testEmail: { recipient: "qa@example.com", rootEmail: root.email },
+    } as Settings);
+    const c = await mount();
+    await c.sendTest();
+    expect(c.notice.value).toBe("Sent a test email to qa@example.com.");
   });
 
   it("shows the server's reason when sending fails", async () => {

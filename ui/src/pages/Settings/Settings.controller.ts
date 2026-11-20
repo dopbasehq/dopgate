@@ -130,6 +130,7 @@ interface Drafts {
   tokens: Strings<TokenSettings>;
   branding: { appName: string; logoUrl: string };
   smtp: SmtpDraft;
+  testEmail: { recipient: string };
 }
 
 interface SectionState {
@@ -147,6 +148,7 @@ const SECTIONS: SectionName[] = [
   "selfService",
   "branding",
   "smtp",
+  "testEmail",
 ];
 
 function strings<T extends object>(value: T): Strings<T> {
@@ -180,6 +182,10 @@ function draftOf<S extends SectionName>(
       return {
         appName: settings.branding.appName,
         logoUrl: settings.branding.logoUrl ?? "",
+      } as Drafts[S];
+    case "testEmail":
+      return {
+        recipient: settings.testEmail.recipient ?? "",
       } as Drafts[S];
     case "smtp": {
       const smtp = settings.smtp;
@@ -315,6 +321,7 @@ export function useSettingsController() {
           selfService: draftOf(next, "selfService"),
           branding: draftOf(next, "branding"),
           smtp: draftOf(next, "smtp"),
+          testEmail: draftOf(next, "testEmail"),
         };
         return;
       }
@@ -398,6 +405,13 @@ export function useSettingsController() {
       case "smtp":
         body = { smtp: smtpBody(draft.smtp, errors) };
         break;
+      case "testEmail": {
+        const recipient = draft.testEmail.recipient.trim();
+        if (recipient && !isValidEmail(recipient))
+          errors.recipient = "Enter a valid email address.";
+        body = { testEmail: { recipient: recipient || null } };
+        break;
+      }
     }
     state[section].fieldErrors = errors;
     return Object.keys(errors).length === 0 ? body : null;
@@ -434,26 +448,27 @@ export function useSettingsController() {
   }
 
   // SMTP test
-  const testTo = ref("");
+  /** Where test emails go: the saved address, or root's email. */
+  const testRecipient = computed(
+    () =>
+      settings.value?.testEmail.recipient ??
+      settings.value?.testEmail.rootEmail ??
+      null,
+  );
   const testing = ref(false);
   const testResult = ref<{ ok: boolean; message: string } | null>(null);
 
+  /** Saves an edited test address first, so the test goes where it shows. */
   async function sendTest(): Promise<void> {
     if (testing.value) return;
-    const to = testTo.value.trim();
-    if (to && !isValidEmail(to)) {
-      testResult.value = { ok: false, message: "Enter a valid email address." };
-      return;
-    }
-    testing.value = true;
     testResult.value = null;
+    if (dirty.value.testEmail && !(await save("testEmail"))) return;
+    testing.value = true;
     try {
-      await sendSmtpTest(to || undefined);
+      await sendSmtpTest();
       testResult.value = {
         ok: true,
-        message: to
-          ? `Test email sent to ${to}.`
-          : "Test email sent to your address.",
+        message: `Test email sent to ${testRecipient.value ?? "root"}.`,
       };
     } catch (cause) {
       testResult.value = {
@@ -474,7 +489,7 @@ export function useSettingsController() {
     dirty,
     save,
     discard,
-    testTo,
+    testRecipient,
     testing,
     testResult,
     sendTest,

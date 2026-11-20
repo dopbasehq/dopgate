@@ -255,7 +255,10 @@ export function updateSettings(
   return api("/admin/settings", { method: "PATCH", body });
 }
 
-/** Sends a test email; `to` defaults to the caller's own address. */
+/**
+ * Sends a test email; `to` defaults to the test email address in settings,
+ * or root's email when none is saved.
+ */
 export function sendSmtpTest(to?: string): Promise<null> {
   return api("/admin/settings/smtp/test", {
     method: "POST",

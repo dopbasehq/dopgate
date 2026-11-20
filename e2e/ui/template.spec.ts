@@ -170,16 +170,17 @@ test(
 );
 
 test(
-  "Send test emails the draft to the signed-in admin",
+  "Send test emails the draft to root, even when another admin sends it",
   {
     tag: ["@templates", "@console"],
     annotation: about(
-      "Send test renders the draft in the editor, saved or not, with sample values and sends it to the admin's own address. Without SMTP it lands in the server log. The template stays unsaved.",
+      "Send test renders the draft in the editor, saved or not, with sample values and sends it to the test email address in Settings, which is root's email until someone sets one. Without SMTP it lands in the server log. The template stays unsaved.",
     ),
   },
   async ({ page }) => {
     const sam = await app.admin("tester");
     const marker = app.uniq("Draft");
+    const before = await app.mail.count(ROOT_EMAIL);
     await step("Open the email changed template as Sam", async () => {
       await openAs(page, sam, "/templates/email_changed");
       await seeHeading(page, "Email changed");
@@ -187,10 +188,10 @@ test(
     await step("Type a draft subject and press Send test", async () => {
       await page.getByLabel("Subject").fill(`${marker} {{new_email}}`);
       await page.getByRole("button", { name: "Send test" }).click();
-      await expect(page.getByText(`Sent a test email to ${sam.email}.`)).toBeVisible();
+      await expect(page.getByText(`Sent a test email to ${ROOT_EMAIL}.`)).toBeVisible();
     });
-    await step("The email reaches Sam with sample values", async () => {
-      const mail = await app.mail.last(sam.email);
+    await step("The email reaches root with sample values", async () => {
+      const mail = await app.mail.last(ROOT_EMAIL, { after: before });
       expect(mail.subject).toBe(`${marker} new.address@example.com`);
     });
     await step("The draft is still unsaved", async () => {

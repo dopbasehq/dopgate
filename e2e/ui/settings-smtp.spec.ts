@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { about, expect, PASSWORD, step, test, useServer } from "../harness/index.ts";
+import { about, expect, PASSWORD, ROOT_EMAIL, step, test, useServer } from "../harness/index.ts";
 import { openAs } from "../harness/helpers.ts";
 import { startSmtp } from "../harness/smtp.ts";
 import { seeHeading } from "./instance.support.ts";
@@ -9,17 +9,19 @@ const app = useServer();
 const smtp = (page: Page) => page.getByTestId("settings-smtp");
 const form = (page: Page) => page.getByTestId("settings-smtp-form");
 const save = (page: Page) => form(page).getByRole("button", { name: "Save", exact: true });
+const testTo = (page: Page) => smtp(page).getByLabel("Send test emails to");
+const sendTest = (page: Page) => smtp(page).getByRole("button", { name: "Send test email" });
 
 async function smtpSettings() {
   return (await (await app.root()).api.get("/admin/settings", { record: false })).data.smtp;
 }
 
-/** Puts email back in the log, whatever a test did. */
+/** Puts email back in the log and test emails back on root, whatever a test did. */
 test.afterEach(async () => {
   const root = await app.root();
   await root.api.patch(
     "/admin/settings",
-    { smtp: { host: null, password: "" } },
+    { smtp: { host: null, password: "" }, testEmail: { recipient: null } },
     { record: false },
   );
 });
@@ -54,8 +56,9 @@ test(
       await expect(save(page)).toBeDisabled();
     });
     await step("Send test email reports that SMTP isn't set up", async () => {
-      await smtp(page).getByLabel("Send a test email to").fill(app.email("nobody"));
-      await smtp(page).getByRole("button", { name: "Send test email" }).click();
+      await expect(testTo(page)).toHaveValue("");
+      await expect(testTo(page)).toHaveAttribute("placeholder", ROOT_EMAIL);
+      await sendTest(page).click();
       await expect(smtp(page).getByRole("alert")).toBeVisible();
       await expect(smtp(page).getByText(/Test email sent/)).toHaveCount(0);
     });
@@ -170,21 +173,30 @@ test(
         await expect(form(page).getByLabel("Port")).toHaveValue(String(sink.port));
         await expect(form(page).getByLabel("From name")).toHaveValue("Acme Auth");
       });
-      const to = app.email("tester");
-      await step("Send test email to an address delivers it to the fake server", async () => {
-        await smtp(page).getByLabel("Send a test email to").fill(to);
-        await smtp(page).getByRole("button", { name: "Send test email" }).click();
-        await expect(smtp(page).getByText(`Test email sent to ${to}.`)).toBeVisible();
-        await expect.poll(() => sink.messages.filter((m) => m.to === to).length).toBe(1);
-        const mail = sink.messages.find((m) => m.to === to)!;
+      await step("With no test address, the test email goes to root", async () => {
+        await sendTest(page).click();
+        await expect(smtp(page).getByText(`Test email sent to ${ROOT_EMAIL}.`)).toBeVisible();
+        await expect.poll(() => sink.messages.filter((m) => m.to === ROOT_EMAIL).length).toBe(1);
+        const mail = sink.messages.find((m) => m.to === ROOT_EMAIL)!;
         expect(mail.raw).toContain("hello@acme.test");
         expect(mail.raw).toContain("Acme Auth");
       });
-      await step("Leaving the address empty sends it to the admin's own email", async () => {
-        await smtp(page).getByLabel("Send a test email to").fill("");
-        await smtp(page).getByRole("button", { name: "Send test email" }).click();
-        await expect(smtp(page).getByText("Test email sent to your address.")).toBeVisible();
-        await expect.poll(() => sink.messages.some((m) => m.to === "root@dopbase.com")).toBe(true);
+      const to = app.email("tester");
+      await step("A typed test address is saved and gets the test email", async () => {
+        await testTo(page).fill(to);
+        await sendTest(page).click();
+        await expect(smtp(page).getByText(`Test email sent to ${to}.`)).toBeVisible();
+        await expect.poll(() => sink.messages.filter((m) => m.to === to).length).toBe(1);
+        const saved = await (await app.root()).api.get("/admin/settings", { record: false });
+        expect(saved.data.testEmail.recipient).toBe(to);
+        await page.reload();
+        await expect(testTo(page)).toHaveValue(to);
+      });
+      await step("Clearing the test address sends to root again", async () => {
+        await testTo(page).fill("");
+        await sendTest(page).click();
+        await expect(smtp(page).getByText(`Test email sent to ${ROOT_EMAIL}.`)).toBeVisible();
+        await expect.poll(() => sink.messages.filter((m) => m.to === ROOT_EMAIL).length).toBe(2);
       });
       await step("A real email goes through the same server", async () => {
         const email = app.email("realmail");
@@ -197,8 +209,8 @@ test(
         await expect.poll(() => sink.messages.some((m) => m.to === email)).toBe(true);
       });
       await step("A malformed test address is caught by the form", async () => {
-        await smtp(page).getByLabel("Send a test email to").fill("nope");
-        await smtp(page).getByRole("button", { name: "Send test email" }).click();
+        await testTo(page).fill("nope");
+        await sendTest(page).click();
         await expect(smtp(page).getByText("Enter a valid email address.")).toBeVisible();
       });
     } finally {
@@ -229,8 +241,7 @@ test(
         await expect(form(page).getByLabel("Host")).toHaveValue("127.0.0.1");
       });
       await step("Send a test email", async () => {
-        await smtp(page).getByLabel("Send a test email to").fill(app.email("refused"));
-        await smtp(page).getByRole("button", { name: "Send test email" }).click();
+        await sendTest(page).click();
       });
       await step("The card shows an error, not a success note", async () => {
         await expect(smtp(page).getByRole("alert")).toBeVisible();

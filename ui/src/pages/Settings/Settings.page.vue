@@ -30,7 +30,6 @@ const {
   dirty,
   save,
   discard,
-  testTo,
   testing,
   testResult,
   sendTest,
@@ -65,6 +64,14 @@ const passwordHint = computed(() => {
     return "Set DOPGATE_SERVICE_KEY on the server to save a password. Dopgate encrypts it with that key.";
   if (smtp.passwordSet) return "Saved and encrypted. Leave empty to keep it.";
   return "Stored encrypted.";
+});
+
+const testEmailHint = computed(() => {
+  if (smtpEditable.value && dirty.value.smtp)
+    return "Save your SMTP changes first. The test uses the saved settings.";
+  if (drafts.value?.testEmail.recipient.trim())
+    return "Template tests go here too. Clear it to send them to root.";
+  return "Leave empty to send them to root. Template tests use this address too.";
 });
 
 const sections: { name: SectionName; title: string; description: string }[] = [
@@ -432,24 +439,43 @@ const card = "rounded-card border border-line bg-panel";
             <div
               class="flex flex-col gap-4 border-t border-line-soft px-5 py-4">
               <form
-                class="flex flex-col gap-3 sm:flex-row sm:items-end"
+                class="flex flex-col gap-3 sm:flex-row sm:items-start"
                 novalidate
+                data-testid="settings-testEmail"
                 @submit.prevent="sendTest">
                 <DgInput
-                  v-model="testTo"
+                  v-model="drafts.testEmail.recipient"
                   class="flex-1"
-                  label="Send a test email to"
+                  label="Send test emails to"
                   type="email"
-                  placeholder="Your own address"
-                  :hint="
-                    smtpEditable && dirty.smtp
-                      ? 'Save your changes first. The test uses the saved settings.'
-                      : null
-                  " />
-                <DgButton type="submit" :loading="testing"
-                  >Send test email</DgButton
-                >
+                  :placeholder="settings.testEmail.rootEmail ?? 'Root\'s email'"
+                  :hint="testEmailHint"
+                  :error="state.testEmail.fieldErrors.recipient" />
+                <div class="flex gap-2 sm:mt-[26px]">
+                  <DgButton
+                    v-if="dirty.testEmail"
+                    variant="ghost"
+                    :disabled="state.testEmail.saving"
+                    @click="discard('testEmail')">
+                    Discard
+                  </DgButton>
+                  <DgButton
+                    v-if="dirty.testEmail"
+                    :loading="state.testEmail.saving"
+                    @click="save('testEmail')">
+                    Save
+                  </DgButton>
+                  <DgButton
+                    type="submit"
+                    :loading="testing"
+                    :disabled="state.testEmail.saving">
+                    Send test email
+                  </DgButton>
+                </div>
               </form>
+              <DgAlert v-if="state.testEmail.error">
+                {{ state.testEmail.error }}
+              </DgAlert>
               <DgAlert
                 v-if="testResult"
                 :tone="testResult.ok ? 'success' : 'error'">
