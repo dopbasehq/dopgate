@@ -46,9 +46,9 @@ pub fn clean_name(raw: &str) -> Result<String, HttpError> {
   Ok(name.to_owned())
 }
 
-fn list_of(rows: &[TokenRow]) -> PersonalTokenList {
+fn list_of(rows: Vec<TokenRow>) -> PersonalTokenList {
   PersonalTokenList {
-    items: rows.iter().map(TokenRow::to_token).collect(),
+    items: rows.into_iter().map(TokenRow::into_token).collect(),
   }
 }
 
@@ -57,7 +57,7 @@ pub async fn list_own(
   user: &UserIdentity,
 ) -> Result<PersonalTokenList, HttpError> {
   Ok(list_of(
-    &repository::list(state.db.pool(), &user.user_id).await?,
+    repository::list(state.db.pool(), &user.user_id).await?,
   ))
 }
 
@@ -146,7 +146,7 @@ pub async fn create(
   tx.commit().await?;
   Ok(CreatedPersonalToken {
     token: secret,
-    personal_token: row.to_token(),
+    personal_token: row.into_token(),
   })
 }
 
@@ -187,7 +187,7 @@ pub async fn list_for_user(
   user_id: &str,
 ) -> Result<PersonalTokenList, HttpError> {
   require_user(state, user_id).await?;
-  Ok(list_of(&repository::list(state.db.pool(), user_id).await?))
+  Ok(list_of(repository::list(state.db.pool(), user_id).await?))
 }
 
 /// Revoke a user's token, for admins.

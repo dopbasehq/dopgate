@@ -42,7 +42,7 @@ pub async fn console_tokens(
     exp: now.timestamp() + expires_in,
     iat: now.timestamp(),
     sid: grant.session_id,
-    role: admin.role(),
+    role: admin.role,
     email: admin.email.clone(),
   };
   Ok(ConsoleTokens {
@@ -50,7 +50,7 @@ pub async fn console_tokens(
     token_type: "Bearer".into(),
     expires_in,
     refresh_token: Some(grant.refresh_token),
-    admin: admin.to_admin(),
+    admin: admin.into_admin(),
   })
 }
 
@@ -61,13 +61,13 @@ async fn start(
   user_agent: Option<&str>,
   tx: &mut sqlx::PgConnection,
 ) -> Result<Grant, HttpError> {
-  let actor_type = verification::actor_type_of(tx, Realm::Console, &account.id).await?;
+  let actor_type = verification::actor_type_of(&mut *tx, Realm::Console, &account.id).await?;
   sessions::service::start(
     state,
     tx,
     Realm::Console,
     account,
-    &actor_type,
+    actor_type,
     method,
     user_agent,
   )
@@ -165,7 +165,7 @@ async fn me_by_id(
     admins::find_by_id(state.db.pool(), admin_id)
       .await?
       .ok_or_else(|| HttpError::not_found(NOT_FOUND, "This account no longer exists."))?
-      .to_admin(),
+      .into_admin(),
   )
 }
 
@@ -199,5 +199,5 @@ pub async fn update_me(
   )
   .await?;
   tx.commit().await?;
-  Ok(updated.to_admin())
+  Ok(updated.into_admin())
 }
