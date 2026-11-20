@@ -11,6 +11,7 @@ import {
   updateMe,
 } from "~/services/auth.api";
 import type { Session } from "~/services/types";
+import { settingsQuery } from "~/queries/admin";
 import { mySessionsQuery } from "~/queries/auth";
 import { useInvalidate } from "~/queries/invalidate";
 import { useAuthStore } from "~/stores/auth.store";
@@ -41,6 +42,11 @@ export function useAccountController() {
   const savingProfile = ref(false);
   const profileError = ref<string | null>(null);
   const profileSaved = ref(false);
+
+  function discardProfile(): void {
+    displayName.value = auth.admin?.displayName ?? "";
+    profileError.value = null;
+  }
 
   async function saveProfile(): Promise<void> {
     if (savingProfile.value) return;
@@ -80,6 +86,28 @@ export function useAccountController() {
   const passwordError = ref<string | null>(null);
   const passwordChanged = ref(false);
   const changingPassword = ref(false);
+  /** Something is typed, so Change password has something to send. */
+  const passwordFilled = computed(
+    () =>
+      currentPassword.value !== "" ||
+      passwordCode.value !== "" ||
+      newPassword.value !== "" ||
+      confirmPassword.value !== "",
+  );
+  const settings = useQuery(settingsQuery);
+  /** The shortest password the server takes, from Settings. */
+  const passwordMinLength = computed(
+    () => settings.data.value?.password.minLength ?? null,
+  );
+
+  function clearPassword(): void {
+    currentPassword.value = "";
+    passwordCode.value = "";
+    newPassword.value = "";
+    confirmPassword.value = "";
+    passwordErrors.value = {};
+    passwordError.value = null;
+  }
 
   async function requestPasswordCode(): Promise<void> {
     const email = auth.admin?.email;
@@ -176,6 +204,17 @@ export function useAccountController() {
   const emailError = ref<string | null>(null);
   const emailChanged = ref(false);
   const changingEmail = ref(false);
+  const emailFilled = computed(
+    () => newEmail.value.trim() !== "" || emailPassword.value !== "",
+  );
+
+  function clearEmail(): void {
+    newEmail.value = "";
+    emailPassword.value = "";
+    emailFieldError.value = null;
+    emailPasswordError.value = null;
+    emailError.value = null;
+  }
 
   async function requestEmailChange(): Promise<void> {
     if (changingEmail.value) return;
@@ -335,6 +374,7 @@ export function useAccountController() {
     profileError,
     profileSaved,
     saveProfile,
+    discardProfile,
     hasPassword,
     currentPassword,
     passwordCode,
@@ -347,6 +387,9 @@ export function useAccountController() {
     passwordError,
     passwordChanged,
     changingPassword,
+    passwordFilled,
+    passwordMinLength,
+    clearPassword,
     submitPassword,
     emailStep,
     newEmail,
@@ -359,6 +402,8 @@ export function useAccountController() {
     emailError,
     emailChanged,
     changingEmail,
+    emailFilled,
+    clearEmail,
     requestEmailChange,
     confirmEmail,
     cancelEmailChange,

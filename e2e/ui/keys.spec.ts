@@ -41,6 +41,13 @@ test(
       await expect(rows(page).first()).toContainText(kid);
       expect((await jwks(page)).keys.map((key) => key.kid)).toEqual([kid]);
     });
+    await step("The Key set card gives the address of the published keys", async () => {
+      const address = new URL("/.well-known/jwks.json", page.url()).href;
+      await expect(page.getByTestId("jwks-url")).toHaveText(address);
+      await expect(
+        page.getByRole("region", { name: "Key set" }).getByRole("button", { name: "Copy" }),
+      ).toBeVisible();
+    });
     await step("Root sees the Rotate button", async () => {
       await expect(page.getByTestId("rotate-key")).toBeVisible();
     });

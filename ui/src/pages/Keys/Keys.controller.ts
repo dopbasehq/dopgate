@@ -38,6 +38,9 @@ export function useKeysController() {
       : null,
   );
 
+  /** Where Dopgate publishes the public keys apps check tokens with. */
+  const jwksUrl = `${window.location.origin}/.well-known/jwks.json`;
+
   const canRotate = computed(() => auth.isRoot);
   const confirmOpen = ref(false);
   const rotating = ref(false);
@@ -74,6 +77,7 @@ export function useKeysController() {
     keys,
     loadError,
     reload: () => read.refetch(),
+    jwksUrl,
     canRotate,
     confirmOpen,
     rotating,
