@@ -30,6 +30,11 @@ RUN cargo build --release --locked --bin dopgate
 
 # 3. A small runtime: glibc and CA certificates, no shell, no root.
 FROM gcr.io/distroless/cc-debian12:nonroot
+LABEL org.opencontainers.image.title="Dopgate" \
+      org.opencontainers.image.description="Modern auth for people and AI agents." \
+      org.opencontainers.image.vendor="Dopbase" \
+      org.opencontainers.image.source="https://github.com/dopbasehq/dopgate" \
+      org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=server /src/app/target/release/dopgate /usr/local/bin/dopgate
 ENV DOPGATE_HOST=0.0.0.0 \
     DOPGATE_PORT=8850 \
