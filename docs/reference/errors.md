@@ -50,7 +50,7 @@ Errors that come from the HTTP layer itself, such as malformed JSON, a missing f
 | `RATE_LIMITED` | 429 | Too many requests from this address, too many codes for this email, or too many wrong setup tokens. |
 | `REQUEST_INVALID` | 400, 404, 422, and others | A malformed request: bad JSON, a missing field, an invalid pagination cursor, an incomplete audit anchor, a code purpose the endpoint doesn't take (`422`), a personal token name or expiry out of range (`422`), or an unknown API route (`404`). |
 | `ROOT_PROTECTED` | 403 | An attempt to update, disable, enable, or delete root through `/admin/admins`. |
-| `SETTINGS_INVALID` | 422 | A settings value is out of range, the request tried to change SMTP while `DOPGATE_SMTP_HOST` is set, or it saved an SMTP password without `DOPGATE_SERVICE_KEY`. |
+| `SETTINGS_INVALID` | 422 | A settings value is out of range, the request tried to change SMTP while `DOPGATE_SMTP_URL` is set, or it saved an SMTP password without `DOPGATE_SERVICE_KEY`. |
 | `SETUP_TOKEN_INVALID` | 401 | The setup token for `POST /bootstrap/root` is wrong. |
 | `SIGNUP_DISABLED` | 403 | Sign-up is turned off in settings. |
 | `SMTP_NOT_CONFIGURED` | 400 | An SMTP test while no SMTP host is set. |

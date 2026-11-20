@@ -466,7 +466,7 @@ Admin. Answers `200 SETTINGS_FETCHED` with every section.
 
 ### `PATCH /api/v1/admin/settings`
 
-Admin. Send any of `signup`, `password`, `tokens`, `limits`, `selfService`, `branding`, and `smtp`. Each section you send replaces the stored one whole; fields missing from a section you send take their defaults. Answers `200 SETTINGS_UPDATED` with every section. `smtp` keeps the saved password when `password` is left out, and removes it for `""`. Errors: `422 SETTINGS_INVALID` for a value out of range, for `smtp` while `DOPGATE_SMTP_HOST` is set, or for an SMTP password without `DOPGATE_SERVICE_KEY`.
+Admin. Send any of `signup`, `password`, `tokens`, `limits`, `selfService`, `branding`, and `smtp`. Each section you send replaces the stored one whole; fields missing from a section you send take their defaults. Answers `200 SETTINGS_UPDATED` with every section. `smtp` keeps the saved password when `password` is left out, and removes it for `""`. Errors: `422 SETTINGS_INVALID` for a value out of range, for `smtp` while `DOPGATE_SMTP_URL` is set, or for an SMTP password without `DOPGATE_SERVICE_KEY`.
 
 ```json
 { "signup": { "enabled": true, "requireEmailVerification": true, "passwordlessSignup": true } }

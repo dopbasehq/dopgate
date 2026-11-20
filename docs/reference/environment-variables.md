@@ -5,7 +5,7 @@ description: "Every DOPGATE_* environment variable, its config file key, its def
 
 # Environment variables
 
-Dopgate reads these at startup. Environment variables win over the [config file](/self-hosting/configuration#config-file), and `dopgate serve` flags win over both. Empty values count as unset for the service key, the root email, the leaked password list URL, and the SMTP host, username, password, sender address, and sender name. An empty number, boolean, or `DOPGATE_SMTP_SECURITY`, such as `DOPGATE_SMTP_PORT=`, fails to parse and stops startup.
+Dopgate reads these at startup. Environment variables win over the [config file](/self-hosting/configuration#config-file), and `dopgate serve` flags win over both. Empty values count as unset for the service key, the root email, the leaked password list URL, and the SMTP URL, sender address, and sender name. An empty number or boolean, such as `DOPGATE_PORT=`, fails to parse and stops startup.
 
 ## Server
 
@@ -39,11 +39,7 @@ Dopgate reads these at startup. Environment variables win over the [config file]
 
 | Variable | File key | Default | Meaning |
 | --- | --- | --- | --- |
-| `DOPGATE_SMTP_HOST` | `smtp.host` | none | SMTP host name or IP address. When set, all SMTP values come from here and the console shows them read-only. Unset leaves SMTP to the console, or the log. |
-| `DOPGATE_SMTP_PORT` | `smtp.port` | `587`, `465`, or `25` by security mode | SMTP port |
-| `DOPGATE_SMTP_SECURITY` | `smtp.security` | `starttls` | `starttls`, `tls`, or `none` |
-| `DOPGATE_SMTP_USERNAME` | `smtp.username` | none | Sign in to the SMTP server with this username |
-| `DOPGATE_SMTP_PASSWORD` | `smtp.password` | none | The SMTP password |
+| `DOPGATE_SMTP_URL` | `smtp.url` | none | The SMTP server, as `smtp://username:password@host:port`. `smtp://` uses STARTTLS on port 587 and `smtps://` uses TLS on port 465; [the URL](/self-hosting/smtp#the-url) has the rest. When set, all SMTP values come from here and the console shows them read-only. Unset leaves SMTP to the console, or the log. |
 | `DOPGATE_SMTP_FROM_EMAIL` | `smtp.from_email` | `no-reply@dopgate.com` | Sender address |
 | `DOPGATE_SMTP_FROM_NAME` | `smtp.from_name` | none | Sender display name |
 
@@ -58,7 +54,7 @@ Dopgate refuses to start, with a message naming the problem, when:
 - the schema name, a number, a boolean, a proxy entry, or an origin can't be parsed,
 - `DOPGATE_SERVICE_KEY` is shorter than 32 characters,
 - `DOPGATE_ROOT_EMAIL` isn't a valid email,
-- the SMTP host has a scheme or port in it, or the from address isn't valid,
+- `DOPGATE_SMTP_URL` isn't an `smtp://` or `smtps://` URL with a host, or the from address isn't valid,
 - the config file has an unknown key or a `version` other than `1`.
 
 Booleans take `true` or `false`.

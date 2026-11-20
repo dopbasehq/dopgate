@@ -1,6 +1,6 @@
 ---
 title: "Email (SMTP)"
-description: "Connect Dopgate to an SMTP server from the console or with DOPGATE_SMTP_* variables, check it with a test email, and read codes from the log during development."
+description: "Connect Dopgate to an SMTP server from the console or with DOPGATE_SMTP_URL, check it with a test email, and read codes from the log during development."
 ---
 
 # Email (SMTP)
@@ -11,11 +11,11 @@ Dopgate sends six kinds of email: verification codes, sign-in codes, password re
 
 Dopgate picks one source for the whole SMTP setup, in this order:
 
-1. The server config. When `DOPGATE_SMTP_HOST` (or `host` in the `[smtp]` table of the [config file](/self-hosting/configuration#config-file)) is set, every SMTP value comes from the environment and the file, read at startup. The console shows them read-only, and a `PATCH /api/v1/admin/settings` that includes `smtp` answers `422 SETTINGS_INVALID`.
-2. The console. Without a host in the server config, an admin sets SMTP under **Settings**, and Dopgate stores it in the database. Changes apply to the next email, with no restart. The other `DOPGATE_SMTP_*` variables are ignored while `DOPGATE_SMTP_HOST` is empty.
-3. Neither. With no host anywhere, emails go to the [log](#without-smtp).
+1. The server config. When `DOPGATE_SMTP_URL` (or `url` in the `[smtp]` table of the [config file](/self-hosting/configuration#config-file)) is set, every SMTP value comes from the environment and the file, read at startup. The console shows them read-only, and a `PATCH /api/v1/admin/settings` that includes `smtp` answers `422 SETTINGS_INVALID`.
+2. The console. Without a URL in the server config, an admin sets SMTP under **Settings**, and Dopgate stores it in the database. Changes apply to the next email, with no restart. `DOPGATE_SMTP_FROM_EMAIL` and `DOPGATE_SMTP_FROM_NAME` are ignored while `DOPGATE_SMTP_URL` is empty.
+3. Neither. With no server anywhere, emails go to the [log](#without-smtp).
 
-The two sources don't mix. A host from the environment never picks up a password saved in the console.
+The two sources don't mix. A URL from the environment never picks up a password saved in the console.
 
 When nothing sets a sender address, mail comes from `no-reply@dopgate.com`. The port defaults to the usual one for the security mode.
 
@@ -43,26 +43,40 @@ Leave out `password`, or send `null`, to keep the saved one. Send `""` to remove
 ## Set it with variables
 
 ```bash
-DOPGATE_SMTP_HOST=smtp.example.com
-DOPGATE_SMTP_PORT=587
-DOPGATE_SMTP_SECURITY=starttls
-DOPGATE_SMTP_USERNAME=dopgate
-DOPGATE_SMTP_PASSWORD=change-me
+DOPGATE_SMTP_URL=smtp://dopgate:change-me@smtp.example.com:587
 DOPGATE_SMTP_FROM_EMAIL=no-reply@example.com
 DOPGATE_SMTP_FROM_NAME=Acme
 ```
 
 | Variable | Meaning |
 | --- | --- |
-| `DOPGATE_SMTP_HOST` | Host name or IP address, with no scheme, port, or `@`. Leave it empty to manage SMTP in the console instead. |
-| `DOPGATE_SMTP_PORT` | Defaults to the usual port for the security mode: 587 for `starttls`, 465 for `tls`, 25 for `none`. |
-| `DOPGATE_SMTP_SECURITY` | `starttls` (the default) upgrades a plain connection. `tls` uses TLS from the first byte. `none` sends unencrypted, only for a relay on the same host or a private network. |
-| `DOPGATE_SMTP_USERNAME` | Optional. Dopgate signs in to the server only when a username is set. |
-| `DOPGATE_SMTP_PASSWORD` | The password for that username. Spaces are kept. |
+| `DOPGATE_SMTP_URL` | The server, as `smtp://username:password@host:port`. Leave it empty to manage SMTP in the console instead. |
 | `DOPGATE_SMTP_FROM_EMAIL` | The sender address. Defaults to `no-reply@dopgate.com`. |
 | `DOPGATE_SMTP_FROM_NAME` | Optional display name for the sender, such as your app's name. |
 
-Empty values count as unset, except for `DOPGATE_SMTP_PORT` and `DOPGATE_SMTP_SECURITY`: when present, they must hold a port number and a known mode. A bad value stops Dopgate at startup with a message that names it: a host with a port or scheme in it, an invalid from address, an unknown security mode, or a username or name with a line break.
+### The URL
+
+The start of the URL sets how the connection is protected, and the port when you leave it out:
+
+| URL | Security | Port |
+| --- | --- | --- |
+| `smtp://host` | STARTTLS, which upgrades a plain connection | 587 |
+| `smtps://host` | TLS from the first byte | 465 |
+| `smtp://host?security=none` | Unencrypted, only for a relay on the same host or a private network | 25 |
+
+The username and password are optional. Dopgate signs in to the server only when the URL has a username. The host is a name or an IP address, and an IPv6 address goes in brackets, as in `smtp://[::1]:2525`.
+
+Some characters in a username or password have to be percent-encoded, or the URL reads differently: `@` as `%40`, `:` as `%3A`, `/` as `%2F`, `?` as `%3F`, `#` as `%23`, and `%` as `%25`. Many providers use an email address as the username:
+
+```bash
+DOPGATE_SMTP_URL=smtps://user%40example.com:p%40ss%2Fword@smtp.example.com
+```
+
+Empty values count as unset. A bad value stops Dopgate at startup with a message that names the setting and leaves the URL out, since it can hold the password. That covers a URL that doesn't start with `smtp://` or `smtps://`, one without a host, one with a path, an option other than `security=none`, an invalid from address, and a username or sender name with a line break.
+
+### Coming from 0.1.0
+
+Dopgate 0.1.0 read the server from `DOPGATE_SMTP_HOST`, `DOPGATE_SMTP_PORT`, `DOPGATE_SMTP_SECURITY`, `DOPGATE_SMTP_USERNAME`, and `DOPGATE_SMTP_PASSWORD`, and from the same keys under `[smtp]` in the config file. The URL replaces all five. Dopgate ignores the old variables, so move the server into `DOPGATE_SMTP_URL` when you upgrade. Until you do, emails go to the log or through the server saved in the console. An old key in the file is an unknown key, which stops startup.
 
 Dopgate checks the server's certificate against the trusted roots of the image and waits up to 15 seconds for each SMTP command.
 

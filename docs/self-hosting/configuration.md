@@ -8,7 +8,7 @@ description: "How Dopgate reads its configuration from DOPGATE_* environment var
 Dopgate has two kinds of configuration:
 
 - Server configuration, read once at startup: the database, the address, the public URL, CORS, the service key, SMTP. It comes from environment variables, an optional TOML file, and command-line flags.
-- Runtime settings, stored in the database and changed without a restart: sign-up rules, the password policy, token lifetimes, limits, self-service (personal tokens and agents for your users), branding, and SMTP when the server config sets no SMTP host. Admins change them in the console or with `PATCH /api/v1/admin/settings`. See [the REST API](/reference/api#settings).
+- Runtime settings, stored in the database and changed without a restart: sign-up rules, the password policy, token lifetimes, limits, self-service (personal tokens and agents for your users), branding, and SMTP when the server config names no SMTP server. Admins change them in the console or with `PATCH /api/v1/admin/settings`. See [the REST API](/reference/api#settings).
 
 ## Environment first
 
@@ -21,7 +21,7 @@ DOPGATE_ALLOWED_ORIGINS=https://app.example.com
 DOPGATE_SERVICE_KEY=<32 or more random characters>
 DOPGATE_ROOT_EMAIL=admin@example.com
 DOPGATE_TRUSTED_PROXIES=172.16.0.0/12
-DOPGATE_SMTP_HOST=smtp.example.com
+DOPGATE_SMTP_URL=smtp://dopgate:secret@smtp.example.com:587
 DOPGATE_SMTP_FROM_EMAIL=no-reply@example.com
 ```
 
@@ -48,11 +48,7 @@ docs = true
 web_ui = true
 
 [smtp]
-host = "smtp.example.com"
-port = 587
-security = "starttls"
-username = "dopgate"
-password = "..."
+url = "smtp://dopgate:...@smtp.example.com:587"
 from_email = "no-reply@example.com"
 from_name = "Acme"
 ```
