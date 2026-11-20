@@ -5,7 +5,7 @@ import type { Breadcrumb } from "./breadcrumb";
 /**
  * PageHeader — the top of a page: an optional breadcrumb back up the pages
  * above it, the title, a line under it, and the page's main actions on the
- * right.
+ * right. An optional `leading` slot sits before the title, for an avatar.
  */
 const props = defineProps<{
   title: string;
@@ -40,13 +40,19 @@ const crumbs = computed<Breadcrumb[]>(
         </template>
         <span class="text-ink" aria-current="page">{{ title }}</span>
       </nav>
-      <h1
-        class="text-lg font-semibold leading-7 text-ink-strong [overflow-wrap:anywhere]">
-        {{ title }}
-      </h1>
-      <p v-if="subtitle" class="mt-0.5 text-sm text-ink-muted">
-        {{ subtitle }}
-      </p>
+      <div
+        :class="$slots.leading ? 'flex min-w-0 items-center gap-3' : undefined">
+        <slot name="leading" />
+        <div class="min-w-0">
+          <h1
+            class="text-lg font-semibold leading-7 text-ink-strong [overflow-wrap:anywhere]">
+            {{ title }}
+          </h1>
+          <p v-if="subtitle" class="mt-0.5 text-sm text-ink-muted">
+            {{ subtitle }}
+          </p>
+        </div>
+      </div>
       <slot name="meta" />
     </div>
     <div v-if="$slots.actions" class="flex shrink-0 items-center gap-2">

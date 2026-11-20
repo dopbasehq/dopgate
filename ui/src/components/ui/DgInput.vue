@@ -34,6 +34,11 @@ const props = withDefaults(
     min?: number;
     max?: number;
     step?: number;
+    /**
+     * A unit shown after the value, such as "minutes". Screen readers hear
+     * it as part of the label: "Code lifetime (minutes)".
+     */
+    unit?: string;
   }>(),
   {
     type: "text",
@@ -47,6 +52,7 @@ const props = withDefaults(
     min: undefined,
     max: undefined,
     step: undefined,
+    unit: undefined,
   },
 );
 
@@ -99,8 +105,8 @@ function toggleReveal(): void {
         v-if="label"
         :for="id"
         class="block px-3.5 pb-0.5 pt-2 text-xs font-semibold text-ink-muted">
-        {{ label
-        }}<span v-if="required" class="ml-0.5 text-crit" aria-hidden="true"
+        {{ label }}<span v-if="unit" class="sr-only"> ({{ unit }})</span
+        ><span v-if="required" class="ml-0.5 text-crit" aria-hidden="true"
           >*</span
         >
       </label>
@@ -125,10 +131,17 @@ function toggleReveal(): void {
           class="h-full w-full bg-transparent pl-3.5 pr-3.5 text-base text-ink-strong outline-none sm:text-sm placeholder:text-ink-faint disabled:cursor-default"
           :class="[
             isPassword || readonly ? 'pr-10' : '',
+            unit ? 'pr-2' : '',
             mono ? 'font-mono sm:text-xs' : '',
             readonly ? 'cursor-default text-ink' : '',
           ]"
           @input="onInput" />
+        <span
+          v-if="unit"
+          class="pointer-events-none shrink-0 pr-3.5 text-sm text-ink-faint"
+          aria-hidden="true">
+          {{ unit }}
+        </span>
         <LockIcon
           v-if="readonly"
           class="pointer-events-none absolute right-3.5 h-3.5 w-3.5 text-ink-faint"
