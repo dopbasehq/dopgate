@@ -5,6 +5,7 @@ import { AlertTriangleIcon, CheckIcon, InfoIcon } from "~/assets/icons";
 /**
  * DgAlert — inline banner for form-level and load errors, and notes.
  * Every tone shows its icon, so an error never relies on colour alone.
+ * Notes (`info`) are grey: the accent is Gate Red, which reads as an error.
  * With a `title`, the slot becomes the description below it. Presentation-only.
  */
 const props = withDefaults(
@@ -43,7 +44,7 @@ const role = computed(() => {
 const toneClasses = computed(() => {
   switch (props.tone) {
     case "info":
-      return "border-accent/30 bg-accent-soft text-accent-strong";
+      return "border-line bg-raised text-ink";
     case "success":
       return "border-ok/30 bg-ok/10 text-ok";
     case "warn":
