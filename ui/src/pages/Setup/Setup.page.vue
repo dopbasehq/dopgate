@@ -58,7 +58,7 @@ const {
         name="email"
         type="email"
         autocomplete="email"
-        placeholder="you@example.com"
+        placeholder="you@dopgate.com"
         :error="fieldErrors.email" />
       <DgInput
         v-model="password"

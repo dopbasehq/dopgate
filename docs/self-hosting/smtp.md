@@ -74,7 +74,7 @@ From the console, open **Settings** and use **Send test email** in the SMTP sect
 curl -X POST https://auth.example.com/api/v1/admin/settings/smtp/test \
   -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"to":"you@example.com"}'
+  -d '{"to":"you@dopgate.com"}'
 ```
 
 Without `to`, the message goes to the test email address, which is root's email until you save another. Set it in the console under **Send test emails to**, or with the API:
