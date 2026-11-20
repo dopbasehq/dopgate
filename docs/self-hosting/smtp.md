@@ -77,14 +77,23 @@ curl -X POST https://auth.example.com/api/v1/admin/settings/smtp/test \
   -d '{"to":"you@example.com"}'
 ```
 
-Without `to`, the message goes to the signed-in admin's own email. The service key has no email, so it must give `to`.
+Without `to`, the message goes to the test email address, which is root's email until you save another. Set it in the console under **Send test emails to**, or with the API:
+
+```bash
+curl -X PATCH https://auth.example.com/api/v1/admin/settings \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"testEmail":{"recipient":"qa@example.com"}}'
+```
+
+Template tests go to the same address. Save `null` or an empty string to send them to root again. `GET /api/v1/admin/settings` shows the saved address in `testEmail.recipient` and root's in `testEmail.rootEmail`.
 
 | Answer | Meaning |
 | --- | --- |
 | `200 SMTP_TEST_SENT` | The SMTP server accepted the message. |
 | `400 SMTP_NOT_CONFIGURED` | No host is set, in the server config or the console. |
 | `400 SMTP_PASSWORD_UNREADABLE` | The password saved in the console can't be decrypted because the service key changed. Enter it again. |
-| `422 EMAIL_INVALID` | `to` is not a valid address, or the service key left it out. |
+| `422 EMAIL_INVALID` | `to` is not a valid address. |
 | `502 SMTP_SEND_FAILED` | The server refused the message or couldn't be reached. The message holds the server's answer. |
 
 `GET /api/v1/admin/settings` returns the settings in use under `smtp`, without the password: `host`, `port`, `security`, `username`, `passwordSet`, `fromEmail`, `fromName`, `source`, and `canStorePassword`. `source` is `server_config` when the server config sets a host, `database` when the console does, and `log` when neither does. `canStorePassword` is `false` until `DOPGATE_SERVICE_KEY` is set.

@@ -1,4 +1,4 @@
-import { about, expect, PASSWORD, step, test, useServer } from "../harness/index.ts";
+import { about, expect, PASSWORD, ROOT_EMAIL, step, test, useServer } from "../harness/index.ts";
 import { openAs } from "../harness/helpers.ts";
 import { seeHeading } from "./instance.support.ts";
 
@@ -49,12 +49,12 @@ test(
       expect(refused.status).toBe(422);
       expect(refused.code).toBe("SETTINGS_INVALID");
     });
-    await step("Send test email delivers to the server's SMTP", async () => {
-      const to = app.email("envtest");
-      await page.getByLabel("Send a test email to").fill(to);
+    await step("Send test email delivers to root through the server's SMTP", async () => {
       await page.getByRole("button", { name: "Send test email" }).click();
-      await expect(page.getByText(`Test email sent to ${to}.`)).toBeVisible();
-      await expect.poll(() => app.server.smtp!.messages.some((m) => m.to === to)).toBe(true);
+      await expect(page.getByText(`Test email sent to ${ROOT_EMAIL}.`)).toBeVisible();
+      await expect
+        .poll(() => app.server.smtp!.messages.some((m) => m.to === ROOT_EMAIL))
+        .toBe(true);
     });
     await step("Other sections still save", async () => {
       await page.getByTestId("settings-branding").getByLabel("App name").fill("Env Acme");

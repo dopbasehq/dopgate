@@ -346,7 +346,12 @@ impl ServerConfig {
     // listener address.
     config.select_bind_address(
       overrides.port.or(environment_port).or(file_port),
-      overrides.host.clone().or(environment_host).or(file_host),
+      overrides
+        .host
+        .clone()
+        .or(environment_host)
+        .or(file_host)
+        .as_deref(),
     )?;
     config.derive_public_url()?;
     config.smtp.check()?;
@@ -546,12 +551,12 @@ impl ServerConfig {
   fn select_bind_address(
     &mut self,
     port: Option<u16>,
-    host: Option<String>,
+    host: Option<&str>,
   ) -> Result<()> {
     if port.is_none() && host.is_none() {
       return Ok(());
     }
-    let host = host.as_deref().unwrap_or("127.0.0.1");
+    let host = host.unwrap_or("127.0.0.1");
     let ip = match host {
       "localhost" => IpAddr::from([127, 0, 0, 1]),
       other => other.parse::<IpAddr>().with_context(|| {

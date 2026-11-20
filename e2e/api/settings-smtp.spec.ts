@@ -44,7 +44,7 @@ test(
   {
     tag: ["@settings", "@templates"],
     annotation: about(
-      "A fresh server has smtp.source log. POST /admin/settings/smtp/test answers 400 SMTP_NOT_CONFIGURED, and the service key must also give a recipient.",
+      "A fresh server has smtp.source log. POST /admin/settings/smtp/test answers 400 SMTP_NOT_CONFIGURED, with or without a recipient, for root and the service key.",
     ),
   },
   async () => {
@@ -71,10 +71,10 @@ test(
       expect(refused.status).toBe(400);
       expect(refused.code).toBe("SMTP_NOT_CONFIGURED");
     });
-    await step("The service key without a recipient is 422 EMAIL_INVALID", async () => {
+    await step("Without a recipient, the service key gets the same answer", async () => {
       const refused = await app.service.post("/admin/settings/smtp/test");
-      expect(refused.status).toBe(422);
-      expect(refused.code).toBe("EMAIL_INVALID");
+      expect(refused.status).toBe(400);
+      expect(refused.code).toBe("SMTP_NOT_CONFIGURED");
     });
     await step("A recipient that isn't an email is 422 EMAIL_INVALID", async () => {
       const refused = await root.api.post("/admin/settings/smtp/test", { to: "not-an-email" });
@@ -191,11 +191,11 @@ test(
 );
 
 test(
-  "the SMTP test sends a message to the caller or to a given address",
+  "the SMTP test goes to root, the saved test address, or a given address",
   {
     tag: "@settings",
     annotation: about(
-      "With SMTP saved, the test message goes to the signed-in admin by default and to `to` when given. The service key has no address, so it has to give one.",
+      "With SMTP saved, the test message goes to root by default, whoever sends it, and to testEmail.recipient once one is saved. A `to` in the body wins for that one message.",
     ),
   },
   async () => {
@@ -223,10 +223,19 @@ test(
         expect(sent.message).toBe("SMTP_TEST_SENT");
         await mailTo(to);
       });
-      await step("The service key without `to` is EMAIL_INVALID", async () => {
-        const refused = await app.service.post("/admin/settings/smtp/test");
-        expect(refused.status).toBe(422);
-        expect(refused.code).toBe("EMAIL_INVALID");
+      await step("The service key without `to` sends it to root", async () => {
+        const sent = await app.service.post("/admin/settings/smtp/test");
+        expect(sent.status).toBe(200);
+        await mailTo(ROOT_EMAIL, 1);
+      });
+      await step("A saved test address takes over from root", async () => {
+        const qa = app.email("qa");
+        await app.settings("testEmail", { recipient: qa.toUpperCase() });
+        const settings = await app.service.get("/admin/settings");
+        expect(settings.data.testEmail.recipient).toBe(qa);
+        const sent = await root.api.post("/admin/settings/smtp/test");
+        expect(sent.status).toBe(200);
+        await mailTo(qa);
       });
       await step("The subject uses the branding app name", async () => {
         await app.settings("branding", { appName: "Acme Mail" });
@@ -236,7 +245,10 @@ test(
         await app.settings("branding", { appName: "Dopgate" });
       });
     } finally {
-      await app.service.patch("/admin/settings", { smtp: { host: "" } });
+      await app.service.patch("/admin/settings", {
+        smtp: { host: "" },
+        testEmail: { recipient: null },
+      });
     }
   },
 );

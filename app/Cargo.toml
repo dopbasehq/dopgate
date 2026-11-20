@@ -30,7 +30,12 @@ axum = { version = "0.8", default-features = false, features = [
   "tokio",
   "tracing",
 ] }
-tower-http = { version = "0.7", features = ["cors", "request-id", "timeout", "trace"] }
+tower-http = { version = "0.7", features = [
+  "cors",
+  "request-id",
+  "timeout",
+  "trace",
+] }
 # API Documentation
 utoipa = { version = "5", features = ["axum_extras", "chrono"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
@@ -61,7 +66,9 @@ reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls-native-roots",
 ] }
 # ES256 access tokens: signing, verification, and key generation
-jsonwebtoken = { version = "9", default-features = false, features = ["use_pem"] }
+jsonwebtoken = { version = "9", default-features = false, features = [
+  "use_pem",
+] }
 p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8", "jwk"] }
 # Password hashing
 argon2 = "0.5"
@@ -131,3 +138,15 @@ opt-level = 3
 # release binary needs stripping.
 [profile.release.build-override]
 strip = false
+
+[lints.clippy]
+# Flag unnecessary clones and locks
+clone_on_ref_ptr = "warn"
+mutex_atomic = "warn"
+mutex_integer = "warn"
+rc_mutex = "warn"
+
+# Force cleaner ownership and borrowing patterns
+needless_pass_by_value = "warn"
+trivially_copy_pass_by_ref = "warn"
+implicit_clone = "warn"

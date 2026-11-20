@@ -6,10 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "bun ./scripts/dev.ts",
-    "dev:db": "docker start dopgate-dev-pg || docker run -d --name dopgate-dev-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55433:5432 postgres:17-alpine",
+    "dev:db": "docker start dopgate-dev-pg || docker run -d --name dopgate-dev-pg -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55433:5432 postgres:18-alpine",
     "dev:app": "cargo run --manifest-path app/Cargo.toml -- serve",
     "dev:ui": "bun run --cwd ui dev",
-    "dev:docs": "vitepress dev docs",
+    "dev:docs": "vitepress dev docs --port 9001",
     "build": "bun run build:app && bun run build:docs",
     "build:ui": "bun run clean:ui && bun run --cwd ui build",
     "build:app": "bun run build:ui && cargo build --manifest-path app/Cargo.toml --release",

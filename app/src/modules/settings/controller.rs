@@ -56,7 +56,8 @@ pub async fn update(
 /// Send a test email
 ///
 /// Send a message through the SMTP server in use (`DOPGATE_SMTP_*`, or the
-/// one saved in settings) and report the server's answer. Without `to`, it goes to the caller's own email.
+/// one saved in settings) and report the server's answer. Without `to`, it
+/// goes to the test email address in settings, or to root when none is saved.
 #[utoipa::path(
   post,
   path = crate::constants::api::settings::SMTP_TEST,
@@ -73,10 +74,10 @@ pub async fn update(
 )]
 pub async fn test_smtp(
   State(state): State<AppState>,
-  AdminIdentity(actor): AdminIdentity,
+  AdminIdentity(_actor): AdminIdentity,
   request: Option<Json<SmtpTestRequest>>,
 ) -> Result<HttpResponse<serde_json::Value>, SettingsError> {
   let request = request.map(|Json(request)| request).unwrap_or_default();
-  service::test_smtp(&state, &actor, request).await?;
+  service::test_smtp(&state, request).await?;
   Ok(HttpResponse::done("SMTP_TEST_SENT"))
 }

@@ -196,6 +196,14 @@ export interface SmtpSettingsInput {
   fromName: string | null;
 }
 
+/** Where the SMTP test and template tests send their message. */
+export interface TestEmailSettings {
+  /** The saved address. Null sends test emails to root. */
+  recipient: string | null;
+  /** Read-only: root's email, used while `recipient` is null. */
+  rootEmail: string | null;
+}
+
 export interface Settings {
   signup: SignupSettings;
   password: PasswordSettings;
@@ -204,11 +212,13 @@ export interface Settings {
   selfService: SelfServiceSettings;
   smtp: SmtpSettings;
   branding: Branding;
+  testEmail: TestEmailSettings;
 }
 
 /** The parts of the settings an admin can change, as the API takes them. */
-export type EditableSettings = Omit<Settings, "smtp"> & {
+export type EditableSettings = Omit<Settings, "smtp" | "testEmail"> & {
   smtp: SmtpSettingsInput;
+  testEmail: { recipient: string | null };
 };
 
 export type TemplateName =

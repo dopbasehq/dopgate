@@ -62,8 +62,8 @@ The service key acts as an admin. It can:
 - list, read, create, update, disable, enable, and delete users,
 - end a user's sessions and send them a password reset code,
 - list and read admins,
-- read and change settings, and send an SMTP test to an address you give in `to`,
-- read, change, preview, and reset email templates,
+- read and change settings, and send an SMTP test,
+- read, change, preview, test, and reset email templates,
 - list and read agents, and list a user's personal tokens,
 - list signing keys and read and verify the audit log.
 
@@ -72,8 +72,9 @@ It can't:
 - add, change, disable, or remove admins, which only root can do (`403 AUTHORIZATION_DENIED`),
 - rotate signing keys, which only root can do,
 - make, change, turn off, or delete agents, or revoke a user's personal token, which need an admin signed in to the console (`403 AUTHORIZATION_DENIED`),
-- call endpoints for a signed-in user or admin, such as `/api/v1/auth/me` or `/api/v1/console/me` (`403 AUTHORIZATION_DENIED`),
-- send a template test email, because it has no inbox (`400 EMAIL_INVALID`). Preview the template instead.
+- call endpoints for a signed-in user or admin, such as `/api/v1/auth/me` or `/api/v1/console/me` (`403 AUTHORIZATION_DENIED`).
+
+Test emails from the SMTP test or a template go to the test email address in settings (`testEmail.recipient`), or to root when none is saved, no matter who sends them. The service key can send them too.
 
 Audit records written by the service key have the actor type `service` and the label `service`, so you can tell them apart from changes made in the console.
 

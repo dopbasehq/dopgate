@@ -87,6 +87,10 @@ async fn a_new_instance_has_defaults_and_logs_mail() {
     })
   );
   assert_eq!(settings["branding"]["appName"], "Dopgate");
+  assert_eq!(
+    settings["testEmail"],
+    json!({ "recipient": null, "rootEmail": crate::support::ROOT_EMAIL })
+  );
 }
 
 #[tokio::test]
@@ -283,6 +287,7 @@ async fn bad_values_are_refused() {
     json!({ "smtp": { "host": "smtp.example.com", "port": 0 } }),
     json!({ "smtp": { "host": "smtp.example.com", "fromEmail": "not-an-address" } }),
     json!({ "smtp": { "host": "smtp.example.com", "fromName": "Line\nbreak" } }),
+    json!({ "testEmail": { "recipient": "not-an-address" } }),
   ] {
     let (status, body) = app
       .request_with(Method::PATCH, SETTINGS, Some(patch.clone()), Some(&root))
@@ -316,20 +321,57 @@ async fn users_cannot_read_settings_but_the_service_key_can() {
 }
 
 #[tokio::test]
-async fn the_test_message_goes_to_the_admin_through_smtp() {
+async fn the_test_message_goes_to_root_unless_an_address_is_saved() {
   let smtp = FakeSmtp::start().await;
   let app = TestApp::with(|config| use_smtp(config, &smtp)).await;
   let root = app.root_token().await;
-  let (status, body) = app
+  app.create_admin(&root, "admin@example.com").await;
+  let admin = app
+    .console_login("admin@example.com", crate::support::PASSWORD)
+    .await;
+  let send_test = |token: String| {
+    let app = &app;
+    async move {
+      let (status, body) = app
+        .request_with(Method::POST, SMTP_TEST, None, Some(&token))
+        .await;
+      assert_eq!(status, StatusCode::OK, "{body}");
+    }
+  };
+
+  // Another admin's test still goes to root.
+  send_test(admin.clone()).await;
+  assert_eq!(smtp.wait_for(crate::support::ROOT_EMAIL, 1).await, 1);
+  assert!(smtp.messages_to("admin@example.com").is_empty());
+
+  let (status, body) = patch(
+    &app,
+    &admin,
+    json!({ "testEmail": { "recipient": "  QA@Example.com " } }),
+  )
+  .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["testEmail"]["recipient"], "qa@example.com");
+  send_test(root.clone()).await;
+  assert_eq!(smtp.wait_for("qa@example.com", 1).await, 1);
+
+  // `to` still wins for a one-off.
+  let (status, _) = app
     .request_with(
       Method::POST,
-      "/api/v1/admin/settings/smtp/test",
-      None,
+      SMTP_TEST,
+      Some(json!({ "to": "once@example.com" })),
       Some(&root),
     )
     .await;
-  assert_eq!(status, StatusCode::OK, "{body}");
-  assert_eq!(smtp.wait_for(crate::support::ROOT_EMAIL, 1).await, 1);
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(smtp.wait_for("once@example.com", 1).await, 1);
+
+  // Clearing the address goes back to root.
+  let (_, body) = patch(&app, &root, json!({ "testEmail": { "recipient": "" } })).await;
+  assert_eq!(body["data"]["testEmail"]["recipient"], json!(null));
+  send_test(root).await;
+  assert_eq!(smtp.wait_for(crate::support::ROOT_EMAIL, 2).await, 2);
 }
 
 #[tokio::test]

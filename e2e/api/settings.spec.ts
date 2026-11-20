@@ -2,6 +2,7 @@ import { claims } from "../harness/helpers.ts";
 import {
   LEAKED_PASSWORD,
   PASSWORD,
+  ROOT_EMAIL,
   about,
   expect,
   step,
@@ -62,7 +63,7 @@ test(
   {
     tag: ["@settings", "@smoke"],
     annotation: about(
-      "GET /admin/settings answers SETTINGS_FETCHED with the signup, password, tokens, limits, selfService, branding and smtp sections. Nothing has been changed yet, so each value is the documented default.",
+      "GET /admin/settings answers SETTINGS_FETCHED with the signup, password, tokens, limits, selfService, branding, smtp and testEmail sections. Nothing has been changed yet, so each value is the documented default.",
     ),
   },
   async () => {
@@ -73,7 +74,7 @@ test(
       expect(fetched.status).toBe(200);
       expect(fetched.message).toBe("SETTINGS_FETCHED");
       expect(Object.keys(fetched.data).sort()).toEqual(
-        ["branding", "limits", "password", "selfService", "signup", "smtp", "tokens"],
+        ["branding", "limits", "password", "selfService", "signup", "smtp", "testEmail", "tokens"],
       );
     });
     await step("The sections hold the default values", async () => {
@@ -93,6 +94,9 @@ test(
         source: "log",
         canStorePassword: true,
       });
+    });
+    await step("testEmail has no saved address, so test emails go to root", async () => {
+      expect(fetched.data.testEmail).toEqual({ recipient: null, rootEmail: ROOT_EMAIL });
     });
   },
 );

@@ -92,6 +92,10 @@ with an admin console and Docker images. Nothing below has shipped before.
   is empty. The environment wins over the console, and with neither, emails
   go to the log. A password saved in the console is encrypted with a key
   from `DOPGATE_SERVICE_KEY`. The sender defaults to `no-reply@dopgate.com`.
+- `testEmail.recipient` sets where the SMTP test and template tests go.
+  Until someone saves an address, they go to root, no matter who sends them.
+  The service key can send them too. The console has the field next to Send
+  test email under Settings. A one-off `to` still works on the SMTP test.
 - A hash-chained audit log with retention (`DOPGATE_AUDIT_RETENTION_DAYS`,
   365 days by default) and a verify endpoint.
 - The admin console at `/`: users, agents, admins, email templates,

@@ -1,5 +1,5 @@
 {
-  "name": "dopgate-ui",
+  "name": "@dopgate/ui",
   "private": true,
   "version": "0.1.0",
   "type": "module",
