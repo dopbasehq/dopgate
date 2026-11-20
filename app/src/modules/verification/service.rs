@@ -45,34 +45,37 @@ pub struct CodeTarget<'a> {
 /// The per-email limits on sending codes: a short wait between codes of the
 /// same kind, and a cap per hour. They apply whether or not the email has an
 /// account, so the answer never tells the two apart.
+///
+/// Counts this code and returns the seconds until the email can be sent the
+/// next one: the wait between codes, or what is left of the hour when this
+/// code was the last one the cap allows.
 pub async fn check_send_limits(
   state: &AppState,
   realm: Realm,
   purpose: Purpose,
   email: &str,
-) -> Result<(), HttpError> {
+) -> Result<u64, HttpError> {
   let config = settings::service::limits(state.db.pool()).await?;
-  if config.code_resend_seconds > 0 {
+  let resend_seconds = u64::from(config.code_resend_seconds);
+  if resend_seconds > 0 {
     let key = format!("code:resend:{}:{}:{email}", realm.key(), purpose.as_str());
     state
       .limits
-      .hit(
-        &key,
-        1,
-        Duration::from_secs(u64::from(config.code_resend_seconds)),
-      )
+      .hit(&key, 1, Duration::from_secs(resend_seconds))
       .await
       .map_err(|limited| HttpError::rate_limited(limited.retry_after))?;
   }
+  let hour_key = format!("code:hour:{}:{email}", realm.key());
   state
     .limits
-    .hit(
-      &format!("code:hour:{}:{email}", realm.key()),
-      config.codes_per_hour,
-      Duration::from_secs(3600),
-    )
+    .hit(&hour_key, config.codes_per_hour, Duration::from_secs(3600))
     .await
-    .map_err(|limited| HttpError::rate_limited(limited.retry_after))
+    .map_err(|limited| HttpError::rate_limited(limited.retry_after))?;
+  let hour_wait = match state.limits.peek(&hour_key, config.codes_per_hour).await {
+    Ok(()) => 0,
+    Err(limited) => limited.retry_after,
+  };
+  Ok(resend_seconds.max(hour_wait))
 }
 
 /// Create a code, replacing any earlier one, and email it.
@@ -190,7 +193,7 @@ fn disabled() -> HttpError {
 pub async fn send(
   state: &AppState,
   request: SendCodeRequest,
-) -> Result<(), HttpError> {
+) -> Result<CodeSent, HttpError> {
   limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
   if !matches!(request.purpose, Purpose::EmailVerify | Purpose::Login) {
@@ -200,7 +203,7 @@ pub async fn send(
       "That kind of code can't be sent from here. Password resets and email changes each ask for their own.",
     ));
   }
-  check_send_limits(state, Realm::App, request.purpose, &email).await?;
+  let retry_after = check_send_limits(state, Realm::App, request.purpose, &email).await?;
   let user = accounts::find_by_email(state.db.pool(), Realm::App, &email).await?;
   match (request.purpose, user) {
     (Purpose::EmailVerify, Some(user)) if user.is_active() && !user.is_verified() => {
@@ -228,7 +231,7 @@ pub async fn send(
     }
     _ => {}
   }
-  Ok(())
+  Ok(CodeSent { retry_after })
 }
 
 pub fn target_for(account: &AccountRow) -> CodeTarget<'_> {

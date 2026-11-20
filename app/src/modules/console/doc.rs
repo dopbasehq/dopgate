@@ -8,6 +8,7 @@ use crate::{
     },
     recovery::model::{ForgotPasswordRequest, ResetPasswordRequest},
     sessions::model::SessionResponse,
+    verification::model::CodeSent,
   },
 };
 use utoipa::OpenApi;
@@ -44,6 +45,7 @@ use utoipa::OpenApi;
     ForgotPasswordRequest,
     ResetPasswordRequest,
     SessionResponse,
+    CodeSent,
     Admin,
     Role,
     UserStatus,
@@ -51,6 +53,7 @@ use utoipa::OpenApi;
     HttpResponseFormat<ConsoleTokens>,
     HttpResponseFormat<Admin>,
     HttpResponseFormat<Vec<SessionResponse>>,
+    HttpResponseFormat<CodeSent>,
     HttpResponseFormat<serde_json::Value>
   )),
   tags((name = "console", description = "Console sign-in and the signed-in admin's account. Only the console calls these."))

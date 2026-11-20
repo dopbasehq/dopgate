@@ -59,6 +59,8 @@ async fn unknown_emails_get_the_same_answer_and_no_mail() {
   let (status, body) = send(&app, "nobody@example.com", "login").await;
   assert_eq!(status, StatusCode::OK);
   assert_eq!(body["message"], "CODE_SENT");
+  // The wait before the next code is the one a real account gets.
+  assert_eq!(body["data"]["retryAfter"], 60);
   tokio::time::sleep(std::time::Duration::from_millis(300)).await;
   assert!(smtp.messages_to("nobody@example.com").is_empty());
 }
@@ -127,7 +129,8 @@ async fn an_expired_code_is_refused() {
 async fn asking_again_waits_and_replaces_the_earlier_code() {
   let (app, smtp, root) = app_with_mail().await;
   app.create_user(&root, "ada@example.com").await;
-  send(&app, "ada@example.com", "login").await;
+  let (_, body) = send(&app, "ada@example.com", "login").await;
+  assert_eq!(body["data"]["retryAfter"], 60, "the default resend wait");
   let first = smtp.code_for("ada@example.com").await;
   let reply = app
     .call(
@@ -148,7 +151,8 @@ async fn asking_again_waits_and_replaces_the_earlier_code() {
                           "lockoutAttempts": 5, "lockoutMinutes": 15, "ipRequestsPerMinute": 20 } }),
     )
     .await;
-  send(&app, "ada@example.com", "login").await;
+  let (_, body) = send(&app, "ada@example.com", "login").await;
+  assert_eq!(body["data"]["retryAfter"], 0, "the wait is turned off");
   smtp.wait_for("ada@example.com", 2).await;
   let second = smtp.code_for("ada@example.com").await;
   if first != second {
@@ -161,6 +165,27 @@ async fn asking_again_waits_and_replaces_the_earlier_code() {
   }
   let (status, _) = confirm(&app, "ada@example.com", &second).await;
   assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn the_last_code_of_the_hour_reports_the_rest_of_the_hour() {
+  let (app, _smtp, root) = app_with_mail().await;
+  app
+    .settings(
+      &root,
+      json!({ "limits": { "codeMinutes": 10, "codeMaxAttempts": 5, "codeResendSeconds": 0, "codesPerHour": 2,
+                          "lockoutAttempts": 5, "lockoutMinutes": 15, "ipRequestsPerMinute": 20 } }),
+    )
+    .await;
+  let (_, body) = send(&app, "ada@example.com", "login").await;
+  assert_eq!(body["data"]["retryAfter"], 0);
+  // The second code uses up the hour, so the wait is what is left of it.
+  let (status, body) = send(&app, "ada@example.com", "login").await;
+  assert_eq!(status, StatusCode::OK);
+  let wait = body["data"]["retryAfter"].as_u64().unwrap();
+  assert!((3500..=3600).contains(&wait), "{wait}");
+  let (status, _) = send(&app, "ada@example.com", "login").await;
+  assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
 }
 
 #[tokio::test]

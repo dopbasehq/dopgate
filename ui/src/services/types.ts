@@ -113,6 +113,12 @@ export interface AuthMethods {
   branding: Branding;
 }
 
+/** The answer to a code request, the same whether or not a code went out. */
+export interface CodeSent {
+  /** Seconds before the email can be sent another code. 0 means right away. */
+  retryAfter: number;
+}
+
 export interface Page<T> {
   items: T[];
   nextCursor: string | null;

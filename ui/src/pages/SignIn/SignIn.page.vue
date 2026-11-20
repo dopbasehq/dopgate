@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AuthLayout } from "~/layouts";
 import { DgAlert, DgButton, DgCodeInput, DgInput } from "~/components/ui";
+import { formatCountdown } from "~/utils/format";
 import { useSignInController } from "./SignIn.controller";
 
 const {
@@ -13,6 +14,7 @@ const {
   problem,
   codeError,
   notice,
+  resendIn,
   submitting,
   sending,
   submitPassword,
@@ -54,6 +56,7 @@ const {
 
         <DgAlert
           v-if="problem"
+          :tone="problem.tone"
           :title="problem.title"
           data-testid="sign-in-problem">
           {{ problem.message }}
@@ -114,12 +117,24 @@ const {
             @click="usePassword">
             Use a password instead
           </button>
+          <!-- One button for both states, so it keeps its place and focus
+               while the server's wait counts down. -->
           <button
             type="button"
-            class="cursor-pointer text-ink-muted underline underline-offset-4 hover:text-ink disabled:opacity-50"
-            :disabled="sending"
+            class="text-ink-muted tabular-nums"
+            :class="
+              resendIn > 0
+                ? 'cursor-default'
+                : 'cursor-pointer underline underline-offset-4 hover:text-ink disabled:opacity-50'
+            "
+            :disabled="sending || resendIn > 0"
+            data-testid="resend-code"
             @click="resend">
-            Send a new code
+            {{
+              resendIn > 0
+                ? `Send a new code in ${formatCountdown(resendIn)}`
+                : "Send a new code"
+            }}
           </button>
         </div>
       </form>

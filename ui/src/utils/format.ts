@@ -77,3 +77,10 @@ export function describeUserAgent(userAgent: string | null): string {
   if (browser && os) return `${browser} on ${os}`;
   return browser ?? os ?? userAgent.slice(0, 60);
 }
+
+/** A wait in seconds as a clock, e.g. `0:45` or `12:05`. */
+export function formatCountdown(seconds: number): string {
+  const whole = Math.max(0, Math.ceil(seconds));
+  const rest = String(whole % 60).padStart(2, "0");
+  return `${Math.floor(whole / 60)}:${rest}`;
+}

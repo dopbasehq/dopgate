@@ -11,11 +11,12 @@ use utoipa::OpenApi;
   components(schemas(
     SendCodeRequest,
     ConfirmCodeRequest,
+    CodeSent,
     Purpose,
     AuthTokens,
     ErrorBody,
     HttpResponseFormat<AuthTokens>,
-    HttpResponseFormat<serde_json::Value>
+    HttpResponseFormat<CodeSent>
   )),
   tags((name = "verification", description = "Emailed codes: verify an email or sign in without a password"))
 )]

@@ -327,7 +327,7 @@ test(
   {
     tag: ["@console", "@limits"],
     annotation: about(
-      "With a 60 second wait between codes, a second request right away is refused. The page says too many attempts and how long to wait. The setting is put back at the end.",
+      "With a 60 second wait between codes, the code step counts down until a new code can be sent and the link stays off until then. The notice about the code is a note, not an error. Asking again from a reloaded page is refused, and the password form counts that wait down too. The setting is put back at the end.",
     ),
   },
   async ({ page }) => {
@@ -342,9 +342,36 @@ test(
         await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
         await app.mail.last(sam.email);
       });
-      await step("A second request right away is refused with the wait", async () => {
-        await page.getByRole("button", { name: "Send a new code" }).click();
-        await expect(page.getByTestId("code-form").getByRole("alert")).toContainText(/Too many attempts\. Try again in \d+ seconds\./);
+      await step("The notice is a note and nothing shows as an error", async () => {
+        const codeForm = page.getByTestId("code-form");
+        await expect(codeForm.getByRole("note")).toContainText("a code is on its way");
+        await expect(codeForm.getByRole("alert")).toBeHidden();
+      });
+      await step("Send a new code is off and counts down", async () => {
+        const resend = page.getByTestId("resend-code");
+        await expect(resend).toBeDisabled();
+        await expect(resend).toHaveText(/^Send a new code in (1:00|0:5\d)$/);
+        const shown = (await resend.textContent())!.trim();
+        await expect(resend).not.toHaveText(shown);
+        await expect(resend).toHaveText(/^Send a new code in 0:5\d$/);
+      });
+      await step("Use a password instead and back keeps the same wait, with no second email", async () => {
+        const before = await app.mail.count(sam.email);
+        await page.getByRole("button", { name: "Use a password instead" }).click();
+        await form.getByRole("button", { name: "Email me a code" }).click();
+        await expect(page.getByTestId("resend-code")).toHaveText(/^Send a new code in 0:[45]\d$/);
+        expect(await app.mail.count(sam.email)).toBe(before);
+      });
+      await step("From a reloaded page a second request is refused, and that wait counts down", async () => {
+        await page.reload();
+        await form.getByLabel("Email").fill(sam.email);
+        await form.getByRole("button", { name: "Email me a code" }).click();
+        const problem = page.getByTestId("sign-in-problem");
+        await expect(problem).toContainText("Slow down");
+        await expect(problem).toContainText(/Too many attempts\. Try again in \d+ seconds\./);
+        const shown = (await problem.textContent())!;
+        await expect(problem).not.toHaveText(shown);
+        await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
       });
     } finally {
       await app.settings("limits", { codeResendSeconds: 0 });

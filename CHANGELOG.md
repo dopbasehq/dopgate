@@ -80,6 +80,8 @@ with an admin console and Docker images. Nothing below has shipped before.
   mirror of the list.
 - Limits: per-address and per-email request limits, code resend waits, and
   account lockout after five wrong passwords, all editable in settings.
+  Sending a code answers with `retryAfter`, the seconds until the next one,
+  and the console's sign-in page counts it down.
 - `GET /api/v1/admin/users?email=` finds the one user with that email.
   `search` matches part of an email, so it can't tell `ana@` from `hana@`.
 - A backend that signs people in for them can send the service key in

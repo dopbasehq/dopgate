@@ -233,7 +233,11 @@ export function errorMessage(cause: unknown, fallback: string): string {
 
 /** "Too many attempts. Try again in 30 seconds." */
 export function rateLimitMessage(error: ApiError): string {
-  const seconds = error.retryAfter;
+  return waitMessage(error.retryAfter);
+}
+
+/** The rate limit message for a wait in seconds, or null when unknown. */
+export function waitMessage(seconds: number | null): string {
   if (seconds === null)
     return "Too many attempts. Wait a moment and try again.";
   if (seconds <= 1) return "Too many attempts. Try again in a second.";

@@ -1,5 +1,11 @@
 import { api } from "./api";
-import type { Admin, AuthMethods, ConsoleTokens, Session } from "./types";
+import type {
+  Admin,
+  AuthMethods,
+  CodeSent,
+  ConsoleTokens,
+  Session,
+} from "./types";
 
 /**
  * Setup, console sign-in, and the signed-in admin's own endpoints. Admins
@@ -34,8 +40,11 @@ export function login(email: string, password: string): Promise<ConsoleTokens> {
   });
 }
 
-/** Emails a sign-in code. The server answers the same for unknown addresses. */
-export function sendCode(email: string): Promise<null> {
+/**
+ * Emails a sign-in code. The server answers the same for unknown addresses,
+ * with the wait before it sends that address another one.
+ */
+export function sendCode(email: string): Promise<CodeSent> {
   return api("/console/codes/send", {
     method: "POST",
     body: { email },

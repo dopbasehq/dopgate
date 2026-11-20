@@ -39,6 +39,8 @@ When your backend signs people in for them, every request comes from the backend
 
 Every endpoint that emails a code (verification, sign-in by code, password reset, and email change) checks two limits on the receiving email before it answers: the wait between codes of the same purpose, and the hourly cap. They apply whether or not the email has an account, so the answers never reveal which emails do. An admin sending a reset code from the admin API skips these two limits.
 
+`POST /api/v1/auth/verification/send` answers with `data.retryAfter`, the seconds until that email can be sent the next code: `codeResendSeconds`, or what is left of the hour when the code was the last one the hourly cap allows. Count it down next to your "send a new code" button so people don't ask too early.
+
 A new code replaces the previous one of the same purpose. Each code allows `codeMaxAttempts` wrong tries; the answer says how many are left, and after the last one the code is used up.
 
 ## Account lockout

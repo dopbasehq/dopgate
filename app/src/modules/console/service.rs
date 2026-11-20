@@ -16,7 +16,7 @@ use crate::{
     audit,
     auth::{self, model::LoginRequest},
     sessions::{self, model::SignInMethod, service::Grant},
-    verification::service as verification,
+    verification::{model::CodeSent, service as verification},
   },
   services::{jwt, limits, otp::Purpose},
   state::AppState,
@@ -93,10 +93,11 @@ pub async fn login(
 pub async fn send_code(
   state: &AppState,
   request: ConsoleSendCodeRequest,
-) -> Result<(), HttpError> {
+) -> Result<CodeSent, HttpError> {
   limits::per_address(state).await?;
   let email = validate::email(&request.email)?;
-  verification::check_send_limits(state, Realm::Console, Purpose::Login, &email).await?;
+  let retry_after =
+    verification::check_send_limits(state, Realm::Console, Purpose::Login, &email).await?;
   if let Some(admin) = accounts::find_by_email(state.db.pool(), Realm::Console, &email).await?
     && admin.is_active()
   {
@@ -108,7 +109,7 @@ pub async fn send_code(
     )
     .await?;
   }
-  Ok(())
+  Ok(CodeSent { retry_after })
 }
 
 /// What confirming a console code returns.

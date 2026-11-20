@@ -159,7 +159,7 @@ test(
   {
     tag: ["@auth", "@limits", "@security"],
     annotation: about(
-      "One email gets one code per purpose every limits.codeResendSeconds. A second request inside that time answers 429 RATE_LIMITED with Retry-After. A known and an unknown email behave the same, so the limit cannot be used to find accounts.",
+      "One email gets one code per purpose every limits.codeResendSeconds. The first answer says how long that is in retryAfter. A second request inside that time answers 429 RATE_LIMITED with Retry-After. A known and an unknown email behave the same, so the limit cannot be used to find accounts.",
     ),
   },
   async () => {
@@ -168,10 +168,11 @@ test(
     const headers = visitor();
     const send = (email: string, purpose = "login") =>
       app.api.post("/auth/verification/send", { email, purpose }, { headers });
-    await step("The first login code for each email answers 200 CODE_SENT", async () => {
+    await step("The first login code for each email answers 200 CODE_SENT with the wait", async () => {
       for (const email of [known.email, unknown]) {
         const result = await send(email);
         expect([result.status, result.message]).toEqual([200, "CODE_SENT"]);
+        expect(result.data).toEqual({ retryAfter: 60 });
       }
       await app.mail.code(known.email);
     });

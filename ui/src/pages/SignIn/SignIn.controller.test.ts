@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authApi from "~/services/auth.api";
 import { useAuthStore } from "~/stores/auth.store";
 import { mountController, settle } from "~/tests/mount-controller";
@@ -25,8 +25,12 @@ beforeEach(() => {
     branding: { appName: "Acme", logoUrl: null },
   });
   vi.mocked(authApi.login).mockResolvedValue(tokensFor(admin));
-  vi.mocked(authApi.sendCode).mockResolvedValue(null);
+  vi.mocked(authApi.sendCode).mockResolvedValue({ retryAfter: 60 });
   vi.mocked(authApi.confirmSignInCode).mockResolvedValue(tokensFor(admin));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 async function mount() {
@@ -78,16 +82,38 @@ describe("useSignInController", () => {
       expect(c.problem.value?.message).toMatch(message);
     });
 
-    it("says how long to wait when rate limited", async () => {
+    it("counts down the wait when rate limited, then clears it", async () => {
       vi.mocked(authApi.login).mockRejectedValue(
         apiError(429, "RATE_LIMITED", "Too many.", 30),
+      );
+      const c = await mount();
+      vi.useFakeTimers();
+      c.password.value = "secret";
+      await c.submitPassword();
+      expect(c.problem.value).toEqual({
+        title: "Slow down",
+        message: "Too many attempts. Try again in 30 seconds.",
+        tone: "warn",
+      });
+      vi.advanceTimersByTime(1000);
+      expect(c.problem.value?.message).toBe(
+        "Too many attempts. Try again in 29 seconds.",
+      );
+      vi.advanceTimersByTime(29_000);
+      expect(c.problem.value).toBeNull();
+    });
+
+    it("says to wait a moment when the server gives no time", async () => {
+      vi.mocked(authApi.login).mockRejectedValue(
+        apiError(429, "RATE_LIMITED", "Too many."),
       );
       const c = await mount();
       c.password.value = "secret";
       await c.submitPassword();
       expect(c.problem.value?.message).toBe(
-        "Too many attempts. Try again in 30 seconds.",
+        "Too many attempts. Wait a moment and try again.",
       );
+      expect(c.problem.value?.tone).toBe("warn");
     });
   });
 
@@ -97,6 +123,11 @@ describe("useSignInController", () => {
       await c.emailMeACode();
       expect(authApi.sendCode).toHaveBeenCalledWith("admin@example.com");
       expect(c.step.value).toBe("code");
+      expect(c.notice.value).toBe(
+        "If admin@example.com belongs to an admin, a code is on its way.",
+      );
+      expect(c.problem.value).toBeNull();
+      expect(c.codeError.value).toBeNull();
 
       c.code.value = "123456";
       await c.submitCode();
@@ -105,6 +136,76 @@ describe("useSignInController", () => {
         "123456",
       );
       expect(replace).toHaveBeenCalledWith({ name: "users" });
+    });
+
+    it("counts down the server's wait, then a new code starts it again", async () => {
+      const c = await mount();
+      vi.useFakeTimers();
+      await c.emailMeACode();
+      expect(c.resendIn.value).toBe(60);
+      vi.advanceTimersByTime(1000);
+      expect(c.resendIn.value).toBe(59);
+      vi.advanceTimersByTime(59_000);
+      expect(c.resendIn.value).toBe(0);
+
+      await c.resend();
+      expect(authApi.sendCode).toHaveBeenCalledTimes(2);
+      expect(c.resendIn.value).toBe(60);
+    });
+
+    it("has no wait when the server turned it off", async () => {
+      vi.mocked(authApi.sendCode).mockResolvedValue({ retryAfter: 0 });
+      const c = await mount();
+      await c.emailMeACode();
+      expect(c.resendIn.value).toBe(0);
+    });
+
+    it("returns to the code step without asking again while the wait runs", async () => {
+      const c = await mount();
+      vi.useFakeTimers();
+      await c.emailMeACode();
+      vi.advanceTimersByTime(10_000);
+      c.usePassword();
+      await c.emailMeACode();
+      expect(authApi.sendCode).toHaveBeenCalledTimes(1);
+      expect(c.step.value).toBe("code");
+      expect(c.resendIn.value).toBe(50);
+
+      // Another address has its own wait on the server, so it is asked.
+      c.usePassword();
+      c.email.value = "other@example.com";
+      await c.emailMeACode();
+      expect(authApi.sendCode).toHaveBeenLastCalledWith("other@example.com");
+      expect(c.resendIn.value).toBe(60);
+    });
+
+    it("shows the wait, not an error, when a new code is refused for now", async () => {
+      vi.mocked(authApi.sendCode).mockResolvedValueOnce({ retryAfter: 0 });
+      const c = await mount();
+      await c.emailMeACode();
+      vi.mocked(authApi.sendCode).mockRejectedValue(
+        apiError(429, "RATE_LIMITED", "Too many.", 42),
+      );
+      await c.resend();
+      expect(c.resendIn.value).toBe(42);
+      expect(c.codeError.value).toBeNull();
+      expect(c.step.value).toBe("code");
+    });
+
+    it("counts down on the password form when the first code is refused", async () => {
+      vi.mocked(authApi.sendCode).mockRejectedValue(
+        apiError(429, "RATE_LIMITED", "Too many.", 42),
+      );
+      const c = await mount();
+      vi.useFakeTimers();
+      await c.emailMeACode();
+      expect(c.step.value).toBe("password");
+      expect(c.problem.value?.tone).toBe("warn");
+      expect(c.problem.value?.message).toBe(
+        "Too many attempts. Try again in 42 seconds.",
+      );
+      vi.advanceTimersByTime(42_000);
+      expect(c.problem.value).toBeNull();
     });
 
     it("wants all six digits", async () => {
