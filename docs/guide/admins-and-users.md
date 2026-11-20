@@ -33,7 +33,7 @@ curl -X POST https://auth.example.com/api/v1/admin/admins \
   -d '{"email":"ana@example.com","displayName":"Ana"}'
 ```
 
-No email is sent. Leave out `password` for an admin who signs in with emailed codes. Every admin can read the list of admins; only root adds, changes, disables, or removes them. Nobody changes root through the API: that answers `403 ROOT_PROTECTED`. Root changes its own profile, password, and email on the console's Account page.
+No email is sent. Leave out `password` for an admin who signs in with emailed codes. Every admin can read the list of admins; only root adds, changes, disables, or removes them. Nobody changes root through the API: that answers `403 ROOT_PROTECTED`. Root changes its own profile, password, and email on the console's Account page. If root or an admin loses their password and email can't reach them, run [`dopgate admin reset-password`](/cli/commands#admin-reset-password) on the server.
 
 Console tokens only work on Dopgate's own endpoints. They are signed with a secret that isn't in the JWKS, so a backend that verifies tokens against the key set can't accept an admin's token, even by mistake.
 
