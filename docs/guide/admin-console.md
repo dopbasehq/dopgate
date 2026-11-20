@@ -45,4 +45,4 @@ Set `DOPGATE_WEB_UI=false`, or start with `dopgate serve --web-ui false`. The AP
 
 ## Running the console from source
 
-During development the console runs on Vite at `http://localhost:5174` and proxies `/api` and `/.well-known` to the API on port 8850. See the repository README for `bun run dev`.
+During development the console runs on Vite at `http://localhost:9000` and proxies `/api` and `/.well-known` to the API on port 8850. See the repository README for `bun run dev`.

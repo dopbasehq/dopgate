@@ -42,8 +42,8 @@ const children: Child[] = [
 console.log("dopgate development servers starting:");
 console.log("  API:      http://localhost:8850/api/v1");
 console.log("  API docs: http://localhost:8850/api/docs");
-console.log("  Console:  http://localhost:5174");
-console.log("  Docs:     http://localhost:5173");
+console.log("  Console:  http://localhost:9000");
+console.log("  Docs:     http://localhost:9001");
 console.log(
   "  Database: " +
     process.env.DOPGATE_DATABASE_URL +
