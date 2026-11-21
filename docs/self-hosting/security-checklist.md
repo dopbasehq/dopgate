@@ -52,7 +52,7 @@ Personal tokens and agents for your users are off by default (`selfService.perso
 
 ## Optional extras
 
-- Turn off the Swagger UI with `DOPGATE_DOCS=false` if you don't want the API description public.
+- Leave `DOPGATE_DOCS` unset if you don't want the API description public. The Swagger UI is off by default.
 - Turn off the console with `DOPGATE_WEB_UI=false` if nobody uses it, and manage users through the admin API.
 - Shorten `tokens.accessTokenMinutes` if the [offline verification gap](/guide/tokens-and-sessions#the-offline-verification-gap) matters for your app.
 - Keep server logs outside the database, so the audit checkpoints they hold can later prove the audit log wasn't rewritten.

@@ -21,7 +21,7 @@ dopgate serve [--database-url URL] [--config PATH] [--port PORT] [--host IP]
 | `--port` | `DOPGATE_PORT`, or `8850` | Port to listen on |
 | `--host` | `DOPGATE_HOST`, or `127.0.0.1` | Interface to listen on, such as `0.0.0.0` |
 | `--public-url` | `DOPGATE_PUBLIC_URL` | The URL apps and users reach Dopgate on, and the token issuer |
-| `--docs` | `true` | Serve Swagger UI at `/api/docs` and the OpenAPI document at `/api/v1/openapi.json` |
+| `--docs` | `false` | Serve Swagger UI at `/api/docs` and the OpenAPI document at `/api/v1/openapi.json` |
 | `--web-ui` | `true` | Serve the admin console at `/` |
 
 On startup `serve` connects to PostgreSQL, runs migrations, applies audit retention, makes sure a signing key exists, and prints a banner with the version, the public URL, the bind address, the API and JWKS URLs, the database without its password, the schema, and the console and API docs URLs. Then it handles the root account:

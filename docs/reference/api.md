@@ -5,7 +5,7 @@ description: "Every Dopgate endpoint grouped by area, with the authentication it
 
 # REST API
 
-Every endpoint lives under `/api/v1`, except the key set at `/.well-known/jwks.json`. Request and response bodies are JSON with camelCase fields. The running server serves the same API as Swagger UI at `/api/docs` and as OpenAPI at `/api/v1/openapi.json`.
+Every endpoint lives under `/api/v1`, except the key set at `/.well-known/jwks.json`. Request and response bodies are JSON with camelCase fields. With `DOPGATE_DOCS=true`, the running server serves the same API as Swagger UI at `/api/docs` and as OpenAPI at `/api/v1/openapi.json`.
 
 ## Conventions
 

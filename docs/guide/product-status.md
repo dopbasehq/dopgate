@@ -30,7 +30,7 @@ This page lists what works in Dopgate {{version}}. Planned endpoints are already
 | Rate limits and account lockout | Built into the endpoints above |
 | Service key for your backend | `DOPGATE_SERVICE_KEY` |
 | Admin console | `/` |
-| API description | `/api/docs`, `/api/v1/openapi.json` |
+| API description | `/api/docs`, `/api/v1/openapi.json`, when `DOPGATE_DOCS=true` |
 | Docker image and Compose file | `Dockerfile`, `docker-compose.yml`, `dopgate healthcheck` |
 
 ## Planned

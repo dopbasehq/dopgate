@@ -29,7 +29,7 @@ docker compose up -d
 docker compose logs dopgate
 ```
 
-The log shows the root password, once. Open http://localhost:8850, sign in with your root email and that password, and change the password on the Account page. The API is at http://localhost:8850/api/v1 and its Swagger UI at http://localhost:8850/api/docs.
+The log shows the root password, once. Open http://localhost:8850, sign in with your root email and that password, and change the password on the Account page. The API is at http://localhost:8850/api/v1. Set `DOPGATE_DOCS=true` in `.env` to browse it in Swagger UI at http://localhost:8850/api/docs.
 
 Without SMTP settings, Dopgate writes every email, codes included, to its log. The [quick start guide](docs/guide/quick-start.md) goes further, and [running with your app's stack](docs/self-hosting/with-your-app.md) shows how to add Dopgate to your own Compose file.
 
@@ -51,7 +51,7 @@ bun run dev      # API, console, and docs together; Ctrl-C stops all three
 | Admin console (Vite) | http://localhost:9000 |
 | Docs (VitePress) | http://localhost:9001 |
 
-`bun run dev` points the API at the `dev:db` database, allows the console's origin, and sets `DOPGATE_ROOT_EMAIL=admin@example.com`, so the first start prints a root password in the terminal. Emails go to the same terminal.
+`bun run dev` points the API at the `dev:db` database, allows the console's origin, turns on the Swagger UI, and sets `DOPGATE_ROOT_EMAIL=admin@example.com`, so the first start prints a root password in the terminal. Emails go to the same terminal.
 
 To run the tests, start their database first. It is a separate container, `dopgate-test-pg`, on port 55432:
 

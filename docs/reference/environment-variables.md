@@ -22,7 +22,7 @@ Dopgate reads these at startup. Environment variables win over the [config file]
 | `DOPGATE_ALLOWED_ORIGINS` | `allowed_origins` | none | Comma-separated browser origins allowed to call the API, such as `https://app.example.com` |
 | `DOPGATE_AUDIT_RETENTION_DAYS` | `audit_retention_days` | `365` | Days audit records are kept. `0` keeps them forever. |
 | `DOPGATE_LEAKED_PASSWORDS_URL` | none | `https://api.pwnedpasswords.com` | Where new passwords are checked against [leaked passwords](/reference/security#leaked-passwords). Set it to a mirror of the Pwned Passwords range API, as an `http://` or `https://` URL. |
-| `DOPGATE_DOCS` | `docs` | `true` | Serve Swagger UI at `/api/docs` and OpenAPI at `/api/v1/openapi.json` |
+| `DOPGATE_DOCS` | `docs` | `false` | Serve Swagger UI at `/api/docs` and OpenAPI at `/api/v1/openapi.json` |
 | `DOPGATE_WEB_UI` | `web_ui` | `true` | Serve the admin console at `/` |
 | `DOPGATE_CONFIG` | none | none | Path to an optional TOML config file. `--config` wins over it. |
 | `RUST_LOG` | none | `app=info,tower_http=info` (`app=info,tower_http=warn` in the image) | Log levels, in `tracing` filter syntax |

@@ -15,4 +15,4 @@ description: "Reference material for the Dopgate API, token claims, errors, emai
 - [Benchmarks](/reference/benchmarks): measured requests per second, latency, and memory, and how to repeat the run.
 - [Glossary](/reference/glossary): the terms these docs use.
 
-The running server also describes its own API in Swagger UI at `/api/docs` and as OpenAPI at `/api/v1/openapi.json`, built from the same code as the binary you run.
+With `DOPGATE_DOCS=true`, the running server also describes its own API in Swagger UI at `/api/docs` and as OpenAPI at `/api/v1/openapi.json`, built from the same code as the binary you run.
