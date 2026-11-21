@@ -1,0 +1,67 @@
+name: Docker Hub page
+
+# Sends scripts/release/docker-hub-overview.md and the short description below
+# to the Docker Hub page of DOCKER_IMAGE. It runs when either changes on main,
+# and by hand from the Actions tab.
+#
+# Docker Hub only lets a token with read, write and delete access edit a
+# repository's page, which is more than the release workflow needs to push an
+# image. So this workflow has its own secret, DOCKERHUB_PAGE_TOKEN, and the
+# account in DOCKERHUB_USERNAME must be an admin of the repository.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/release/docker-hub-overview.md
+      - .github/workflows/docker-hub.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-hub-page
+  cancel-in-progress: false
+
+env:
+  DOCKER_IMAGE: dopbase/dopgate
+  OVERVIEW: scripts/release/docker-hub-overview.md
+  # Shown in Docker Hub search results and as the page's meta description.
+  SHORT_DESCRIPTION: "Modern auth for people and AI agents. Agents get their own account, owner and signed permissions."
+
+jobs:
+  page:
+    name: Update the Docker Hub page
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Docker Hub cuts off anything longer, so stop here instead.
+      - name: Check the length limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_bytes=$(printf '%s' "$SHORT_DESCRIPTION" | wc -c)
+          if (( short_bytes > 100 )); then
+            echo "The short description is $short_bytes bytes; Docker Hub allows 100" >&2
+            exit 1
+          fi
+          overview_bytes=$(wc -c < "$OVERVIEW")
+          if (( overview_bytes > 25000 )); then
+            echo "$OVERVIEW is $overview_bytes bytes; Docker Hub allows 25000" >&2
+            exit 1
+          fi
+
+      - name: Update the overview and short description
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PAGE_TOKEN }}
+          repository: ${{ env.DOCKER_IMAGE }}
+          short-description: ${{ env.SHORT_DESCRIPTION }}
+          readme-filepath: ${{ env.OVERVIEW }}
