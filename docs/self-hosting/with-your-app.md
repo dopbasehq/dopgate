@@ -9,7 +9,7 @@ The usual way to run Dopgate is as one more service in your app's Compose file, 
 
 ## Add the service
 
-Copy the `dopgate` service from the repository's `docker-compose.yml` into your app's Compose file. A typical result:
+Add a `dopgate` service that runs the [published image](/self-hosting/docker#pull-it) to your app's Compose file. A typical result:
 
 ```yaml
 services:
@@ -35,7 +35,7 @@ services:
       DOPGATE_SERVICE_KEY: ${DOPGATE_SERVICE_KEY}
 
   dopgate:
-    image: dopgate:latest
+    image: dopbase/dopgate:{{version}}
     restart: unless-stopped
     depends_on:
       postgres:

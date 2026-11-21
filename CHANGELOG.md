@@ -13,6 +13,11 @@ All notable changes to Dopgate are documented in this file. The format follows
   password once, or reads one with `--password-stdin`. It clears the
   lockout, ends the account's console sessions, and voids codes already
   emailed to it. It sends no email, so it works without SMTP.
+- An overview for the `dopbase/dopgate` page on Docker Hub, kept in
+  `scripts/release/docker-hub-overview.md`. The `Docker Hub page` workflow
+  sends it and the short description to Docker Hub when it changes on main.
+  It needs a `DOCKERHUB_PAGE_TOKEN` secret with read, write and delete
+  access.
 
 ### Changed
 
@@ -22,6 +27,9 @@ All notable changes to Dopgate are documented in this file. The format follows
   `smtp://user:password@smtp.example.com:587`, replaces `DOPGATE_SMTP_HOST`,
   `PORT`, `SECURITY`, `USERNAME` and `PASSWORD`. `[smtp]` in the config file
   takes `url` the same way. The old variables are ignored.
+- The README and the docs show how to pull `dopbase/dopgate` from Docker
+  Hub, and their `docker run` and Compose examples use that image, so they
+  work without a build.
 
 ## 0.1.0 - 2026-11-20
 

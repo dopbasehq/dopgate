@@ -1,21 +1,31 @@
 ---
 title: "Docker image"
-description: "Build the Dopgate image, run it against PostgreSQL, and use it for one-off commands such as `dopgate init` and `dopgate keys rotate`."
+description: "Pull the Dopgate image from Docker Hub or build it yourself, run it against PostgreSQL, and use it for one-off commands such as `dopgate init` and `dopgate keys rotate`."
 ---
 
 # Docker image
 
-The repository's `Dockerfile` builds one image that holds the `dopgate` binary with the admin console built in. It needs nothing at runtime except a PostgreSQL URL.
+The Dopgate image holds the `dopgate` binary with the admin console built in. It needs nothing at runtime except a PostgreSQL URL. Every release is on Docker Hub as [`dopbase/dopgate`](https://hub.docker.com/r/dopbase/dopgate), and the repository's `Dockerfile` builds one from source.
+
+## Pull it
+
+```bash
+docker pull dopbase/dopgate:{{version}}
+```
+
+Each release has three tags: its version (`{{version}}`), its minor line (such as `0.1`), which moves to the newest patch, and `latest`, which follows the highest version. Pin the version or the minor line for anything you keep running. The image is built for `linux/amd64` and `linux/arm64`.
+
+The published image holds the same static binary as the Linux archive of the GitHub release, on a distroless base with CA certificates, no shell, and a non-root user. It is about 8 MB to pull.
 
 ## Build it
 
-From the repository root:
+To run a change of your own, or a commit that has no release yet, build the image from the repository root:
 
 ```bash
 docker build -t dopgate .
 ```
 
-`bun run docker:build` does the same. The build has three stages: Bun builds the console into `ui/dist`, Rust builds the binary with the console embedded, and the result is copied into a small distroless image with glibc and CA certificates, no shell, and a non-root user.
+`bun run docker:build` does the same, and both name the image `dopgate`. Use that name in place of `dopbase/dopgate` in the commands below. The build has three stages: Bun builds the console into `ui/dist`, Rust builds the binary with the console embedded, and the result is copied into a small distroless image with glibc and CA certificates, no shell, and a non-root user.
 
 ## What the image sets
 
@@ -39,7 +49,7 @@ docker run -d --name dopgate -p 8850:8850 \
   -e DOPGATE_DATABASE_URL=postgres://dopgate:secret@db.internal:5432/app \
   -e DOPGATE_PUBLIC_URL=https://auth.example.com \
   -e DOPGATE_ROOT_EMAIL=admin@example.com \
-  dopgate
+  dopbase/dopgate
 ```
 
 Always set `DOPGATE_PUBLIC_URL`. Because the image listens on `0.0.0.0`, Dopgate can't guess the address people reach it on, and without the variable it uses `http://SERVER_HOST:8850` and prints a warning. That value becomes the `iss` claim of every access token, so your backend's issuer check would fail.
@@ -52,10 +62,10 @@ The entrypoint is the `dopgate` binary, so anything after the image name is a Do
 
 ```bash
 # Create root interactively instead of using DOPGATE_ROOT_EMAIL
-docker run --rm -it -e DOPGATE_DATABASE_URL=postgres://... dopgate init
+docker run --rm -it -e DOPGATE_DATABASE_URL=postgres://... dopbase/dopgate init
 
 # Rotate the signing key
-docker run --rm -e DOPGATE_DATABASE_URL=postgres://... dopgate keys rotate
+docker run --rm -e DOPGATE_DATABASE_URL=postgres://... dopbase/dopgate keys rotate
 ```
 
 In a Compose stack, use `docker compose run --rm dopgate init` or `docker compose exec dopgate dopgate keys rotate`. The running server picks up a key rotated from the CLI within a minute; see [the command reference](/cli/commands#keys-rotate).
