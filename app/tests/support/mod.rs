@@ -326,7 +326,7 @@ pub const ROOT_EMAIL: &str = "root@example.com";
 pub const PASSWORD: &str = "correct horse battery";
 
 /// The configuration of an instance in `schema`, ignoring the process
-/// environment.
+/// environment. The API docs are on, because tests read the OpenAPI document.
 pub fn config_for(schema: &str) -> ServerConfig {
   let overrides = ServerOverrides {
     database_url: Some(database_url()),
@@ -335,6 +335,7 @@ pub fn config_for(schema: &str) -> ServerConfig {
   let environment = EnvironmentOverrides {
     database_schema: Some(schema.into()),
     database_max_connections: Some("3".into()),
+    docs: Some("true".into()),
     ..Default::default()
   };
   ServerConfig::load_with_environment(&overrides, environment).unwrap()

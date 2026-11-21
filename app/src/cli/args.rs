@@ -58,7 +58,7 @@ pub struct ServeArgs {
   /// The URL apps and users reach this server on.
   #[arg(long, value_name = "URL")]
   pub public_url: Option<String>,
-  /// Serve Swagger UI at /api/docs.
+  /// Serve Swagger UI at /api/docs. Off by default.
   #[arg(long, value_name = "BOOL")]
   pub docs: Option<bool>,
   /// Serve the admin console at /.

@@ -3,6 +3,8 @@ process.env.DOPGATE_DATABASE_URL ??=
   "postgres://postgres@localhost:55433/postgres";
 process.env.DOPGATE_ALLOWED_ORIGINS ??= "http://localhost:9000";
 process.env.DOPGATE_ROOT_EMAIL ??= "root@dopgate.com";
+// Off by default in the server; on here so Swagger UI is there while you work.
+process.env.DOPGATE_DOCS ??= "true";
 
 type ChildName = "dopgate API" | "Admin console" | "Docs";
 
