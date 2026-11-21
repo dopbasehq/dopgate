@@ -5,7 +5,7 @@ description: "Run PostgreSQL and Dopgate with Docker Compose, sign in to the adm
 
 # Quick start
 
-This page runs Dopgate and PostgreSQL on your machine with Docker Compose, signs you in to the admin console as root, and makes a first API call. It takes a few minutes. You need Docker with the Compose plugin and a clone of the Dopgate repository.
+This page runs Dopgate and PostgreSQL on your machine with Docker Compose, signs you in to the admin console as root, and makes a first API call. It takes a few minutes. You need Docker with the Compose plugin and a clone of the Dopgate repository. To skip the clone and the build, run the [image from Docker Hub](/self-hosting/docker#pull-it) instead.
 
 ## 1. Fill in the environment file
 

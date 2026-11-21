@@ -51,7 +51,7 @@ The password comes from `DOPGATE_ROOT_PASSWORD` when it is set, then standard in
 printf '%s' "$ROOT_PASSWORD" | dopgate init --email admin@example.com --password-stdin
 ```
 
-`init` runs migrations first, so it works on an empty database. It fails if the instance already has a root account. In Docker, add `-it` for the prompts: `docker run --rm -it -e DOPGATE_DATABASE_URL=... dopgate init`.
+`init` runs migrations first, so it works on an empty database. It fails if the instance already has a root account. In Docker, add `-it` for the prompts: `docker run --rm -it -e DOPGATE_DATABASE_URL=... dopbase/dopgate init`.
 
 ## admin reset-password
 

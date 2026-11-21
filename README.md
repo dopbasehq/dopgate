@@ -31,6 +31,8 @@ docker compose logs dopgate
 
 The log shows the root password, once. Open http://localhost:8850, sign in with your root email and that password, and change the password on the Account page. The API is at http://localhost:8850/api/v1. Set `DOPGATE_DOCS=true` in `.env` to browse it in Swagger UI at http://localhost:8850/api/docs.
 
+Compose builds the image from this checkout. To skip the build, pull a release from Docker Hub as [`dopbase/dopgate`](https://hub.docker.com/r/dopbase/dopgate); the [Docker image page](docs/self-hosting/docker.md) has the tags and a `docker run` example.
+
 Without SMTP settings, Dopgate writes every email, codes included, to its log. The [quick start guide](docs/guide/quick-start.md) goes further, and [running with your app's stack](docs/self-hosting/with-your-app.md) shows how to add Dopgate to your own Compose file.
 
 ## Local development

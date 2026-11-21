@@ -11,7 +11,7 @@ Dopgate upgrades by replacing the binary or image and restarting. Migrations are
 
 1. Read the changelog for the new version.
 2. [Back up](/self-hosting/backups) the `dopgate` schema.
-3. Build or pull the new image. From a checkout of the new version: `docker build -t dopgate .`
+3. Get the new image. Change the tag of `dopbase/dopgate` in your Compose file and run `docker compose pull dopgate`. If you build your own, run `docker build -t dopgate .` from a checkout of the new version.
 4. Restart the service: `docker compose up -d dopgate`.
 5. Check `docker compose logs dopgate` and `GET /api/v1/health`.
 

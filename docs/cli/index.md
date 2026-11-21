@@ -5,7 +5,7 @@ description: "The Dopgate command: its five commands, the global --json flag, ex
 
 # CLI overview
 
-The `dopgate` binary is the server and its command line. In the Docker image it is the entrypoint, so `docker run dopgate <command>` runs a command.
+The `dopgate` binary is the server and its command line. In the Docker image it is the entrypoint, so `docker run dopbase/dopgate <command>` runs a command.
 
 ```text
 dopgate [--json] <command>
