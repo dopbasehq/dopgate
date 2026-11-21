@@ -297,7 +297,7 @@ pub fn setup_token_message(
   };
   format!(
     "\nNo root account yet. Set DOPGATE_ROOT_EMAIL, run `dopgate init`, or use this one-time setup token:\n\n{token}\n\n{console}\
-     curl -X POST {base}{} \\\n  -H 'content-type: application/json' \\\n  -d '{{\"setupToken\":\"{token}\",\"email\":\"you@example.com\",\"password\":\"...\"}}'\n",
+     curl -X POST {base}{} \\\n  -H 'content-type: application/json' \\\n  -d '{{\"setupToken\":\"{token}\",\"email\":\"you@dopgate.com\",\"password\":\"...\"}}'\n",
     api::bootstrap::ROOT
   )
 }

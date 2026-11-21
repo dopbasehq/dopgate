@@ -317,7 +317,7 @@ function smtpBody(
 /**
  * Settings page controller. Each section saves on its own with the whole
  * sub-object, as the API wants. SMTP can be edited only while the server's
- * DOPGATE_SMTP_* variables set no host; when they do, they win and the
+ * DOPGATE_SMTP_URL is unset; when it's set, the server's values win and the
  * section is read-only.
  */
 export function useSettingsController() {

@@ -1,7 +1,7 @@
 import { PASSWORD, about, expect, step, test, useServer } from "../harness/index.ts";
 import { eventsOf } from "./admin.support.ts";
 
-// DOPGATE_SMTP_* names a fake SMTP server, which locks SMTP to it.
+// DOPGATE_SMTP_URL names a fake SMTP server, which locks SMTP to it.
 const app = useServer({ smtp: "env" });
 
 test(
@@ -9,7 +9,7 @@ test(
   {
     tag: ["@settings", "@security"],
     annotation: about(
-      "When DOPGATE_SMTP_HOST is set, GET /admin/settings reports source server_config with the host from the environment, and PATCHing the smtp section answers SETTINGS_INVALID. Other sections still save.",
+      "When DOPGATE_SMTP_URL is set, GET /admin/settings reports source server_config with the host, port and security from the URL, and PATCHing the smtp section answers SETTINGS_INVALID. Other sections still save.",
     ),
   },
   async () => {

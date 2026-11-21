@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod healthcheck;
 pub mod init;
 pub mod keys;

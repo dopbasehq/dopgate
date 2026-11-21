@@ -115,3 +115,21 @@ pub async fn consume(
   .await
   .map(|_| ())
 }
+
+/// Use up every pending code of an account, so a code sent before a reset
+/// can't undo it.
+pub async fn consume_all(
+  connection: &mut PgConnection,
+  realm: Realm,
+  account_id: &str,
+) -> Result<u64, sqlx::Error> {
+  sqlx::query(&format!(
+    "UPDATE {} SET consumed_at = now() WHERE {} = $1 AND consumed_at IS NULL",
+    realm.codes(),
+    realm.owner_column()
+  ))
+  .bind(account_id)
+  .execute(connection)
+  .await
+  .map(|result| result.rows_affected())
+}

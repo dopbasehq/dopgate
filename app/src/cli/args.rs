@@ -26,6 +26,9 @@ pub enum Command {
   /// Manage the keys that sign access tokens.
   #[command(subcommand)]
   Keys(KeysCommand),
+  /// Server administration, run on the machine that hosts the instance.
+  #[command(subcommand)]
+  Admin(AdminCommand),
   /// Check that a server on this machine answers. For container health
   /// checks: exits 0 when healthy, 1 otherwise.
   Healthcheck(HealthcheckArgs),
@@ -81,6 +84,34 @@ pub enum KeysCommand {
   /// Start signing with a new key. The old one stays in the JWKS until its
   /// tokens expire.
   Rotate(InstanceArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AdminCommand {
+  /// Set a new password for root or an admin.
+  ///
+  /// Writes to the instance's database directly, with the server running or
+  /// stopped. Prints a generated password once, or reads one from standard
+  /// input with --password-stdin. Every console session of the account ends.
+  #[command(after_help = RESET_PASSWORD_HELP)]
+  ResetPassword(ResetPasswordArgs),
+}
+
+const RESET_PASSWORD_HELP: &str = "\
+Examples:
+  dopgate admin reset-password root@example.com
+  printf '%s' \"$NEW_PASSWORD\" | dopgate admin reset-password ops@example.com --password-stdin
+";
+
+#[derive(Debug, Args)]
+pub struct ResetPasswordArgs {
+  /// Email of the root or admin account to reset.
+  pub email: String,
+  #[command(flatten)]
+  pub instance: InstanceArgs,
+  /// Read the new password from standard input instead of generating one.
+  #[arg(long)]
+  pub password_stdin: bool,
 }
 
 #[derive(Debug, Args)]

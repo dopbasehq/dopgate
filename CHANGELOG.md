@@ -6,6 +6,21 @@ All notable changes to Dopgate are documented in this file. The format follows
 
 ## Unreleased
 
+### Added
+
+- `dopgate admin reset-password EMAIL` sets a new password for root or an
+  admin who lost theirs, the same command Dopbase has. It prints a generated
+  password once, or reads one with `--password-stdin`. It clears the
+  lockout, ends the account's console sessions, and voids codes already
+  emailed to it. It sends no email, so it works without SMTP.
+
+### Changed
+
+- **Breaking:** `DOPGATE_SMTP_URL`, such as
+  `smtp://user:password@smtp.example.com:587`, replaces `DOPGATE_SMTP_HOST`,
+  `PORT`, `SECURITY`, `USERNAME` and `PASSWORD`. `[smtp]` in the config file
+  takes `url` the same way. The old variables are ignored.
+
 ## 0.1.0 - 2026-11-20
 
 The first release: an auth server for one app that signs in people and AI

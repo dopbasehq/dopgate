@@ -194,7 +194,7 @@ function submitEmail(): void {
               label="New email"
               type="email"
               autocomplete="email"
-              placeholder="you@example.com"
+              placeholder="you@dopgate.com"
               :error="emailFieldError" />
             <DgInput
               v-if="needsEmailPassword"

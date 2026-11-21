@@ -1,6 +1,6 @@
 ---
 title: "Commands"
-description: "Reference for the dopgate serve, init, keys rotate, and healthcheck commands, with every option."
+description: "Reference for the dopgate serve, init, admin reset-password, keys rotate, and healthcheck commands, with every option."
 ---
 
 # Commands
@@ -52,6 +52,32 @@ printf '%s' "$ROOT_PASSWORD" | dopgate init --email admin@example.com --password
 ```
 
 `init` runs migrations first, so it works on an empty database. It fails if the instance already has a root account. In Docker, add `-it` for the prompts: `docker run --rm -it -e DOPGATE_DATABASE_URL=... dopgate init`.
+
+## admin reset-password
+
+Set a new password for root or an admin who lost theirs. Run it on the machine that hosts the instance, with the server running or stopped.
+
+```bash
+dopgate admin reset-password EMAIL [--database-url URL] [--config PATH] [--password-stdin]
+```
+
+| Option | Meaning |
+| --- | --- |
+| `EMAIL` | The root or admin account to reset. |
+| `--password-stdin` | Read the new password from standard input instead of generating one. |
+
+By default it generates a password of 24 characters in groups of four and prints it once. Sign in with it, then pick your own on the console's Account page. `DOPGATE_ROOT_PASSWORD` is ignored here, since it often stays set from the first start and would put the old password back.
+
+```bash
+dopgate admin reset-password root@example.com
+printf '%s' "$NEW_PASSWORD" | dopgate admin reset-password ops@example.com --password-stdin
+```
+
+Before it changes anything, it prints the instance it acts on (the database without its password, and the schema) to standard error. The reset clears a lockout from failed sign-ins, ends every console session of the account, and voids any code already emailed to it, so a password reset started earlier can't undo it. A disabled admin stays disabled. It sends no email, so it works without SMTP. The audit log records `admin.password_reset` with the actor `system` and the label `cli`.
+
+It only resets root and admins. Your app's users reset their own password by email, or an admin sends them a code.
+
+There is no check beyond reaching the database: anyone who can run it with the instance's `DOPGATE_DATABASE_URL` can take over any admin, root included. In Docker, run it in the server's container, where the URL is already set: `docker exec <container> dopgate admin reset-password root@example.com`. Dopbase has the same command, `dopbase admin reset-password`.
 
 ## keys rotate
 

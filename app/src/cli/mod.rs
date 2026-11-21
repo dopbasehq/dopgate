@@ -4,7 +4,10 @@ mod args;
 pub mod commands;
 pub mod output;
 
-pub use args::{Cli, Command, HealthcheckArgs, InitArgs, InstanceArgs, KeysCommand, ServeArgs};
+pub use args::{
+  AdminCommand, Cli, Command, HealthcheckArgs, InitArgs, InstanceArgs, KeysCommand,
+  ResetPasswordArgs, ServeArgs,
+};
 
 use anyhow::Result;
 use clap::Parser;
@@ -37,6 +40,7 @@ pub async fn execute(cli: Cli) -> Result<i32> {
     Command::Serve(args) => commands::serve::run(args).await,
     Command::Init(args) => commands::init::run(args, json).await,
     Command::Keys(command) => commands::keys::run(command, json).await,
+    Command::Admin(command) => commands::admin::run(command, json).await,
     Command::Healthcheck(args) => commands::healthcheck::run(args).await,
   }
 }

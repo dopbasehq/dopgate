@@ -54,11 +54,7 @@ fn read_password(from_stdin: bool) -> Result<String> {
     return Ok(password);
   }
   if from_stdin {
-    let mut password = String::new();
-    std::io::stdin()
-      .read_to_string(&mut password)
-      .context("failed to read the password from standard input")?;
-    return Ok(password.trim_end_matches(['\r', '\n']).to_owned());
+    return password_from_stdin();
   }
   ask(
     "the root password",
@@ -69,6 +65,17 @@ fn read_password(from_stdin: bool) -> Result<String> {
         .prompt()
     },
   )
+}
+
+/// The password piped to standard input, without its trailing newline.
+pub(super) fn password_from_stdin() -> Result<String> {
+  let mut password = String::new();
+  std::io::stdin()
+    .read_to_string(&mut password)
+    .context("failed to read the password from standard input")?;
+  let length = password.trim_end_matches(['\r', '\n']).len();
+  password.truncate(length);
+  Ok(password)
 }
 
 /// Prompts on the terminal, or fails at once when standard input isn't one.

@@ -61,13 +61,15 @@ test(
       });
       expect(failures).toEqual([]);
     });
-    await step("The tree has the four commands people use", async () => {
+    await step("The tree has the five commands people use", async () => {
       expect(visited).toEqual([
         "(root)",
         "serve",
         "init",
         "keys",
         "keys rotate",
+        "admin",
+        "admin reset-password",
         "healthcheck",
       ]);
     });

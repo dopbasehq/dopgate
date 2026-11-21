@@ -163,3 +163,16 @@ pub async fn list(pool: &PgPool) -> Result<Vec<AdminRow>, sqlx::Error> {
   .fetch_all(pool)
   .await
 }
+
+/// The admin with this email, locked until the transaction ends.
+pub async fn find_by_email_for_update(
+  connection: &mut PgConnection,
+  email: &str,
+) -> Result<Option<AdminRow>, sqlx::Error> {
+  sqlx::query_as(&format!(
+    "SELECT {COLUMNS} FROM admins WHERE email = $1 FOR UPDATE"
+  ))
+  .bind(email)
+  .fetch_optional(connection)
+  .await
+}

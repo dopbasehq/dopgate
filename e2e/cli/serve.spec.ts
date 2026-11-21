@@ -571,10 +571,11 @@ const refusals: { name: string; env: Record<string, string>; args?: string[]; me
   { name: "an allowed origin with a path", env: { DOPGATE_ALLOWED_ORIGINS: "https://app.example.com/path" }, message: "must be an origin like https://app.example.com" },
   { name: "a trusted proxy that isn't an address", env: { DOPGATE_TRUSTED_PROXIES: "not-an-ip" }, message: "invalid DOPGATE_TRUSTED_PROXIES" },
   { name: "an audit retention that isn't a number", env: { DOPGATE_AUDIT_RETENTION_DAYS: "forever" }, message: "invalid DOPGATE_AUDIT_RETENTION_DAYS" },
-  { name: "an SMTP host with a scheme", env: { DOPGATE_SMTP_HOST: "smtp://mail.example.com" }, message: "smtp host must be a host name or IP address, without a scheme or port" },
-  { name: "an empty SMTP port", env: { DOPGATE_SMTP_HOST: "mail.example.com", DOPGATE_SMTP_PORT: "" }, message: "invalid DOPGATE_SMTP_PORT" },
-  { name: "an SMTP security mode that doesn't exist", env: { DOPGATE_SMTP_HOST: "mail.example.com", DOPGATE_SMTP_SECURITY: "ssl" }, message: "invalid DOPGATE_SMTP_SECURITY" },
-  { name: "an SMTP sender that isn't an address", env: { DOPGATE_SMTP_HOST: "mail.example.com", DOPGATE_SMTP_FROM_EMAIL: "nope" }, message: 'smtp from_email "nope" is not a valid address' },
+  { name: "an SMTP URL without a scheme", env: { DOPGATE_SMTP_URL: "mail.example.com:587" }, message: "invalid DOPGATE_SMTP_URL: the URL must start with smtp:// or smtps://" },
+  { name: "an SMTP URL without a host", env: { DOPGATE_SMTP_URL: "smtp://" }, message: "invalid DOPGATE_SMTP_URL" },
+  { name: "an SMTP URL with a path", env: { DOPGATE_SMTP_URL: "smtp://mail.example.com/inbox" }, message: "invalid DOPGATE_SMTP_URL: the URL takes no path" },
+  { name: "an SMTP security option that doesn't exist", env: { DOPGATE_SMTP_URL: "smtp://mail.example.com?security=ssl" }, message: "invalid DOPGATE_SMTP_URL: the only option is ?security=none" },
+  { name: "an SMTP sender that isn't an address", env: { DOPGATE_SMTP_URL: "smtp://mail.example.com", DOPGATE_SMTP_FROM_EMAIL: "nope" }, message: 'smtp from_email "nope" is not a valid address' },
 ];
 
 test(

@@ -14,8 +14,7 @@ use crate::constants::config::{
   ENV_ALLOWED_ORIGINS, ENV_AUDIT_RETENTION_DAYS, ENV_CONFIG, ENV_DATABASE_MAX_CONNECTIONS,
   ENV_DATABASE_SCHEMA, ENV_DATABASE_URL, ENV_DOCS, ENV_HOST, ENV_LEAKED_PASSWORDS_URL, ENV_PORT,
   ENV_PUBLIC_URL, ENV_ROOT_EMAIL, ENV_SERVICE_KEY, ENV_SHUTDOWN_GRACE_SECONDS, ENV_SMTP_FROM_EMAIL,
-  ENV_SMTP_FROM_NAME, ENV_SMTP_HOST, ENV_SMTP_PASSWORD, ENV_SMTP_PORT, ENV_SMTP_SECURITY,
-  ENV_SMTP_USERNAME, ENV_TRUSTED_PROXIES, ENV_WEB_UI, SERVER_HOST_PLACEHOLDER,
+  ENV_SMTP_FROM_NAME, ENV_SMTP_URL, ENV_TRUSTED_PROXIES, ENV_WEB_UI, SERVER_HOST_PLACEHOLDER,
   SERVICE_KEY_MIN_LENGTH,
 };
 pub use crate::constants::config::{DEFAULT_BIND_ADDRESS, DEFAULT_PUBLIC_URL};
@@ -69,8 +68,8 @@ pub struct ServerConfig {
   pub docs_enabled: bool,
   #[serde(skip)]
   pub web_ui_enabled: bool,
-  /// SMTP from the config file or `DOPGATE_SMTP_*`. When it sets a host it
-  /// wins over the dashboard. Without one, the SMTP settings saved in the
+  /// SMTP from the config file or `DOPGATE_SMTP_URL`. When it names a server
+  /// it wins over the dashboard. Without one, the SMTP settings saved in the
   /// dashboard apply, and with neither, mail is written to the server log.
   #[serde(skip)]
   pub smtp: SmtpServerConfig,
@@ -125,7 +124,8 @@ pub fn redact_database_url(url: &str) -> String {
   }
 }
 
-/// The SMTP settings from the config file or the environment. No host means
+/// The SMTP settings from the config file or the environment. The server
+/// fields come from one URL, `smtp://user:password@host:port`. No host means
 /// the dashboard's SMTP settings apply instead.
 #[derive(Clone, Default)]
 pub struct SmtpServerConfig {
@@ -200,11 +200,7 @@ struct ServerConfigFile {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SmtpConfigFile {
-  host: Option<String>,
-  port: Option<u16>,
-  security: Option<SmtpSecurity>,
-  username: Option<String>,
-  password: Option<String>,
+  url: Option<String>,
   from_email: Option<String>,
   from_name: Option<String>,
 }
@@ -228,11 +224,7 @@ pub struct EnvironmentOverrides {
   pub root_email: Option<String>,
   pub docs: Option<String>,
   pub web_ui: Option<String>,
-  pub smtp_host: Option<String>,
-  pub smtp_port: Option<String>,
-  pub smtp_security: Option<String>,
-  pub smtp_username: Option<String>,
-  pub smtp_password: Option<String>,
+  pub smtp_url: Option<String>,
   pub smtp_from_email: Option<String>,
   pub smtp_from_name: Option<String>,
   pub leaked_passwords_url: Option<String>,
@@ -256,11 +248,7 @@ impl EnvironmentOverrides {
       root_email: env::var(ENV_ROOT_EMAIL).ok(),
       docs: env::var(ENV_DOCS).ok(),
       web_ui: env::var(ENV_WEB_UI).ok(),
-      smtp_host: env::var(ENV_SMTP_HOST).ok(),
-      smtp_port: env::var(ENV_SMTP_PORT).ok(),
-      smtp_security: env::var(ENV_SMTP_SECURITY).ok(),
-      smtp_username: env::var(ENV_SMTP_USERNAME).ok(),
-      smtp_password: env::var(ENV_SMTP_PASSWORD).ok(),
+      smtp_url: env::var(ENV_SMTP_URL).ok(),
       smtp_from_email: env::var(ENV_SMTP_FROM_EMAIL).ok(),
       smtp_from_name: env::var(ENV_SMTP_FROM_NAME).ok(),
       leaked_passwords_url: env::var(ENV_LEAKED_PASSWORDS_URL).ok(),
@@ -409,15 +397,14 @@ impl ServerConfig {
       self.docs_enabled = value;
     }
     if let Some(smtp) = file.smtp {
-      self.smtp = SmtpServerConfig {
-        host: smtp.host,
-        port: smtp.port,
-        security: smtp.security.unwrap_or_default(),
-        username: smtp.username,
-        password: smtp.password,
-        from_email: smtp.from_email,
-        from_name: smtp.from_name,
-      };
+      if let Some(url) = smtp.url {
+        self
+          .smtp
+          .set_url(&url)
+          .context("invalid smtp url in the config file")?;
+      }
+      self.smtp.from_email = smtp.from_email;
+      self.smtp.from_name = smtp.from_name;
     }
     Ok(())
   }
@@ -474,23 +461,8 @@ impl ServerConfig {
       self.docs_enabled = value.parse().context("invalid DOPGATE_DOCS")?;
     }
     let smtp = &mut self.smtp;
-    if let Some(value) = environment.smtp_host {
-      smtp.host = Some(value);
-    }
-    if let Some(value) = environment.smtp_port {
-      smtp.port = Some(value.parse().context("invalid DOPGATE_SMTP_PORT")?);
-    }
-    if let Some(value) = environment.smtp_security {
-      smtp.security = value
-        .parse()
-        .map_err(anyhow::Error::msg)
-        .context("invalid DOPGATE_SMTP_SECURITY")?;
-    }
-    if let Some(value) = environment.smtp_username {
-      smtp.username = Some(value);
-    }
-    if let Some(value) = environment.smtp_password {
-      smtp.password = Some(value);
+    if let Some(value) = environment.smtp_url {
+      smtp.set_url(&value).context("invalid DOPGATE_SMTP_URL")?;
     }
     if let Some(value) = environment.smtp_from_email {
       smtp.from_email = Some(value);
@@ -696,6 +668,58 @@ fn parse_origins<'a>(values: impl Iterator<Item = &'a str>) -> Result<Vec<String
 }
 
 impl SmtpServerConfig {
+  /// Replace the server with the one `value` names:
+  /// `smtp://user:password@host:port`. `smtp://` upgrades the connection
+  /// with STARTTLS, `smtps://` uses TLS from the first byte, and
+  /// `smtp://...?security=none` sends unencrypted. An empty value names no
+  /// server, which is how the environment turns off the one in the file.
+  ///
+  /// The errors never repeat the URL, since it can hold the password.
+  fn set_url(
+    &mut self,
+    value: &str,
+  ) -> Result<()> {
+    *self = Self {
+      from_email: self.from_email.take(),
+      from_name: self.from_name.take(),
+      ..Self::default()
+    };
+    let value = value.trim();
+    if value.is_empty() {
+      return Ok(());
+    }
+    let url = Url::parse(value).context(
+      "write it as smtp://user:password@host:587, with any of / ? # @ : % in the username or password percent-encoded",
+    )?;
+    self.security = match (url.scheme(), url.query()) {
+      ("smtp", None) => SmtpSecurity::Starttls,
+      ("smtps", None) => SmtpSecurity::Tls,
+      ("smtp", Some("security=none")) => SmtpSecurity::None,
+      ("smtp" | "smtps", Some(_)) => {
+        bail!("the only option is ?security=none, on a URL that starts with smtp://")
+      }
+      _ => bail!("the URL must start with smtp:// or smtps://"),
+    };
+    if !matches!(url.path(), "" | "/") || url.fragment().is_some() {
+      bail!(
+        "the URL takes no path. Percent-encode a /, ? or # in the username or password, as %2F, %3F or %23"
+      );
+    }
+    self.host = match url.host() {
+      Some(Host::Domain(host)) if !host.is_empty() => Some(host.to_owned()),
+      Some(Host::Ipv4(address)) => Some(address.to_string()),
+      Some(Host::Ipv6(address)) => Some(address.to_string()),
+      _ => bail!("the URL needs a host, as in smtp://smtp.example.com"),
+    };
+    if url.port() == Some(0) {
+      bail!("the port must be between 1 and 65535");
+    }
+    self.port = url.port();
+    self.username = Some(decode_userinfo(url.username())?);
+    self.password = url.password().map(decode_userinfo).transpose()?;
+    Ok(())
+  }
+
   /// Trim the values, treat empty ones as unset, and refuse the rest of
   /// what the admin API refuses.
   fn check(&mut self) -> Result<()> {
@@ -715,15 +739,12 @@ impl SmtpServerConfig {
     if self.password.as_deref() == Some("") {
       self.password = None;
     }
-    if self.port == Some(0) {
-      bail!("smtp port must be between 1 and 65535");
-    }
     if self
       .host
       .as_deref()
       .is_some_and(|host| !mailer::valid_host(host))
     {
-      bail!("smtp host must be a host name or IP address, without a scheme or port");
+      bail!("smtp host must be a host name or IP address");
     }
     for (name, value) in [("username", &self.username), ("from_name", &self.from_name)] {
       if value
@@ -760,6 +781,15 @@ impl SmtpServerConfig {
       from_name: self.from_name.clone(),
     })
   }
+}
+
+/// The username or password of an SMTP URL, with `%40` and the like turned
+/// back into the characters they stand for.
+fn decode_userinfo(value: &str) -> Result<String> {
+  percent_encoding::percent_decode_str(value)
+    .decode_utf8()
+    .map(std::borrow::Cow::into_owned)
+    .context("the username and password must be UTF-8 after percent-decoding")
 }
 
 fn url_is_loopback(url: &Url) -> bool {

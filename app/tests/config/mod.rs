@@ -1,6 +1,9 @@
 use std::fs;
 
-use app::config::{EnvironmentOverrides, PublicUrlSource, ServerConfig, ServerOverrides};
+use app::{
+  config::{EnvironmentOverrides, PublicUrlSource, ServerConfig, ServerOverrides},
+  services::mailer::SmtpSecurity,
+};
 use tempfile::TempDir;
 
 const URL: &str = "postgres://dopgate:secret@localhost:5432/app";
@@ -61,9 +64,8 @@ fn a_database_url_is_required() {
 fn secrets_stay_out_of_debug_output() {
   let config = load(EnvironmentOverrides {
     service_key: Some("s".repeat(40)),
-    smtp_host: Some("smtp.example.com".into()),
+    smtp_url: Some("smtp://dopgate:smtp-secret@smtp.example.com".into()),
     smtp_from_email: Some("no-reply@example.com".into()),
-    smtp_password: Some("smtp-secret".into()),
     ..Default::default()
   })
   .unwrap();
@@ -260,42 +262,109 @@ fn invalid_values_are_refused() {
     database_max_connections: Some("0".into()),
     ..Default::default()
   });
-  let smtp = |host: &str, from_email: Option<&str>| EnvironmentOverrides {
-    smtp_host: Some(host.into()),
-    smtp_from_email: from_email.map(Into::into),
+  refused(EnvironmentOverrides {
+    smtp_url: Some("smtp://smtp.example.com".into()),
+    smtp_from_email: Some("not-an-address".into()),
     ..Default::default()
-  };
-  refused(smtp("smtp.example.com:587", Some("no-reply@example.com")));
-  refused(smtp("smtp.example.com", Some("not-an-address")));
-  for (port, security) in [(Some("0"), None), (Some("x"), None), (None, Some("ssl"))] {
-    let mut environment = smtp("smtp.example.com", Some("no-reply@example.com"));
-    environment.smtp_port = port.map(Into::into);
-    environment.smtp_security = security.map(Into::into);
-    refused(environment);
+  });
+  for url in [
+    // No scheme, or the wrong one.
+    "smtp.example.com:587",
+    "http://smtp.example.com",
+    // No host.
+    "smtp://",
+    "smtp://:587",
+    "smtp://smtp.example.com:0",
+    "smtp://smtp.example.com:x",
+    "smtp://smtp.example.com/inbox",
+    "smtp://smtp.example.com#inbox",
+    // The one option is security=none, and only without TLS.
+    "smtp://smtp.example.com?security=ssl",
+    "smtps://smtp.example.com?security=none",
+    // A slash in the password has to be written %2F.
+    "smtp://dopgate:pa/ss@smtp.example.com",
+  ] {
+    let error = load(smtp_url(url)).expect_err(url);
+    assert!(format!("{error:#}").contains("DOPGATE_SMTP_URL"), "{url}");
+  }
+  // A line break in the username would end up in a mail header.
+  refused(smtp_url("smtp://dopgate%0Aname@smtp.example.com"));
+  // The URL can hold the password, so the error never repeats it.
+  let error = load(smtp_url("smtp://dopgate:hunter2@smtp.example.com/inbox")).unwrap_err();
+  assert!(!format!("{error:#}").contains("hunter2"));
+}
+
+fn smtp_url(url: &str) -> EnvironmentOverrides {
+  EnvironmentOverrides {
+    smtp_url: Some(url.into()),
+    ..Default::default()
   }
 }
 
-/// A host without a sender address sends from the built-in default.
+/// The scheme picks the security mode and its usual port. The username and
+/// password are percent-decoded. Without a sender address, mail comes from
+/// the built-in default.
 #[test]
-fn an_smtp_host_without_a_sender_uses_the_default_address() {
-  let config = load(EnvironmentOverrides {
-    smtp_host: Some("smtp.example.com".into()),
-    ..Default::default()
-  })
-  .unwrap();
-  let smtp = config.smtp.mailer_config().unwrap();
-  assert_eq!(smtp.from_email, "no-reply@dopgate.com");
-  assert_eq!(smtp.port, 587);
+fn an_smtp_url_names_the_server_its_security_and_the_sign_in() {
+  let server = |url: &str| {
+    let smtp = load(smtp_url(url)).unwrap().smtp.mailer_config().unwrap();
+    assert_eq!(smtp.from_email, "no-reply@dopgate.com");
+    (
+      smtp.host,
+      smtp.port,
+      smtp.security,
+      smtp.username,
+      smtp.password.map(|password| password.to_string()),
+    )
+  };
+  let host = || "smtp.example.com".to_owned();
+  assert_eq!(
+    server("smtp://smtp.example.com"),
+    (host(), 587, SmtpSecurity::Starttls, None, None)
+  );
+  assert_eq!(
+    server("smtps://dopgate:secret@smtp.example.com/"),
+    (
+      host(),
+      465,
+      SmtpSecurity::Tls,
+      Some("dopgate".into()),
+      Some("secret".into())
+    )
+  );
+  assert_eq!(
+    server("smtp://smtp.example.com?security=none"),
+    (host(), 25, SmtpSecurity::None, None, None)
+  );
+  assert_eq!(
+    server("smtp://127.0.0.1:1025?security=none"),
+    ("127.0.0.1".into(), 1025, SmtpSecurity::None, None, None)
+  );
+  assert_eq!(
+    server("smtp://[::1]:2525"),
+    ("::1".into(), 2525, SmtpSecurity::Starttls, None, None)
+  );
+  assert_eq!(
+    server(" smtp://user%40example.com:p%40ss%3Aw%2Ford%20100%25@smtp.example.com:2525 "),
+    (
+      host(),
+      2525,
+      SmtpSecurity::Starttls,
+      Some("user@example.com".into()),
+      Some("p@ss:w/ord 100%".into())
+    )
+  );
 }
 
-/// The environment replaces single `[smtp]` fields and leaves the rest.
+/// The environment replaces the file's URL whole, and the sender address
+/// and name one by one.
 #[test]
 fn smtp_comes_from_the_file_with_environment_overrides() {
   let directory = TempDir::new().unwrap();
   let file = directory.path().join("dopgate.toml");
   fs::write(
     &file,
-    "[smtp]\nhost = \" smtp.example.com \"\nsecurity = \"tls\"\nusername = \"dopgate\"\npassword = \"from-file\"\nfrom_email = \"No-Reply@Example.com\"\n",
+    "[smtp]\nurl = \" smtps://dopgate:from-file@smtp.example.com \"\nfrom_email = \"No-Reply@Example.com\"\n",
   )
   .unwrap();
   let flags = ServerOverrides {
@@ -304,7 +373,6 @@ fn smtp_comes_from_the_file_with_environment_overrides() {
     ..Default::default()
   };
   let environment = EnvironmentOverrides {
-    smtp_password: Some("from-env".into()),
     smtp_from_name: Some("Example".into()),
     ..Default::default()
   };
@@ -313,13 +381,23 @@ fn smtp_comes_from_the_file_with_environment_overrides() {
   assert_eq!(smtp.host, "smtp.example.com");
   assert_eq!(smtp.port, 465);
   assert_eq!(smtp.username.as_deref(), Some("dopgate"));
-  assert_eq!(smtp.password.as_deref().unwrap().as_str(), "from-env");
+  assert_eq!(smtp.password.as_deref().unwrap().as_str(), "from-file");
   assert_eq!(smtp.from_email, "no-reply@example.com");
   assert_eq!(smtp.from_name.as_deref(), Some("Example"));
 
-  // An empty variable clears the file's value.
+  // A URL in the environment brings its own port, security and sign-in.
+  let config =
+    ServerConfig::load_with_environment(&flags, smtp_url("smtp://relay.example.com")).unwrap();
+  let smtp = config.smtp.mailer_config().unwrap();
+  assert_eq!(smtp.host, "relay.example.com");
+  assert_eq!(smtp.port, 587);
+  assert_eq!(smtp.username, None);
+  assert!(smtp.password.is_none());
+  assert_eq!(smtp.from_email, "no-reply@example.com");
+
+  // An empty variable clears the file's server.
   let environment = EnvironmentOverrides {
-    smtp_host: Some(String::new()),
+    smtp_url: Some(String::new()),
     ..Default::default()
   };
   let config = ServerConfig::load_with_environment(&flags, environment).unwrap();

@@ -5,11 +5,11 @@ import { seeHeading } from "./instance.support.ts";
 const app = useServer({ smtp: "env" });
 
 test(
-  "a server started with DOPGATE_SMTP_* shows the SMTP section read-only",
+  "a server started with DOPGATE_SMTP_URL shows the SMTP section read-only",
   {
     tag: ["@settings", "@console"],
     annotation: about(
-      "When the server's environment sets an SMTP host, the card says the values come from the server configuration, lists them without a form, and the test email still goes through that server.",
+      "When the server's environment sets an SMTP URL, the card says the values come from the server configuration, lists them without a form, and the test email still goes through that server.",
     ),
   },
   async ({ page }) => {

@@ -114,7 +114,7 @@ async fn smtp_from_the_environment_is_reported_without_its_password() {
     body["error"]["SETTINGS_INVALID"]
       .as_str()
       .unwrap()
-      .contains("DOPGATE_SMTP_HOST")
+      .contains("DOPGATE_SMTP_URL")
   );
 }
 
@@ -413,6 +413,6 @@ async fn testing_without_smtp_explains_what_to_set() {
     body["error"]["SMTP_NOT_CONFIGURED"]
       .as_str()
       .unwrap()
-      .contains("DOPGATE_SMTP_HOST")
+      .contains("DOPGATE_SMTP_URL")
   );
 }

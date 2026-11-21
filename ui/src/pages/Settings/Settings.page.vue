@@ -52,7 +52,7 @@ const LOGO_PLACEHOLDER = "https://example.com/logo.png";
 
 const SECURITY_LABELS = { starttls: "STARTTLS", tls: "TLS", none: "None" };
 
-// The server's DOPGATE_SMTP_* variables win when they set a host.
+// The server's DOPGATE_SMTP_* variables win when DOPGATE_SMTP_URL is set.
 const smtpEditable = computed(
   () => settings.value?.smtp.source !== "server_config",
 );
@@ -60,7 +60,7 @@ const smtpEditable = computed(
 const smtpDescription = computed(() => {
   switch (settings.value?.smtp.source) {
     case "server_config":
-      return "Set on the server with DOPGATE_SMTP_* environment variables, which take priority. Change them there, or unset DOPGATE_SMTP_HOST to manage email delivery here.";
+      return "Set on the server with DOPGATE_SMTP_* environment variables, which take priority. Change them there, or unset DOPGATE_SMTP_URL to manage email delivery here.";
     case "database":
       return "Dopgate sends email through this server. DOPGATE_SMTP_* environment variables on the server would take priority over it.";
     default:
@@ -597,7 +597,9 @@ function jump(id: string): void {
                 <template v-if="settings.smtp.fromName"
                   >{{ settings.smtp.fromName }}
                 </template>
-                <span class="font-mono">{{ settings.smtp.fromEmail }}</span>
+                <span class="ml-2 font-mono">{{
+                  settings.smtp.fromEmail
+                }}</span>
               </dd>
             </dl>
 

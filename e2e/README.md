@@ -164,7 +164,7 @@ test(
 - `await startSmtp()` from `harness/smtp.ts` is a fake SMTP server: point the
   `smtp` settings at `127.0.0.1` and its `port` with security `none`, then
   read `messages`. `useServer({ smtp: "env" })` starts one, names it in
-  `DOPGATE_SMTP_*` and reads `app.mail` from it.
+  `DOPGATE_SMTP_URL` and reads `app.mail` from it.
 - `app.cli(["keys", "rotate"])` runs the binary against this server's
   database and schema. `.ok()`, `.fails(code)` and `.json()` assert on the
   result. `app.cliRaw(args, { env })` runs it with nothing but the env you
