@@ -20,14 +20,14 @@ fn load(environment: EnvironmentOverrides) -> anyhow::Result<ServerConfig> {
 }
 
 #[test]
-fn defaults_listen_locally_on_8850_with_the_console_on() {
+fn defaults_listen_locally_on_8850_with_the_console_on_and_the_docs_off() {
   let config = load(EnvironmentOverrides::default()).unwrap();
   assert_eq!(config.bind_address, "127.0.0.1:8850");
   assert_eq!(config.public_url, "http://localhost:8850");
   assert_eq!(config.public_url_source, PublicUrlSource::LoopbackDefault);
   assert_eq!(config.database_schema, "dopgate");
   assert_eq!(config.audit_retention_days, Some(365));
-  assert!(config.docs_enabled);
+  assert!(!config.docs_enabled);
   assert!(config.web_ui_enabled);
   assert!(config.service_key.is_none());
   assert!(config.allowed_origins.is_empty());
@@ -82,7 +82,7 @@ fn flags_beat_environment_beat_file() {
   let file = directory.path().join("dopgate.toml");
   fs::write(
     &file,
-    "port = 9001\ndocs = false\naudit_retention_days = 30\n",
+    "port = 9001\ndocs = true\naudit_retention_days = 30\n",
   )
   .unwrap();
   let with_file = |environment: EnvironmentOverrides, flags: ServerOverrides| {
@@ -95,28 +95,28 @@ fn flags_beat_environment_beat_file() {
   };
   let config = with_file(EnvironmentOverrides::default(), ServerOverrides::default());
   assert_eq!(config.bind_address, "127.0.0.1:9001");
-  assert!(!config.docs_enabled);
+  assert!(config.docs_enabled);
   assert_eq!(config.audit_retention_days, Some(30));
 
   let environment = EnvironmentOverrides {
     port: Some("9002".into()),
-    docs: Some("true".into()),
+    docs: Some("false".into()),
     ..Default::default()
   };
   let config = with_file(environment.clone(), ServerOverrides::default());
   assert_eq!(config.bind_address, "127.0.0.1:9002");
-  assert!(config.docs_enabled);
+  assert!(!config.docs_enabled);
 
   let config = with_file(
     environment,
     ServerOverrides {
       port: Some(9003),
-      docs: Some(false),
+      docs: Some(true),
       ..Default::default()
     },
   );
   assert_eq!(config.bind_address, "127.0.0.1:9003");
-  assert!(!config.docs_enabled);
+  assert!(config.docs_enabled);
 }
 
 #[test]

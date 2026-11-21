@@ -87,7 +87,7 @@ curl -X POST http://localhost:8850/api/v1/auth/verification/confirm \
 
 Use the code from the log in place of `482913`. The answer holds an `accessToken` and a `refreshToken`. The user now shows up on the console's **Users** page.
 
-The running server also describes its own API in Swagger UI at `http://localhost:8850/api/docs`.
+To browse the API in Swagger UI, add `DOPGATE_DOCS=true` to `.env` and run `docker compose up -d` again. It is served at `http://localhost:8850/api/docs`.
 
 ## Next steps
 

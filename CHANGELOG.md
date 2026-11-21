@@ -16,6 +16,8 @@ All notable changes to Dopgate are documented in this file. The format follows
 
 ### Changed
 
+- **Breaking:** The Swagger UI at `/api/docs` and `/api/v1/openapi.json` are
+  off by default. Set `DOPGATE_DOCS=true` or `--docs true` to serve them.
 - **Breaking:** `DOPGATE_SMTP_URL`, such as
   `smtp://user:password@smtp.example.com:587`, replaces `DOPGATE_SMTP_HOST`,
   `PORT`, `SECURITY`, `USERNAME` and `PASSWORD`. `[smtp]` in the config file

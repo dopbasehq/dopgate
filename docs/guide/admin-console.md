@@ -41,7 +41,7 @@ Because of the cookie, the console has to run on Dopgate's own origin. Serve Dop
 
 ## Turning it off
 
-Set `DOPGATE_WEB_UI=false`, or start with `dopgate serve --web-ui false`. The API keeps working, and every non-API path answers `404`. The Swagger UI at `/api/docs` is controlled separately by `DOPGATE_DOCS`.
+Set `DOPGATE_WEB_UI=false`, or start with `dopgate serve --web-ui false`. The API keeps working, and every non-API path answers `404`. The Swagger UI at `/api/docs` has its own switch, `DOPGATE_DOCS`, which is off by default.
 
 ## Running the console from source
 

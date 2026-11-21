@@ -272,7 +272,7 @@ impl Default for ServerConfig {
       allowed_origins: Vec::new(),
       service_key: None,
       root_email: None,
-      docs_enabled: true,
+      docs_enabled: false,
       web_ui_enabled: true,
       public_url_source: PublicUrlSource::LoopbackDefault,
       smtp: SmtpServerConfig::default(),
