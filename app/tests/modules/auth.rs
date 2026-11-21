@@ -1,0 +1,711 @@
+//! Sign-up, sign-in, tokens, and the signed-in account, end to end.
+
+use axum::http::{Method, StatusCode};
+use serde_json::{Value, json};
+
+use crate::support::{PASSWORD, ROOT_EMAIL, TestApp, smtp::FakeSmtp, use_smtp};
+
+async fn app_with_mail() -> (TestApp, FakeSmtp) {
+  let smtp = FakeSmtp::start().await;
+  let app = TestApp::with(|config| use_smtp(config, &smtp)).await;
+  (app, smtp)
+}
+
+async fn signup(
+  app: &TestApp,
+  email: &str,
+) -> (StatusCode, Value) {
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/signup",
+      Some(json!({ "email": email, "password": PASSWORD, "displayName": "Ada" })),
+    )
+    .await
+}
+
+async fn confirm(
+  app: &TestApp,
+  email: &str,
+  purpose: &str,
+  code: &str,
+) -> (StatusCode, Value) {
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/verification/confirm",
+      Some(json!({ "email": email, "purpose": purpose, "code": code })),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn signup_sends_a_code_and_sign_in_waits_for_it() {
+  let (app, smtp) = app_with_mail().await;
+  let (status, body) = signup(&app, " Ada@Example.com ").await;
+  assert_eq!(status, StatusCode::CREATED, "{body}");
+  assert_eq!(body["data"]["user"]["email"], "ada@example.com");
+  assert_eq!(body["data"]["user"]["emailVerified"], false);
+  assert_eq!(body["data"]["verificationRequired"], true);
+  assert!(body["data"]["tokens"].is_null());
+
+  let (status, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
+    )
+    .await;
+  assert_eq!(status, StatusCode::FORBIDDEN);
+  // An app may show this to the person as it is, so it says what to do and
+  // names no route.
+  assert_eq!(
+    body["error"]["EMAIL_NOT_VERIFIED"],
+    "Confirm your email before signing in. Enter the code we emailed you, or ask for a new one."
+  );
+
+  let code = smtp.code_for("ada@example.com").await;
+  let (status, body) = confirm(&app, "ada@example.com", "email_verify", &code).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["user"]["emailVerified"], true);
+  assert!(
+    body["data"]["refreshToken"]
+      .as_str()
+      .unwrap()
+      .starts_with("dgr_")
+  );
+
+  // The code works once.
+  let (status, _) = confirm(&app, "ada@example.com", "email_verify", &code).await;
+  assert_eq!(status, StatusCode::BAD_REQUEST);
+  app.login("ada@example.com", PASSWORD).await;
+}
+
+#[tokio::test]
+async fn without_the_verification_rule_signup_signs_in_at_once() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app
+    .settings(&root, json!({ "signup": { "enabled": true, "requireEmailVerification": false, "passwordlessSignup": false } }))
+    .await;
+  let (status, body) = signup(&app, "ada@example.com").await;
+  assert_eq!(status, StatusCode::CREATED);
+  let token = body["data"]["tokens"]["accessToken"].as_str().unwrap();
+  let (status, me) = app
+    .request_with(Method::GET, "/api/v1/auth/me", None, Some(token))
+    .await;
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(me["data"]["emailVerified"], false);
+}
+
+#[tokio::test]
+async fn signup_refuses_taken_emails_weak_passwords_and_closed_signup() {
+  let app = TestApp::new().await;
+  assert_eq!(signup(&app, "ada@example.com").await.0, StatusCode::CREATED);
+  let (status, body) = signup(&app, "ADA@example.com").await;
+  assert_eq!(status, StatusCode::CONFLICT);
+  assert!(body["error"]["EMAIL_TAKEN"].is_string());
+
+  let (status, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/signup",
+      Some(json!({ "email": "bob@example.com", "password": "short" })),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+  assert!(body["error"]["PASSWORD_INVALID"].is_string());
+
+  let (status, _) = signup(&app, "not-an-email").await;
+  assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+  let root = app.root_token().await;
+  app
+    .settings(&root, json!({ "signup": { "enabled": false, "requireEmailVerification": true, "passwordlessSignup": false } }))
+    .await;
+  let (status, body) = signup(&app, "carl@example.com").await;
+  assert_eq!(status, StatusCode::FORBIDDEN);
+  assert!(body["error"]["SIGNUP_DISABLED"].is_string());
+}
+
+#[tokio::test]
+async fn wrong_passwords_lock_the_account_with_the_same_answer() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let attempt = |password: &'static str| {
+    let app = &app;
+    async move {
+      app
+        .request(
+          Method::POST,
+          "/api/v1/auth/login",
+          Some(json!({ "email": "ada@example.com", "password": password })),
+        )
+        .await
+    }
+  };
+  for _ in 0..5 {
+    let (status, body) = attempt("wrong password").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+  }
+  // Locked: even the right password gets the wrong-password answer.
+  let (status, body) = attempt(PASSWORD).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+
+  // Unknown emails get the same answer too.
+  let (status, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "nobody@example.com", "password": PASSWORD })),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+
+  let (_, user) = app
+    .request_with(
+      Method::GET,
+      "/api/v1/admin/users?search=ada",
+      None,
+      Some(&root),
+    )
+    .await;
+  assert!(user["data"]["items"][0]["lockedUntil"].is_string());
+}
+
+/// Signs ada in and returns her access token and first refresh token.
+async fn signed_in_ada(app: &TestApp) -> (String, String) {
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let (_, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
+    )
+    .await;
+  (
+    body["data"]["accessToken"].as_str().unwrap().to_owned(),
+    body["data"]["refreshToken"].as_str().unwrap().to_owned(),
+  )
+}
+
+async fn refresh(
+  app: &TestApp,
+  token: &str,
+) -> (StatusCode, Option<String>) {
+  let (status, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/refresh",
+      Some(json!({ "refreshToken": token })),
+    )
+    .await;
+  (
+    status,
+    body["data"]["refreshToken"].as_str().map(str::to_owned),
+  )
+}
+
+#[tokio::test]
+async fn a_refresh_repeated_within_the_window_gets_the_same_token() {
+  let app = TestApp::new().await;
+  let (access, first) = signed_in_ada(&app).await;
+
+  let (status, second) = refresh(&app, &first).await;
+  assert_eq!(status, StatusCode::OK);
+  let second = second.unwrap();
+  // A second tab sends the spent token a moment later and gets the same
+  // answer, so the two tabs hold one token.
+  assert_eq!(
+    refresh(&app, &first).await,
+    (StatusCode::OK, Some(second.clone()))
+  );
+
+  // The chain moves on, and the first token still leads to its newest link.
+  let (status, third) = refresh(&app, &second).await;
+  assert_eq!(status, StatusCode::OK);
+  let third = third.unwrap();
+  assert_ne!(third, second);
+  assert_eq!(
+    refresh(&app, &first).await,
+    (StatusCode::OK, Some(third.clone()))
+  );
+  assert_eq!(me(&app, &access).await, StatusCode::OK);
+  assert_eq!(refresh(&app, &third).await.0, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_metadata_change_reaches_the_token_on_the_next_refresh() {
+  fn claims(access_token: &str) -> Value {
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    let payload = access_token.split('.').nth(1).unwrap();
+    serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).unwrap()).unwrap()
+  }
+  async fn refreshed(
+    app: &TestApp,
+    token: &str,
+  ) -> (String, String) {
+    let (status, body) = app
+      .request(
+        Method::POST,
+        "/api/v1/auth/refresh",
+        Some(json!({ "refreshToken": token })),
+      )
+      .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    (
+      body["data"]["accessToken"].as_str().unwrap().to_owned(),
+      body["data"]["refreshToken"].as_str().unwrap().to_owned(),
+    )
+  }
+
+  let app = TestApp::new().await;
+  let (access, first) = signed_in_ada(&app).await;
+  assert!(claims(&access).get("public_metadata").is_none());
+
+  // `signed_in_ada` already set root up, so sign in to the console again.
+  let root = app.console_login(ROOT_EMAIL, PASSWORD).await;
+  let (_, found) = app
+    .request_with(
+      Method::GET,
+      "/api/v1/admin/users?email=ada@example.com",
+      None,
+      Some(&root),
+    )
+    .await;
+  let path = format!(
+    "/api/v1/admin/users/{}",
+    found["data"]["items"][0]["id"].as_str().unwrap()
+  );
+  let (status, body) = app
+    .request_with(
+      Method::PATCH,
+      &path,
+      Some(json!({ "publicMetadata": { "role": "manager" } })),
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+
+  // The token already handed out is a snapshot. The next one has the role.
+  let (access, second) = refreshed(&app, &first).await;
+  assert_eq!(claims(&access)["public_metadata"]["role"], "manager");
+
+  // Emptying the object takes the claim out again.
+  app
+    .request_with(
+      Method::PATCH,
+      &path,
+      Some(json!({ "publicMetadata": {} })),
+      Some(&root),
+    )
+    .await;
+  let (access, _) = refreshed(&app, &second).await;
+  assert!(claims(&access).get("public_metadata").is_none());
+}
+
+#[tokio::test]
+async fn a_refresh_repeated_after_the_window_ends_the_session() {
+  let app = TestApp::new().await;
+  let (access, first) = signed_in_ada(&app).await;
+  let (_, second) = refresh(&app, &first).await;
+  // Move the first use 11 seconds into the past, one past the window.
+  sqlx::query(
+    "UPDATE refresh_tokens SET used_at = used_at - interval '11 seconds' WHERE used_at IS NOT NULL",
+  )
+  .execute(app.state.db.pool())
+  .await
+  .unwrap();
+
+  assert_eq!(refresh(&app, &first).await.0, StatusCode::UNAUTHORIZED);
+  assert_eq!(
+    refresh(&app, &second.unwrap()).await.0,
+    StatusCode::UNAUTHORIZED
+  );
+  assert_eq!(me(&app, &access).await, StatusCode::UNAUTHORIZED);
+}
+
+/// With the window set to 0, a spent token ends the session at once.
+#[tokio::test]
+async fn refresh_tokens_rotate_and_a_reused_one_ends_the_session() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app
+    .settings(
+      &root,
+      json!({ "tokens": { "accessTokenMinutes": 15, "refreshTokenIdleDays": 30,
+                          "sessionAbsoluteDays": 90, "refreshReuseSeconds": 0 } }),
+    )
+    .await;
+  app.create_user(&root, "ada@example.com").await;
+  let (_, body) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
+    )
+    .await;
+  let first = body["data"]["refreshToken"].as_str().unwrap().to_owned();
+  let access = body["data"]["accessToken"].as_str().unwrap().to_owned();
+  let refresh = |token: String| {
+    let app = &app;
+    async move {
+      app
+        .request(
+          Method::POST,
+          "/api/v1/auth/refresh",
+          Some(json!({ "refreshToken": token })),
+        )
+        .await
+    }
+  };
+  let (status, body) = refresh(first.clone()).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  let second = body["data"]["refreshToken"].as_str().unwrap().to_owned();
+  assert_ne!(first, second);
+
+  // The first token comes back: someone copied it, so the session ends.
+  let (status, _) = refresh(first).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  let (status, _) = refresh(second).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  let (status, _) = app
+    .request_with(Method::GET, "/api/v1/auth/me", None, Some(&access))
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn cookie_mode_keeps_the_refresh_token_out_of_the_body() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let reply = app
+    .call(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
+      None,
+      &[("x-dopgate-session", "cookie")],
+    )
+    .await;
+  assert_eq!(reply.status, StatusCode::OK);
+  assert!(reply.json["data"]["refreshToken"].is_null());
+  let cookie = reply.headers["set-cookie"].to_str().unwrap().to_owned();
+  assert!(cookie.contains("HttpOnly"));
+  assert!(cookie.contains("SameSite=Strict"));
+  assert!(cookie.contains("Path=/api/v1/auth"));
+  let pair = cookie.split(';').next().unwrap().to_owned();
+
+  let reply = app
+    .call(
+      Method::POST,
+      "/api/v1/auth/refresh",
+      Some(json!({})),
+      None,
+      &[("x-dopgate-session", "cookie"), ("cookie", &pair)],
+    )
+    .await;
+  assert_eq!(reply.status, StatusCode::OK, "{}", reply.json);
+  assert!(reply.json["data"]["accessToken"].is_string());
+  let pair = reply.headers["set-cookie"]
+    .to_str()
+    .unwrap()
+    .split(';')
+    .next()
+    .unwrap()
+    .to_owned();
+
+  // Signing out with only the cookie works and clears it.
+  let reply = app
+    .call(
+      Method::POST,
+      "/api/v1/auth/logout",
+      Some(json!({})),
+      None,
+      &[("x-dopgate-session", "cookie"), ("cookie", &pair)],
+    )
+    .await;
+  assert_eq!(reply.status, StatusCode::OK);
+  assert!(
+    reply.headers["set-cookie"]
+      .to_str()
+      .unwrap()
+      .contains("Max-Age=0")
+  );
+  let reply = app
+    .call(
+      Method::POST,
+      "/api/v1/auth/refresh",
+      Some(json!({})),
+      None,
+      &[("cookie", &pair)],
+    )
+    .await;
+  assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn the_profile_reads_and_changes_its_own_fields_only() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  let id = app.create_user(&root, "ada@example.com").await;
+  app
+    .request_with(
+      Method::PATCH,
+      &format!("/api/v1/admin/users/{id}"),
+      Some(json!({ "publicMetadata": { "plan": "pro" } })),
+      Some(&root),
+    )
+    .await;
+  let token = app.login("ada@example.com", PASSWORD).await;
+  let (status, body) = app
+    .request_with(
+      Method::PATCH,
+      "/api/v1/auth/me",
+      Some(json!({
+        "displayName": "  Ada L ",
+        "avatarUrl": "https://cdn.example.com/a.png",
+        "userMetadata": { "theme": "dark" },
+        "publicMetadata": { "plan": "free" },
+      })),
+      Some(&token),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["displayName"], "Ada L");
+  assert_eq!(body["data"]["userMetadata"]["theme"], "dark");
+  // The user can't change what the app sets.
+  assert_eq!(body["data"]["publicMetadata"]["plan"], "pro");
+  assert!(body["data"].get("privateMetadata").is_none());
+
+  for patch in [
+    json!({ "avatarUrl": "javascript:alert(1)" }),
+    json!({ "userMetadata": [1, 2] }),
+    json!({ "displayName": "x".repeat(300) }),
+  ] {
+    let (status, _) = app
+      .request_with(
+        Method::PATCH,
+        "/api/v1/auth/me",
+        Some(patch.clone()),
+        Some(&token),
+      )
+      .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{patch}");
+  }
+
+  let (_, body) = app
+    .request_with(
+      Method::PATCH,
+      "/api/v1/auth/me",
+      Some(json!({ "displayName": "" })),
+      Some(&token),
+    )
+    .await;
+  assert!(body["data"]["displayName"].is_null());
+}
+
+#[tokio::test]
+async fn changing_the_password_ends_other_sessions_and_sends_a_notice() {
+  let (app, smtp) = app_with_mail().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let laptop = app.login("ada@example.com", PASSWORD).await;
+  let phone = app.login("ada@example.com", PASSWORD).await;
+
+  let (status, body) = app
+    .request_with(
+      Method::POST,
+      "/api/v1/auth/password/change",
+      Some(json!({ "currentPassword": "wrong", "newPassword": "a brand new password" })),
+      Some(&laptop),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED, "{body}");
+
+  let (status, _) = app
+    .request_with(
+      Method::POST,
+      "/api/v1/auth/password/change",
+      Some(json!({ "currentPassword": PASSWORD, "newPassword": "a brand new password" })),
+      Some(&laptop),
+    )
+    .await;
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(me(&app, &laptop).await, StatusCode::OK);
+  assert_eq!(me(&app, &phone).await, StatusCode::UNAUTHORIZED);
+  assert_eq!(smtp.wait_for("ada@example.com", 1).await, 1);
+  app.login("ada@example.com", "a brand new password").await;
+}
+
+#[tokio::test]
+async fn changing_the_email_needs_the_password_and_a_code_from_the_new_address() {
+  let (app, smtp) = app_with_mail().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  app.create_user(&root, "taken@example.com").await;
+  let token = app.login("ada@example.com", PASSWORD).await;
+  let change = |body: Value| {
+    app.request_with(
+      Method::POST,
+      "/api/v1/auth/email/change",
+      Some(body),
+      Some(&token),
+    )
+  };
+
+  let (status, _) = change(json!({ "newEmail": "new@example.com" })).await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  let (status, _) = change(json!({ "newEmail": "taken@example.com", "password": PASSWORD })).await;
+  assert_eq!(status, StatusCode::CONFLICT);
+  let (status, body) = change(json!({ "newEmail": "New@Example.com", "password": PASSWORD })).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+
+  let code = smtp.code_for("new@example.com").await;
+  let (status, body) = confirm(&app, "new@example.com", "email_change", &code).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  assert_eq!(body["data"]["email"], "new@example.com");
+  // The old address hears about it.
+  assert_eq!(smtp.wait_for("ada@example.com", 1).await, 1);
+  app.login("new@example.com", PASSWORD).await;
+}
+
+/// A stolen access token can't be used to guess the password without limit:
+/// wrong current passwords lock the account like wrong sign-ins do.
+#[tokio::test]
+async fn wrong_current_passwords_lock_the_account() {
+  let app = TestApp::new().await;
+  let root = app.root_token().await;
+  app.create_user(&root, "ada@example.com").await;
+  let token = app.login("ada@example.com", PASSWORD).await;
+  let guess = |path: &'static str, body: Value| {
+    let (app, token) = (&app, &token);
+    async move {
+      app
+        .request_with(Method::POST, path, Some(body), Some(token))
+        .await
+    }
+  };
+  for _ in 0..4 {
+    let (status, _) = guess(
+      "/api/v1/auth/password/change",
+      json!({ "currentPassword": "wrong", "newPassword": "a brand new password" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+  }
+  // The email change checks the same password and counts the fifth miss.
+  let (status, _) = guess(
+    "/api/v1/auth/email/change",
+    json!({ "newEmail": "new@example.com", "password": "wrong" }),
+  )
+  .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+  // Locked: the right password gets the wrong-password answer, here and at
+  // sign-in.
+  let (status, body) = guess(
+    "/api/v1/auth/password/change",
+    json!({ "currentPassword": PASSWORD, "newPassword": "a brand new password" }),
+  )
+  .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+  assert!(body["error"]["AUTHENTICATION_INVALID"].is_string());
+  let (status, _) = app
+    .request(
+      Method::POST,
+      "/api/v1/auth/login",
+      Some(json!({ "email": "ada@example.com", "password": PASSWORD })),
+    )
+    .await;
+  assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+/// An account made without a password needs an emailed code to add one, so
+/// a stolen access token can't turn into a password the thief keeps.
+#[tokio::test]
+async fn an_account_without_a_password_needs_a_code_to_set_one() {
+  let (app, smtp) = app_with_mail().await;
+  let root = app.root_token().await;
+  let (status, _) = app
+    .request_with(
+      Method::POST,
+      "/api/v1/admin/users",
+      Some(json!({ "email": "ada@example.com", "emailVerified": true })),
+      Some(&root),
+    )
+    .await;
+  assert_eq!(status, StatusCode::CREATED);
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/verification/send",
+      Some(json!({ "email": "ada@example.com", "purpose": "login" })),
+    )
+    .await;
+  let code = smtp.code_for("ada@example.com").await;
+  let (status, body) = confirm(&app, "ada@example.com", "login", &code).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  let token = body["data"]["accessToken"].as_str().unwrap().to_owned();
+  let set = |body: Value| {
+    let (app, token) = (&app, &token);
+    async move {
+      app
+        .request_with(
+          Method::POST,
+          "/api/v1/auth/password/change",
+          Some(body),
+          Some(token),
+        )
+        .await
+    }
+  };
+
+  let (status, body) = set(json!({ "newPassword": "a brand new password" })).await;
+  assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+  assert!(body["error"]["CODE_INVALID"].is_string());
+  let (status, _) = set(json!({ "newPassword": "a brand new password", "code": "000000" })).await;
+  assert_eq!(status, StatusCode::BAD_REQUEST);
+
+  app
+    .request(
+      Method::POST,
+      "/api/v1/auth/password/forgot",
+      Some(json!({ "email": "ada@example.com" })),
+    )
+    .await;
+  assert_eq!(smtp.wait_for("ada@example.com", 2).await, 2);
+  let code = smtp.code_for("ada@example.com").await;
+  let (status, body) = set(json!({ "newPassword": "a brand new password", "code": code })).await;
+  assert_eq!(status, StatusCode::OK, "{body}");
+  // The session that set it stays signed in.
+  assert_eq!(me(&app, &token).await, StatusCode::OK);
+  app.login("ada@example.com", "a brand new password").await;
+}
+
+#[tokio::test]
+async fn sign_in_methods_describe_the_instance() {
+  let app = TestApp::new().await;
+  let (status, body) = app.request(Method::GET, "/api/v1/auth/methods", None).await;
+  assert_eq!(status, StatusCode::OK);
+  assert_eq!(body["data"]["signupEnabled"], true);
+  assert_eq!(body["data"]["emailOtp"], true);
+  assert_eq!(body["data"]["emailVerificationRequired"], true);
+  assert_eq!(body["data"]["branding"]["appName"], "Dopgate");
+}
+
+async fn me(
+  app: &TestApp,
+  token: &str,
+) -> StatusCode {
+  app
+    .request_with(Method::GET, "/api/v1/auth/me", None, Some(token))
+    .await
+    .0
+}
