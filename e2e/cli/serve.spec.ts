@@ -137,6 +137,9 @@ test(
           expect(page.status).toBe(200);
           expect(page.headers.get("content-type")).toContain("text/html");
         });
+        await step("The banner lists the API docs address", async () => {
+          expect(flagsOn.output()).toContain(`API docs:   http://localhost:${second}/api/docs`);
+        });
       } finally {
         await stopAll(flagsOn);
       }
@@ -149,7 +152,7 @@ test(
   {
     tag: ["@smoke"],
     annotation: about(
-      "Starting prints what an operator needs to check: the version, the public URL and bind address, the API and JWKS URLs, the database without its password and the schema, and the console and docs addresses when they are on.",
+      "Starting prints what an operator needs to check: the version, the public URL and bind address, the API and JWKS URLs, the database without its password and the schema, and the console and docs addresses when they are on. The docs are off unless asked for, so a plain start lists none.",
     ),
   },
   async () => {
@@ -172,11 +175,15 @@ test(
           expect(log).toContain(`Public URL: http://localhost:${port}`);
           expect(log).toContain(`Bind:       127.0.0.1:${port}`);
         });
-        await step("The API, key set, console and docs addresses are listed", async () => {
+        await step("The API, key set and console addresses are listed", async () => {
           expect(log).toContain(`API:        http://localhost:${port}/api/v1`);
           expect(log).toContain(`JWKS:       http://localhost:${port}/.well-known/jwks.json`);
           expect(log).toContain(`Console:    http://localhost:${port}/`);
-          expect(log).toContain(`API docs:   http://localhost:${port}/api/docs`);
+        });
+        await step("The docs are off by default: no API docs line, and no OpenAPI document", async () => {
+          expect(log).not.toContain("API docs:");
+          expect((await get(server.url, "/api/v1/openapi.json")).status).toBe(404);
+          expect((await get(server.url, "/api/docs/")).status).toBe(404);
         });
         await step("The database is named with its password hidden, next to the schema", async () => {
           const database = new URL(databaseUrl());
@@ -305,7 +312,7 @@ test(
             `allowed_origins = ["https://app.example.com"]`,
             `service_key = ${toml(serviceKey)}`,
             `root_email = "File.Root@Example.com"`,
-            "docs = false",
+            "docs = true",
             "web_ui = false",
             "",
           ].join("\n"),
@@ -334,8 +341,8 @@ test(
             });
             expect(answer.headers.get("access-control-allow-origin")).toBe("https://app.example.com");
           });
-          await step("The docs and the console are off", async () => {
-            expect((await get(server.url, "/api/v1/openapi.json")).status).toBe(404);
+          await step("The docs are on and the console is off, both unlike the defaults", async () => {
+            expect((await get(server.url, "/api/v1/openapi.json")).status).toBe(200);
             expect((await get(server.url, "/")).status).toBe(404);
           });
           await step("Root was created for the file's email, with a printed password that works", async () => {
@@ -388,7 +395,7 @@ test(
             `host = "127.0.0.1"`,
             `port = ${filePort}`,
             `public_url = "https://file.example.com"`,
-            "docs = false",
+            "docs = true",
             "web_ui = false",
             "",
           ].join("\n"),
@@ -410,7 +417,7 @@ test(
         };
         await step("File only: the file's port, public URL and switches", async () => {
           const result = await probe(["--config", file], {}, filePort);
-          expect(result).toEqual({ issuer: "https://file.example.com", docs: 404 });
+          expect(result).toEqual({ issuer: "https://file.example.com", docs: 200 });
         });
         await step("File and environment: the environment wins", async () => {
           const result = await probe(
@@ -418,23 +425,23 @@ test(
             {
               DOPGATE_PORT: String(envPort),
               DOPGATE_PUBLIC_URL: "https://env.example.com",
-              DOPGATE_DOCS: "true",
+              DOPGATE_DOCS: "false",
             },
             envPort,
           );
-          expect(result).toEqual({ issuer: "https://env.example.com", docs: 200 });
+          expect(result).toEqual({ issuer: "https://env.example.com", docs: 404 });
         });
         await step("File, environment and flags: the flags win", async () => {
           const result = await probe(
-            ["--config", file, "--port", String(flagPort), "--public-url", "https://flag.example.com", "--docs", "false"],
+            ["--config", file, "--port", String(flagPort), "--public-url", "https://flag.example.com", "--docs", "true"],
             {
               DOPGATE_PORT: String(envPort),
               DOPGATE_PUBLIC_URL: "https://env.example.com",
-              DOPGATE_DOCS: "true",
+              DOPGATE_DOCS: "false",
             },
             flagPort,
           );
-          expect(result).toEqual({ issuer: "https://flag.example.com", docs: 404 });
+          expect(result).toEqual({ issuer: "https://flag.example.com", docs: 200 });
         });
         await step("DOPGATE_CONFIG names the file when there is no flag", async () => {
           const result = await probe([], { DOPGATE_CONFIG: file }, filePort);
